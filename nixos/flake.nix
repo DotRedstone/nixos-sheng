@@ -90,29 +90,31 @@
         ];
       };
 
-      packages.${system}.rootfsTarball =
-        pkgs.callPackage "${nixpkgs}/nixos/lib/make-system-tarball.nix" {
-          fileName = "nixos-sheng-aarch64-linux";
-          contents = [
-            {
-              source = "${shengSystem}/.";
-              target = "./";
-            }
-          ];
-          storeContents = [
-            {
-              object = shengSystem;
-              symlink = "run/current-system";
-            }
-            {
-              object = pkgs.stdenv;
-              symlink = "none";
-            }
-          ];
-          extraArgs = "--owner=0";
-          extraCommands = rootfsExtraCommands;
-        };
+      packages.${system} = {
+        rootfsTarball =
+          pkgs.callPackage "${nixpkgs}/nixos/lib/make-system-tarball.nix" {
+            fileName = "nixos-sheng-aarch64-linux";
+            contents = [
+              {
+                source = "${shengSystem}/.";
+                target = "./";
+              }
+            ];
+            storeContents = [
+              {
+                object = shengSystem;
+                symlink = "run/current-system";
+              }
+              {
+                object = pkgs.stdenv;
+                symlink = "none";
+              }
+            ];
+            extraArgs = "--owner=0";
+            extraCommands = rootfsExtraCommands;
+          };
 
-      packages.${system}.stage1Initramfs = stage1Initramfs;
+        stage1Initramfs = stage1Initramfs;
+      };
     };
 }
