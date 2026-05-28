@@ -68,8 +68,13 @@ cp "${OUT_DIR}/boot/Image.gz-dtb_sheng" "${OUT_DIR}/boot/zImage_sheng"
 cd "${WORKSPACE}"
 chmod +x ./mkbootimg
 
+echo "==> Building NixOS stage-1 initramfs"
+chmod +x ./build-stage1-initramfs.sh
+./build-stage1-initramfs.sh "${OUT_DIR}/sheng-stage1-initramfs.cpio.gz"
+
 DUALBOOT_CMDLINE="${DUALBOOT_CMDLINE:-root=PARTLABEL=linux init=/init rootwait console=tty0 console=ttyMSM0,115200n8 fbcon=map:0 fbcon=rotate:1 loglevel=7 ignore_loglevel systemd.log_level=debug}"
 SINGLEBOOT_CMDLINE="${SINGLEBOOT_CMDLINE:-root=PARTLABEL=userdata rootwait}"
+NIXOS_CMDLINE="${NIXOS_CMDLINE:-root=PARTLABEL=linux rootwait console=tty0 console=ttyMSM0,115200n8 fbcon=map:0 fbcon=rotate:1 loglevel=7 ignore_loglevel}"
 
 echo "==> Creating Android boot images"
 ./mkbootimg --kernel "${OUT_DIR}/boot/zImage_sheng" \
@@ -83,6 +88,13 @@ echo "==> Creating Android boot images"
     --base 0x00000000 --kernel_offset 0x00008000 \
     --tags_offset 0x01e00000 --pagesize 4096 --id \
     -o "${OUT_DIR}/boot_sheng_singleboot.img"
+
+./mkbootimg --kernel "${OUT_DIR}/boot/zImage_sheng" \
+    --ramdisk "${OUT_DIR}/sheng-stage1-initramfs.cpio.gz" \
+    --cmdline "${NIXOS_CMDLINE}" \
+    --base 0x00000000 --kernel_offset 0x00008000 \
+    --tags_offset 0x01e00000 --pagesize 4096 --id \
+    -o "${OUT_DIR}/boot_sheng_nixos.img"
 
 echo "==> Fetching optional firmware and ALSA data"
 rm -rf "${OUT_DIR}/firmware" "${OUT_DIR}/alsa-ucm" sheng-firmware alsa-sheng

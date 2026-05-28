@@ -53,6 +53,7 @@ The kernel workflow produces:
 
 - `boot_sheng_dualboot.img`
 - `boot_sheng_singleboot.img`
+- `boot_sheng_nixos.img`
 - `sheng-kernel-files.tar.zst`
 - `sheng-kernel-modules.tar.zst`
 
@@ -77,8 +78,7 @@ Output:
 
 ```text
 out/nixos-sheng-YYYYmmdd_HHMMSS.img
-out/nixos-sheng-YYYYmmdd_HHMMSS.img.7z
-out/boot_sheng_nixos.img
+out/nixos-sheng-YYYYmmdd_HHMMSS.img.zip
 ```
 
 The image expects the Linux partition to be labeled `linux` and the boot image
@@ -93,10 +93,8 @@ and reflash `boot_b` after changing kernel command-line arguments.
 
 The rootfs workflow can optionally inject kernel artifacts from a release such
 as `kernel-7.1`. Build the kernel workflow first, then pass that tag as
-`kernel_release_tag` when building the rootfs. When kernel artifacts are
-available, the workflow also builds `boot_sheng_nixos.img`, which includes a
-small stage-1 initramfs that mounts `PARTLABEL=linux` and switches into NixOS.
-Use this boot image for NixOS testing.
+`kernel_release_tag` when building the rootfs. Boot images are produced only by
+the kernel workflow; use `boot_sheng_nixos.img` for NixOS testing.
 
 ## Bring-up Plan
 

@@ -38,7 +38,7 @@ jobs:
           sudo apt update
           sudo apt install -y \
             bc bison build-essential ccache clang flex git libelf-dev \
-            libssl-dev lld llvm wget xz-utils zstd
+            busybox cpio gzip libssl-dev lld llvm wget xz-utils zstd
           ccache --set-config=max_size=10G
           ccache --set-config=cache_dir=/home/runner/.ccache
 
@@ -54,6 +54,7 @@ jobs:
           path: |
             out/kernel/*.img
             out/kernel/*.tar.zst
+            out/kernel/*.cpio.gz
           retention-days: 14
 
       - name: Create release
@@ -64,6 +65,7 @@ jobs:
           files: |
             out/kernel/*.img
             out/kernel/*.tar.zst
+            out/kernel/*.cpio.gz
           draft: false
           prerelease: true
         env:
