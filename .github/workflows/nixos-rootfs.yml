@@ -37,6 +37,9 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
 
+      - name: Enable Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v13
+
       - name: Build image
         run: |
           chmod +x build-nixos-rootfs.sh
