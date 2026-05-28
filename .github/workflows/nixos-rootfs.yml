@@ -9,7 +9,7 @@ on:
       image_size:
         description: "RootFS image size"
         required: true
-        default: "8G"
+        default: "4G"
       kernel_release_tag:
         description: "Optional kernel release tag to inject, for example kernel-7.1"
         required: false
@@ -21,7 +21,7 @@ on:
 
 jobs:
   build:
-    name: Build NixOS desktop rootfs
+    name: Build NixOS console rootfs
     runs-on: ubuntu-24.04-arm
     permissions:
       contents: write

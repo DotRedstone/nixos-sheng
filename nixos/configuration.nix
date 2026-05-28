@@ -27,33 +27,37 @@
 
   services.openssh.enable = true;
 
-  services.xserver = {
-    enable = true;
-    desktopManager.xfce.enable = true;
-    displayManager.lightdm.enable = true;
+  services.getty = {
+    autologinUser = "luser";
+    helpLine = ''
+      NixOS sheng debug console
+      Useful checks: dmesg -w, journalctl -b, ip addr, lsmod
+    '';
   };
 
-  services.displayManager = {
-    defaultSession = "xfce";
-    autoLogin = {
-      enable = true;
-      user = "luser";
-    };
-  };
-
-  services.libinput.enable = true;
   hardware.graphics.enable = true;
+
+  console = {
+    earlySetup = true;
+    font = "Lat2-Terminus16";
+    keyMap = "us";
+  };
+
+  services.kmscon = {
+    enable = true;
+    hwRender = false;
+    extraConfig = ''
+      font-size=18
+    '';
+  };
 
   environment.systemPackages = with pkgs; [
     curl
-    foot
     gitMinimal
     kmod
     mesa-demos
     nano
-    networkmanagerapplet
     pciutils
-    xfce.xfce4-terminal
     usbutils
     vim
     vulkan-tools
@@ -75,6 +79,8 @@
   boot.kernelParams = [
     "console=tty0"
     "console=ttyMSM0,115200n8"
+    "fbcon=map:0"
+    "fbcon=rotate:1"
     "ignore_loglevel"
     "loglevel=7"
     "root=PARTLABEL=linux"
