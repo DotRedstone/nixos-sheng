@@ -36,6 +36,11 @@ nix --extra-experimental-features "nix-command flakes" \
     build ./nixos#rootfsTarball \
     --out-link "${OUT_DIR}/nixos-sheng-rootfs-tarball"
 
+echo "==> Building sheng stage-1 initramfs"
+nix --extra-experimental-features "nix-command flakes" \
+    build ./nixos#stage1Initramfs \
+    --out-link "${OUT_DIR}/nixos-sheng-stage1-initramfs"
+
 TARBALL_DIR="$(readlink -f "${OUT_DIR}/nixos-sheng-rootfs-tarball")"
 TARBALL="$(find "${TARBALL_DIR}" -type f \( -name "*.tar.xz" -o -name "*.tar.zst" -o -name "*.tar.gz" -o -name "*.tgz" \) | head -n 1)"
 if [ -z "${TARBALL}" ] || [ ! -f "${TARBALL}" ]; then
@@ -84,5 +89,23 @@ tune2fs -U "${FILESYSTEM_UUID}" "${OUT_DIR}/${ROOTFS_IMG}" >/dev/null
 
 echo "==> Compressing image"
 7z a "${OUT_DIR}/${ROOTFS_IMG}.7z" "${OUT_DIR}/${ROOTFS_IMG}"
+
+if [ -f artifacts/boot/zImage_sheng ]; then
+    INITRAMFS="$(readlink -f "${OUT_DIR}/nixos-sheng-stage1-initramfs")"
+    BOOT_IMG="${OUT_DIR}/boot_sheng_nixos.img"
+    CMDLINE="${CMDLINE:-root=PARTLABEL=linux rootwait console=tty0 console=ttyMSM0,115200n8 loglevel=7 ignore_loglevel}"
+
+    echo "==> Creating NixOS boot image with stage-1 initramfs"
+    chmod +x ./mkbootimg
+    ./mkbootimg --kernel artifacts/boot/zImage_sheng \
+        --ramdisk "${INITRAMFS}" \
+        --cmdline "${CMDLINE}" \
+        --base 0x00000000 --kernel_offset 0x00008000 \
+        --tags_offset 0x01e00000 --pagesize 4096 --id \
+        -o "${BOOT_IMG}"
+else
+    echo "==> No kernel artifact found; skipped boot_sheng_nixos.img"
+    echo "==> Pass kernel_release_tag in the workflow to build a flashable NixOS boot image."
+fi
 
 echo "Done: ${OUT_DIR}/${ROOTFS_IMG}.7z"
