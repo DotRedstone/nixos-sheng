@@ -20,5 +20,6 @@ mobile-nixos.kernel-builder-clang {
   makeFlags = [
     "LLVM=1"
     "KCFLAGS=-Wno-error=unused-command-line-argument"
+    "KCPPFLAGS=-Wno-error=unused-command-line-argument"
   ];
 }
