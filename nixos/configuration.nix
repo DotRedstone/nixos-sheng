@@ -27,14 +27,36 @@
 
   services.openssh.enable = true;
 
+  services.xserver = {
+    enable = true;
+    desktopManager.xfce.enable = true;
+    displayManager.lightdm.enable = true;
+  };
+
+  services.displayManager = {
+    defaultSession = "xfce";
+    autoLogin = {
+      enable = true;
+      user = "luser";
+    };
+  };
+
+  services.libinput.enable = true;
+  hardware.graphics.enable = true;
+
   environment.systemPackages = with pkgs; [
     curl
+    foot
     gitMinimal
     kmod
+    mesa-demos
     nano
+    networkmanagerapplet
     pciutils
+    xfce.xfce4-terminal
     usbutils
     vim
+    vulkan-tools
     wget
   ];
 
@@ -51,9 +73,13 @@
   boot.loader.generic-extlinux-compatible.enable = false;
 
   boot.kernelParams = [
+    "console=tty0"
     "console=ttyMSM0,115200n8"
+    "ignore_loglevel"
+    "loglevel=7"
     "root=PARTLABEL=linux"
     "rootwait"
+    "systemd.log_level=debug"
   ];
 
   boot.supportedFilesystems = [ "ext4" ];

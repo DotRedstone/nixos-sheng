@@ -17,7 +17,7 @@ Android `boot.img` flow.
 | Kernel image | Work in progress | Built from `code002-2/sm8550-mainline` |
 | Android boot image | Work in progress | Uses `mkbootimg` and `root=PARTLABEL=linux` |
 | NixOS rootfs | Initial skeleton | Builds an ext4 image from a NixOS tarball |
-| Graphical desktop | Not enabled | Add after serial/tty boot is confirmed |
+| Graphical desktop | Debug desktop enabled | XFCE + LightDM autologin for bring-up |
 | TWRP generation switcher | Planned | Future goal for switching NixOS generations |
 
 ## Repository Layout
@@ -64,7 +64,7 @@ bash sheng-kernel_build.sh 7.1
 
 ## Build NixOS RootFS
 
-The rootfs workflow builds a minimal ext4 image:
+The rootfs workflow builds an XFCE debug desktop ext4 image:
 
 ```bash
 sudo ./build-nixos-rootfs.sh

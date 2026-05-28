@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-IMAGE_SIZE="${IMAGE_SIZE:-4G}"
+IMAGE_SIZE="${IMAGE_SIZE:-8G}"
 FILESYSTEM_UUID="${FILESYSTEM_UUID:-ee8d3593-59b1-480e-a3b6-4fefb17ee7d8}"
 TIMESTAMP="$(date +"%Y%m%d_%H%M%S")"
 ROOTFS_IMG="nixos-sheng-${TIMESTAMP}.img"
