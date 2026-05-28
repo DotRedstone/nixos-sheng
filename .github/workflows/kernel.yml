@@ -42,7 +42,7 @@ jobs:
       - name: Build boot image
         run: |
           nix --extra-experimental-features "nix-command flakes" \
-            build ./nixos#mobileAndroidBootimg \
+            build -L ./nixos#mobileAndroidBootimg \
             --out-link out/mobile-bootimg
           mkdir -p out/kernel
           cp out/mobile-bootimg out/kernel/boot_sheng_nixos.img
