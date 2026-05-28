@@ -8,6 +8,8 @@ in
 {
   mobile.enable = true;
 
+  boot.kernel.enable = false;
+
   mobile.generatedFilesystems.rootfs.name = "nixos-sheng-rootfs";
   mobile.generatedFilesystems.rootfs.filesystem = lib.mkDefault "ext4";
   mobile.generatedFilesystems.rootfs.label = lib.mkForce "linux";
