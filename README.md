@@ -53,7 +53,10 @@ device/testing/linux-postmarketos-qcom-sm8550/config-postmarketos-qcom-sm8550.aa
 
 The Mobile NixOS kernel builder is kept aligned with that flow by completing
 configuration through `olddefconfig`, then building `Image.gz`, modules, and
-DTBs through the Mobile NixOS Android boot image pipeline.
+DTBs through the Mobile NixOS Android boot image pipeline. For this test path,
+Mobile NixOS structured kernel config validation is disabled for the sheng
+kernel package so the postmarketOS/Debian configuration can be evaluated
+without being rewritten to Mobile NixOS firewall defaults first.
 
 ## How Boot Works
 
