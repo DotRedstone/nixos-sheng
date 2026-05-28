@@ -16,6 +16,7 @@ mobile-nixos.kernel-builder-clang {
   enableRemovingWerror = true;
   nativeBuildInputs = [
     buildPackages.lld
+    buildPackages.llvmPackages.llvm
   ];
   makeFlags = [
     "LLVM=1"
