@@ -4,6 +4,12 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
+  push:
+    branches:
+      - sheng
+    paths:
+      - "nixos/**"
+      - ".github/workflows/kernel.yml"
   workflow_dispatch:
     inputs:
       skip_release:
