@@ -5,6 +5,7 @@
 
   mobile.generatedFilesystems.rootfs = {
     name = "nixos-sheng-rootfs";
+    filesystem = "ext4";
     label = lib.mkForce "linux";
     location = lib.mkForce "/rootfs.img";
     extraPadding = lib.mkForce (1024 * 1024 * 1024);
