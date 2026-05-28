@@ -9,7 +9,7 @@ on:
       image_size:
         description: "RootFS image size"
         required: true
-        default: "4G"
+        default: "8G"
       kernel_release_tag:
         description: "Optional kernel release tag to inject, for example kernel-7.1"
         required: false

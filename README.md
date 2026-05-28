@@ -70,6 +70,9 @@ The rootfs workflow builds a console-focused debug ext4 image:
 sudo ./build-nixos-rootfs.sh
 ```
 
+The default image size is `8G`. NixOS stores complete runtime closures in
+`/nix/store`, so `4G` is usually too small even for the console image.
+
 Output:
 
 ```text

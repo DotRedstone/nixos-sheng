@@ -35,8 +35,6 @@
     '';
   };
 
-  hardware.graphics.enable = true;
-
   console = {
     earlySetup = true;
     font = "Lat2-Terminus16";
@@ -55,12 +53,10 @@
     curl
     gitMinimal
     kmod
-    mesa-demos
     nano
     pciutils
     usbutils
     vim
-    vulkan-tools
     wget
   ];
 
