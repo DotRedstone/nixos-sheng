@@ -42,7 +42,23 @@ jobs:
           ccache --set-config=max_size=10G
           ccache --set-config=cache_dir=/home/runner/.ccache
 
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Build Mobile NixOS stage-1
+        run: |
+          nix --extra-experimental-features "nix-command flakes" \
+            build ./nixos#mobileStage1Initrd \
+            --out-link out/mobile-stage1-initrd
+          mkdir -p out/kernel
+          cp out/mobile-stage1-initrd/initrd out/kernel/sheng-stage1-initramfs.cpio.gz
+
       - name: Build kernel
+        env:
+          STAGE1_INITRAMFS: ${{ github.workspace }}/out/kernel/sheng-stage1-initramfs.cpio.gz
         run: |
           chmod +x sheng-kernel_build.sh
           bash sheng-kernel_build.sh "${{ github.event.inputs.kernel_version }}" "${{ github.workspace }}"

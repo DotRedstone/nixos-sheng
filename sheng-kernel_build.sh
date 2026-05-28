@@ -70,7 +70,12 @@ chmod +x ./mkbootimg
 
 echo "==> Building NixOS stage-1 initramfs"
 chmod +x ./build-stage1-initramfs.sh
-./build-stage1-initramfs.sh "${OUT_DIR}/sheng-stage1-initramfs.cpio.gz"
+if [ -n "${STAGE1_INITRAMFS:-}" ]; then
+    echo "==> Using external stage-1 initramfs: ${STAGE1_INITRAMFS}"
+    install -Dm644 "${STAGE1_INITRAMFS}" "${OUT_DIR}/sheng-stage1-initramfs.cpio.gz"
+else
+    ./build-stage1-initramfs.sh "${OUT_DIR}/sheng-stage1-initramfs.cpio.gz"
+fi
 
 DUALBOOT_CMDLINE="${DUALBOOT_CMDLINE:-root=PARTLABEL=linux init=/init rootwait console=tty0 console=ttyMSM0,115200n8 fbcon=map:0 fbcon=rotate:1 loglevel=7 ignore_loglevel systemd.log_level=debug}"
 SINGLEBOOT_CMDLINE="${SINGLEBOOT_CMDLINE:-root=PARTLABEL=userdata rootwait}"

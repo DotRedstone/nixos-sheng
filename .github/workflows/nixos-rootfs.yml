@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       image_size:
-        description: "RootFS image size"
+        description: "RootFS image size, or auto for Mobile NixOS computed size"
         required: true
-        default: "8G"
+        default: "auto"
       kernel_release_tag:
         description: "Optional kernel release tag to inject, for example kernel-7.1"
         required: false

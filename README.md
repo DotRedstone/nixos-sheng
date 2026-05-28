@@ -1,7 +1,7 @@
 # NixOS on Xiaomi Pad 6S Pro
 
-This repository contains an experimental NixOS port for the Xiaomi Pad 6S Pro
-(`sheng`, SM8550).
+This repository contains an experimental Mobile NixOS based port for the
+Xiaomi Pad 6S Pro (`sheng`, SM8550).
 
 The project is intentionally NixOS-only. Older Debian, Ubuntu, Fedora, Arch
 Linux, `.deb`, and bundle workflows have been removed so the tree can grow into
@@ -9,32 +9,35 @@ a clean independent port.
 
 ## Status
 
-Current target: a minimal bootable NixOS root filesystem for the existing
-Android `boot.img` flow.
+Current target: a Mobile NixOS based bring-up image for the existing Android
+`boot.img` flow.
 
 | Area | Status | Notes |
 | --- | --- | --- |
 | Kernel image | Work in progress | Built from `code002-2/sm8550-mainline` |
-| Android boot image | Work in progress | Uses `mkbootimg` and `root=PARTLABEL=linux` |
-| NixOS rootfs | Initial skeleton | Builds an ext4 image from a NixOS tarball |
-| Local console | Debug console enabled | kmscon plus cage/foot terminal for bring-up |
+| Android boot image | Work in progress | Uses upstream sheng kernel plus Mobile NixOS stage-1 |
+| NixOS rootfs | Initial skeleton | Builds an ext4 image with Mobile NixOS filesystem tooling |
+| Local console | Debug console enabled | kmscon/getty for bring-up |
 | TWRP generation switcher | Planned | Future goal for switching NixOS generations |
 
 ## Repository Layout
 
 ```text
 .
-├── .github/workflows/
-│   ├── kernel.yml          # Build kernel, DTB, modules, boot images
-│   └── nixos-rootfs.yml    # Build minimal NixOS rootfs image
-├── nixos/
-│   ├── flake.nix
-│   ├── configuration.nix
-│   ├── hardware-sheng.nix
-│   └── services/
-├── build-nixos-rootfs.sh
-├── sheng-kernel_build.sh
-└── mkbootimg
+|-- .github/workflows/
+|   |-- kernel.yml          # Build kernel, DTB, modules, boot images
+|   `-- nixos-rootfs.yml    # Build Mobile NixOS rootfs image
+|-- nixos/
+|   |-- devices/xiaomi-sheng/
+|   |-- flake.nix
+|   |-- configuration.nix
+|   |-- hardware-sheng.nix
+|   |-- mobile-profile.nix
+|   `-- services/
+|-- build-nixos-rootfs.sh
+|-- build-stage1-initramfs.sh
+|-- sheng-kernel_build.sh
+`-- mkbootimg
 ```
 
 ## Default Login
@@ -54,8 +57,14 @@ The kernel workflow produces:
 - `boot_sheng_dualboot.img`
 - `boot_sheng_singleboot.img`
 - `boot_sheng_nixos.img`
+- `sheng-stage1-initramfs.cpio.gz`
 - `sheng-kernel-files.tar.zst`
 - `sheng-kernel-modules.tar.zst`
+
+`boot_sheng_nixos.img` is the important bring-up image. It keeps using the
+upstream sheng kernel tree, but its initramfs is built from Mobile NixOS
+stage-1 so early boot can show Mobile NixOS splash/error handling before the
+rootfs is mounted.
 
 Locally, on an aarch64 Linux host with the required toolchain:
 
@@ -65,14 +74,14 @@ bash sheng-kernel_build.sh 7.1
 
 ## Build NixOS RootFS
 
-The rootfs workflow builds a console-focused debug ext4 image:
+The rootfs workflow builds a console-focused Mobile NixOS ext4 image:
 
 ```bash
 sudo ./build-nixos-rootfs.sh
 ```
 
-The default image size is `8G`. NixOS stores complete runtime closures in
-`/nix/store`, so `4G` is usually too small even for the console image.
+The default image size is `auto`. Mobile NixOS computes a compact ext4 image
+and adds padding. If you want a fixed size, pass a value such as `8G`.
 
 Output:
 
@@ -81,15 +90,15 @@ out/nixos-sheng-YYYYmmdd_HHMMSS.img
 out/nixos-sheng-YYYYmmdd_HHMMSS.img.zip
 ```
 
-The image expects the Linux partition to be labeled `linux` and the boot image
-to pass:
+The image expects the Linux partition to be named `linux` and the boot image to
+pass:
 
 ```text
-root=PARTLABEL=linux init=/init rootwait console=tty0 console=ttyMSM0,115200n8 fbcon=map:0 fbcon=rotate:1 loglevel=7 ignore_loglevel systemd.log_level=debug
+root=PARTLABEL=linux rootwait console=tty0 console=ttyMSM0,115200n8 fbcon=map:0 fbcon=rotate:1 loglevel=7 ignore_loglevel
 ```
 
-These arguments live in `boot_sheng_dualboot.img`, not in the rootfs. Rebuild
-and reflash `boot_b` after changing kernel command-line arguments.
+These arguments live in `boot_sheng_nixos.img`, not in the rootfs. Rebuild and
+reflash `boot_b` after changing kernel command-line arguments or stage-1.
 
 The rootfs workflow can optionally inject kernel artifacts from a release such
 as `kernel-7.1`. Build the kernel workflow first, then pass that tag as
@@ -98,11 +107,11 @@ the kernel workflow; use `boot_sheng_nixos.img` for NixOS testing.
 
 ## Bring-up Plan
 
-1. Confirm kernel reaches init with the minimal NixOS rootfs.
-2. Confirm serial/getty on `ttyMSM0` and local login.
-3. Import kernel modules and firmware into the image.
-4. Add NetworkManager, Wi-Fi/Bluetooth firmware validation, and ALSA UCM.
-5. Add a desktop profile after basic hardware is stable.
+1. Confirm the kernel reaches Mobile NixOS stage-1 and shows splash/error UI.
+2. Confirm stage-1 mounts the `linux` partition and switches to NixOS.
+3. Confirm serial/getty on `ttyMSM0` and local login.
+4. Import kernel modules and firmware into the image.
+5. Add Wi-Fi/Bluetooth/audio validation after basic boot is stable.
 6. Implement a TWRP-side generation switcher that selects NixOS generations.
 
 ## Warning
