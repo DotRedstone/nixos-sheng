@@ -8,8 +8,6 @@ in
 {
   mobile.enable = true;
 
-  boot.kernel.enable = false;
-
   mobile.generatedFilesystems.rootfs.name = "nixos-sheng-rootfs";
   mobile.generatedFilesystems.rootfs.filesystem = lib.mkDefault "ext4";
   mobile.generatedFilesystems.rootfs.label = lib.mkForce "linux";
@@ -66,12 +64,8 @@ in
 
     shell.shellOnFail = true;
 
-    kernel = {
-      package = null;
-      modular = false;
-      modules = [ ];
-      additionalModules = [ ];
-    };
+    kernel.modules = [ ];
+    kernel.additionalModules = [ ];
   };
 
   mobile.boot.stage-1.fail.reboot = false;

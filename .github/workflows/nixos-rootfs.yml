@@ -10,10 +10,6 @@ on:
         description: "RootFS image size, or auto for Mobile NixOS computed size"
         required: true
         default: "auto"
-      kernel_release_tag:
-        description: "Optional kernel release tag to inject, for example kernel-7.1"
-        required: false
-        default: ""
       skip_release:
         description: "Skip GitHub release"
         type: boolean
@@ -40,21 +36,6 @@ jobs:
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
-
-      - name: Download kernel artifacts
-        if: ${{ github.event.inputs.kernel_release_tag != '' }}
-        run: |
-          mkdir -p artifacts
-          gh release download "${{ github.event.inputs.kernel_release_tag }}" \
-            --pattern "*.tar.zst" \
-            --dir artifacts \
-            --repo "${{ github.repository }}" \
-            --clobber
-          for archive in artifacts/*.tar.zst; do
-            tar --zstd -xf "$archive" -C artifacts
-          done
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build image
         run: |

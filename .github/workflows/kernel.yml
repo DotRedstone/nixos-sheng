@@ -6,14 +6,14 @@ env:
 on:
   workflow_dispatch:
     inputs:
-      kernel_version:
-        description: "Kernel branch suffix, for example 7.1"
-        required: true
-        default: "7.1"
+      skip_release:
+        description: "Skip GitHub release"
+        type: boolean
+        default: false
 
 jobs:
   build:
-    name: Build kernel ${{ github.event.inputs.kernel_version }}
+    name: Build Mobile NixOS boot image
     runs-on: ubuntu-24.04-arm
     permissions:
       contents: write
@@ -24,64 +24,34 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Restore ccache
-        uses: actions/cache@v4
-        with:
-          path: /home/runner/.ccache
-          key: ${{ runner.os }}-sheng-kernel-${{ github.event.inputs.kernel_version }}-${{ github.ref_name }}
-          restore-keys: |
-            ${{ runner.os }}-sheng-kernel-${{ github.event.inputs.kernel_version }}-
-            ${{ runner.os }}-sheng-kernel-
-
-      - name: Install build dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y \
-            bc bison build-essential ccache clang flex git libelf-dev \
-            busybox cpio gzip libssl-dev lld llvm wget xz-utils zstd
-          ccache --set-config=max_size=10G
-          ccache --set-config=cache_dir=/home/runner/.ccache
-
       - name: Install Nix
         uses: cachix/install-nix-action@v27
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
 
-      - name: Build Mobile NixOS stage-1
+      - name: Build boot image
         run: |
           nix --extra-experimental-features "nix-command flakes" \
-            build ./nixos#mobileStage1Initrd \
-            --out-link out/mobile-stage1-initrd
+            build ./nixos#mobileAndroidBootimg \
+            --out-link out/mobile-bootimg
           mkdir -p out/kernel
-          cp out/mobile-stage1-initrd/initrd out/kernel/sheng-stage1-initramfs.cpio.gz
-
-      - name: Build kernel
-        env:
-          STAGE1_INITRAMFS: ${{ github.workspace }}/out/kernel/sheng-stage1-initramfs.cpio.gz
-        run: |
-          chmod +x sheng-kernel_build.sh
-          bash sheng-kernel_build.sh "${{ github.event.inputs.kernel_version }}" "${{ github.workspace }}"
+          cp out/mobile-bootimg out/kernel/boot_sheng_nixos.img
 
       - name: Upload kernel artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sheng-kernel-${{ github.event.inputs.kernel_version }}
-          path: |
-            out/kernel/*.img
-            out/kernel/*.tar.zst
-            out/kernel/*.cpio.gz
+          name: sheng-mobile-nixos-boot
+          path: out/kernel/boot_sheng_nixos.img
           retention-days: 14
 
       - name: Create release
+        if: ${{ !github.event.inputs.skip_release }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: kernel-${{ github.event.inputs.kernel_version }}
-          name: "Sheng kernel ${{ github.event.inputs.kernel_version }}"
-          files: |
-            out/kernel/*.img
-            out/kernel/*.tar.zst
-            out/kernel/*.cpio.gz
+          tag_name: kernel-${{ github.run_number }}
+          name: "Sheng Mobile NixOS boot ${{ github.run_number }}"
+          files: out/kernel/boot_sheng_nixos.img
           draft: false
           prerelease: true
         env:

@@ -91,29 +91,6 @@ else
     umount "${ROOTDIR}"
 fi
 
-mount -o loop "${OUT_DIR}/${ROOTFS_IMG}" "${ROOTDIR}"
-
-if [ -d artifacts/kernel-modules ]; then
-    echo "==> Injecting external kernel modules"
-    mkdir -p "${ROOTDIR}/lib/modules"
-    cp -a artifacts/kernel-modules/lib/modules/. "${ROOTDIR}/lib/modules/"
-fi
-
-if [ -d artifacts/firmware ]; then
-    echo "==> Injecting firmware blobs"
-    mkdir -p "${ROOTDIR}/lib/firmware"
-    cp -a artifacts/firmware/. "${ROOTDIR}/lib/firmware/"
-fi
-
-if [ -d artifacts/alsa-ucm ]; then
-    echo "==> Injecting ALSA UCM data"
-    mkdir -p "${ROOTDIR}/usr/share/alsa/ucm2"
-    cp -a artifacts/alsa-ucm/. "${ROOTDIR}/usr/share/alsa/ucm2/"
-fi
-
-sync
-umount "${ROOTDIR}"
-
 tune2fs -U "${FILESYSTEM_UUID}" "${OUT_DIR}/${ROOTFS_IMG}" >/dev/null
 
 echo "==> Packing image as zip"

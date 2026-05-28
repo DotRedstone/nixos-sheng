@@ -30,6 +30,12 @@ in
         };
       };
 
+      mobile.boot.stage-1.kernel = {
+        package = pkgs.callPackage ./kernel { };
+        modular = true;
+        allowMissingModules = true;
+      };
+
       mobile.system.type = "android";
       mobile.system.android = {
         ab_partitions = true;
@@ -47,6 +53,10 @@ in
           offset_tags = "0x01e00000";
           pagesize = "4096";
         };
+
+        appendDTB = [
+          "dtbs/qcom/sm8550-xiaomi-sheng.dtb"
+        ];
       };
 
       mobile.usb = {
