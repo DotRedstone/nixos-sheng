@@ -16,7 +16,7 @@ This is an early bring-up project.
 | Area | Status | Notes |
 | --- | --- | --- |
 | Device framework | Mobile NixOS | Device definition lives in `nixos/devices/xiaomi-sheng` |
-| Kernel | Upstream sheng kernel | Built from `code002-2/sm8550-mainline` through Nix |
+| Kernel | Upstream sheng kernel | Built from `map220v/sm8550-mainline` through Nix |
 | Boot image | Work in progress | Mobile NixOS Android boot image for `boot_b` |
 | RootFS | Minimal image | ext4 image labeled `linux` |
 | Display/console | Bring-up | Kernel and stage-1 still need real-device testing |
@@ -29,7 +29,7 @@ This project is mainly glue between two upstream efforts:
 - [mobile-nixos/mobile-nixos](https://github.com/mobile-nixos/mobile-nixos)
   provides the mobile device framework, stage-1 initramfs, Android boot image
   builder, generated rootfs support, and device-port conventions.
-- [code002-2/sm8550-mainline](https://github.com/code002-2/sm8550-mainline)
+- [map220v/sm8550-mainline](https://github.com/map220v/sm8550-mainline)
   provides the Xiaomi Pad 6S Pro mainline kernel work: device tree, display,
   storage, USB, panel, and other hardware support.
 
@@ -41,8 +41,15 @@ from hand-written distribution scripts.
 The kernel source is pinned in `nixos/flake.nix`:
 
 ```nix
-shengKernelSrc.url = "github:code002-2/sm8550-mainline/1c2d6f012c0a3c529ad68c5dc4d47cc0f60fb9f2";
+shengKernelSrc.url = "github:map220v/sm8550-mainline/f273227fab85e2ad8391c61c21b3556bd017a726";
 ```
+
+The kernel configuration is intentionally trimmed for the current bring-up
+path: Android boot image, Qualcomm device tree, UFS storage, and an ext4
+`linux` rootfs partition. General-purpose desktop/server filesystems and
+virtualization boot paths such as Btrfs, XFS, F2FS, FUSE, overlayfs, FAT/exFAT,
+SquashFS, EROFS, Xen, virtio, and ACPI are kept disabled unless the sheng port
+gains a concrete need for them.
 
 ## How Boot Works
 
