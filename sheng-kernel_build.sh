@@ -68,15 +68,18 @@ cp "${OUT_DIR}/boot/Image.gz-dtb_sheng" "${OUT_DIR}/boot/zImage_sheng"
 cd "${WORKSPACE}"
 chmod +x ./mkbootimg
 
+DUALBOOT_CMDLINE="${DUALBOOT_CMDLINE:-root=PARTLABEL=linux init=/init rootwait console=tty0 console=ttyMSM0,115200n8 fbcon=map:0 fbcon=rotate:1 loglevel=7 ignore_loglevel systemd.log_level=debug}"
+SINGLEBOOT_CMDLINE="${SINGLEBOOT_CMDLINE:-root=PARTLABEL=userdata rootwait}"
+
 echo "==> Creating Android boot images"
 ./mkbootimg --kernel "${OUT_DIR}/boot/zImage_sheng" \
-    --cmdline "root=PARTLABEL=linux init=/init rootwait" \
+    --cmdline "${DUALBOOT_CMDLINE}" \
     --base 0x00000000 --kernel_offset 0x00008000 \
     --tags_offset 0x01e00000 --pagesize 4096 --id \
     -o "${OUT_DIR}/boot_sheng_dualboot.img"
 
 ./mkbootimg --kernel "${OUT_DIR}/boot/zImage_sheng" \
-    --cmdline "root=PARTLABEL=userdata" \
+    --cmdline "${SINGLEBOOT_CMDLINE}" \
     --base 0x00000000 --kernel_offset 0x00008000 \
     --tags_offset 0x01e00000 --pagesize 4096 --id \
     -o "${OUT_DIR}/boot_sheng_singleboot.img"

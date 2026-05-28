@@ -84,8 +84,11 @@ The image expects the Linux partition to be labeled `linux` and the boot image
 to pass:
 
 ```text
-root=PARTLABEL=linux init=/init rootwait
+root=PARTLABEL=linux init=/init rootwait console=tty0 console=ttyMSM0,115200n8 fbcon=map:0 fbcon=rotate:1 loglevel=7 ignore_loglevel systemd.log_level=debug
 ```
+
+These arguments live in `boot_sheng_dualboot.img`, not in the rootfs. Rebuild
+and reflash `boot_b` after changing kernel command-line arguments.
 
 The rootfs workflow can optionally inject kernel artifacts from a release such
 as `kernel-7.1`. Build the kernel workflow first, then pass that tag as
