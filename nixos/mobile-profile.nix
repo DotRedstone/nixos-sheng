@@ -3,13 +3,11 @@
 {
   mobile.enable = true;
 
-  mobile.generatedFilesystems.rootfs = {
-    name = "nixos-sheng-rootfs";
-    filesystem = "ext4";
-    label = lib.mkForce "linux";
-    location = lib.mkForce "/rootfs.img";
-    extraPadding = lib.mkForce (1024 * 1024 * 1024);
-  };
+  mobile.generatedFilesystems.rootfs.name = "nixos-sheng-rootfs";
+  mobile.generatedFilesystems.rootfs.filesystem = lib.mkDefault "ext4";
+  mobile.generatedFilesystems.rootfs.label = lib.mkForce "linux";
+  mobile.generatedFilesystems.rootfs.location = lib.mkForce "/rootfs.img";
+  mobile.generatedFilesystems.rootfs.extraPadding = lib.mkForce (1024 * 1024 * 1024);
 
   fileSystems."/" = lib.mkForce {
     device = "/dev/disk/by-partlabel/linux";
