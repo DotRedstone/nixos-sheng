@@ -44,12 +44,16 @@ The kernel source is pinned in `nixos/flake.nix`:
 shengKernelSrc.url = "github:map220v/sm8550-mainline/f273227fab85e2ad8391c61c21b3556bd017a726";
 ```
 
-The kernel configuration is intentionally trimmed for the current bring-up
-path: Android boot image, Qualcomm device tree, UFS storage, and an ext4
-`linux` rootfs partition. General-purpose desktop/server filesystems and
-virtualization boot paths such as Btrfs, XFS, F2FS, FUSE, overlayfs, FAT/exFAT,
-SquashFS, EROFS, Xen, virtio, and ACPI are kept disabled unless the sheng port
-gains a concrete need for them.
+The kernel configuration is based on the postmarketOS sheng configuration that
+has already been used by the Debian bring-up path:
+
+```text
+device/testing/linux-postmarketos-qcom-sm8550/config-postmarketos-qcom-sm8550.aarch64
+```
+
+The Mobile NixOS kernel builder is kept aligned with that flow by completing
+configuration through `olddefconfig`, then building `Image.gz`, modules, and
+DTBs through the Mobile NixOS Android boot image pipeline.
 
 ## How Boot Works
 

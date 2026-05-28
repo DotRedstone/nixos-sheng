@@ -26,6 +26,15 @@
             nixpkgs.overlays = [
               (final: prev: {
                 inherit shengKernelSrc;
+                mobile-nixos = prev.mobile-nixos // {
+                  kernel-builder-clang = args:
+                    (prev.mobile-nixos.kernel-builder-clang args).overrideAttrs (old: {
+                      configurePhase = builtins.replaceStrings
+                        [ "oldconfig" ]
+                        [ "olddefconfig" ]
+                        old.configurePhase;
+                    });
+                };
               })
             ];
           })
