@@ -8,7 +8,7 @@
     };
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     shengKernelSrc = {
-      url = "github:map220v/sm8550-mainline/f273227fab85e2ad8391c61c21b3556bd017a726";
+      url = "github:code002-2/sm8550-mainline/1c2d6f012c0a3c529ad68c5dc4d47cc0f60fb9f2";
       flake = false;
     };
   };

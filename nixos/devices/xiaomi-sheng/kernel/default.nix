@@ -16,9 +16,11 @@ mobile-nixos.kernel-builder-clang {
   enableRemovingWerror = true;
   nativeBuildInputs = [
     buildPackages.lld
+    buildPackages.llvmPackages.clang
     buildPackages.llvmPackages.llvm
   ];
   makeFlags = [
+    "CC=clang"
     "LLVM=1"
     "KCFLAGS=-Wno-error=unused-command-line-argument"
     "KCPPFLAGS=-Wno-error=unused-command-line-argument"
