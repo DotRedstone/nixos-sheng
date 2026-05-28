@@ -17,7 +17,7 @@ Android `boot.img` flow.
 | Kernel image | Work in progress | Built from `code002-2/sm8550-mainline` |
 | Android boot image | Work in progress | Uses `mkbootimg` and `root=PARTLABEL=linux` |
 | NixOS rootfs | Initial skeleton | Builds an ext4 image from a NixOS tarball |
-| Local console | Debug console enabled | kmscon/getty autologin for bring-up |
+| Local console | Debug console enabled | kmscon plus cage/foot terminal for bring-up |
 | TWRP generation switcher | Planned | Future goal for switching NixOS generations |
 
 ## Repository Layout

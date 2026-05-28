@@ -49,8 +49,20 @@
     '';
   };
 
+  services.greetd = {
+    enable = true;
+    settings = {
+      default_session = {
+        user = "luser";
+        command = "${pkgs.cage}/bin/cage -s -- ${pkgs.foot}/bin/foot";
+      };
+    };
+  };
+
   environment.systemPackages = with pkgs; [
+    cage
     curl
+    foot
     gitMinimal
     kmod
     nano
