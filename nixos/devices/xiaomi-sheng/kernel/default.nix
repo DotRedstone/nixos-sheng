@@ -1,5 +1,6 @@
 { mobile-nixos
 , shengKernelSrc
+, buildPackages
 , ...
 }:
 
@@ -13,5 +14,8 @@ mobile-nixos.kernel-builder-clang {
   isCompressed = "gz";
   isImageGzDtb = false;
   enableRemovingWerror = true;
+  nativeBuildInputs = [
+    buildPackages.lld
+  ];
   makeFlags = [ "LLVM=1" ];
 }
