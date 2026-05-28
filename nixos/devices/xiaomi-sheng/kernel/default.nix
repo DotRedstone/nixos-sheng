@@ -25,4 +25,11 @@ mobile-nixos.kernel-builder-clang {
     "KCFLAGS=-Wno-error=unused-command-line-argument"
     "KCPPFLAGS=-Wno-error=unused-command-line-argument"
   ];
+
+  postConfigure = ''
+    echo "===== effective io_uring config ====="
+    grep -n "IO_URING" build/.config || true
+    echo "===== effective bpf config ====="
+    grep -n "BPF" build/.config | head -80 || true
+  '';
 }
