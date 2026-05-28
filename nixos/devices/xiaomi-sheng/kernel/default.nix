@@ -9,7 +9,6 @@ mobile-nixos.kernel-builder-clang {
   modDirVersion = "7.0.0";
   src = shengKernelSrc;
   configfile = ./config.aarch64;
-  systemBuild-structuredConfig = _: {};
 
   isModular = true;
   isCompressed = "gz";
