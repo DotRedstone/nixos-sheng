@@ -4,6 +4,10 @@
 , ...
 }:
 
+let
+  pkgs = buildPackages;
+  llvmPkgs = pkgs.llvmPackages;
+in
 mobile-nixos.kernel-builder-clang {
   version = "7.0.0";
   modDirVersion = "7.0.0";
@@ -21,6 +25,14 @@ mobile-nixos.kernel-builder-clang {
   ];
   makeFlags = [
     "LLVM=1"
+    "CC=${llvmPkgs.clang-unwrapped}/bin/clang"
+    "LD=${pkgs.lld}/bin/ld.lld"
+    "AR=${llvmPkgs.llvm}/bin/llvm-ar"
+    "NM=${llvmPkgs.llvm}/bin/llvm-nm"
+    "OBJCOPY=${llvmPkgs.llvm}/bin/llvm-objcopy"
+    "OBJDUMP=${llvmPkgs.llvm}/bin/llvm-objdump"
+    "READELF=${llvmPkgs.llvm}/bin/llvm-readelf"
+    "STRIP=${llvmPkgs.llvm}/bin/llvm-strip"
     "KCFLAGS=-Wno-error=unused-command-line-argument"
     "KCPPFLAGS=-Wno-error=unused-command-line-argument"
   ];
