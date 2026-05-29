@@ -104,6 +104,29 @@ let
         add_dependency(:Mount, "/dev")
       end
     end
+
+    class Tasks::SwitchRoot
+      def splash_disabled?()
+        Configuration["splash"] && Configuration["splash"]["disabled"]
+      end
+
+      def selected_generation()
+        return @selected_generation if @selected_generation
+
+        if Hal::Recovery.wants_recovery? && !splash_disabled?
+          Tasks::Splash.instance.quit("Continuing to recovery menu")
+          @selected_generation = choose_generation()
+        else
+          @selected_generation = NixOSGeneration.new(default_selection_path())
+          if will_kexec?()
+            Tasks::Splash.instance.quit("Rebooting in generation kernel", sticky: true)
+          else
+            Tasks::Splash.instance.quit("Continuing to stage-2")
+          end
+        end
+        @selected_generation
+      end
+    end
   '';
 in
 {
