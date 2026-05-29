@@ -3,11 +3,9 @@
 Experimental Mobile NixOS port for the Xiaomi Pad 6S Pro 12.4 (`sheng`,
 Qualcomm SM8550).
 
-This repository is intentionally NixOS-only. It is no longer a Debian/Ubuntu
-rootfs bundle project: the old distribution build scripts, Debian package
-metadata, firmware bundles, and helper binaries are not part of the maintained
-tree. The goal is to keep this as a small device port that describes the tablet
-with Nix and lets Mobile NixOS build the boot and rootfs artifacts.
+This repository is a NixOS-only device port. The goal is to keep the tablet
+definition, kernel build, boot image, and rootfs image in Nix so Mobile NixOS
+can produce the artifacts used for flashing and bring-up.
 
 ## Status
 
@@ -33,10 +31,9 @@ This project is mainly glue between two upstream efforts:
   provides the Xiaomi Pad 6S Pro mainline kernel work: device tree, display,
   storage, USB, panel, and other hardware support.
 
-Mobile NixOS does not magically provide device drivers. The driver support
-still comes from the sheng kernel. The difference is that the kernel, initramfs,
-boot image, and rootfs are now built from one Nix device definition instead of
-from hand-written distribution scripts.
+Mobile NixOS provides the device framework, stage-1 initramfs, Android boot
+image builder, and generated rootfs support. The sheng kernel input provides
+the device-specific kernel and device tree support.
 
 The kernel source is configured in `nixos/flake.nix`:
 
@@ -44,8 +41,7 @@ The kernel source is configured in `nixos/flake.nix`:
 shengKernelSrc.url = "github:map220v/sm8550-mainline/sheng-7.0";
 ```
 
-The kernel configuration is based on the postmarketOS sheng configuration that
-has already been used by the Debian bring-up path:
+The kernel configuration starts from the postmarketOS sheng configuration:
 
 ```text
 device/testing/linux-postmarketos-qcom-sm8550/config-postmarketos-qcom-sm8550.aarch64
@@ -55,8 +51,8 @@ The Mobile NixOS kernel builder is kept aligned with that flow by completing
 configuration through `olddefconfig`, then building `Image.gz`, modules, and
 DTBs through the Mobile NixOS Android boot image pipeline. For this test path,
 Mobile NixOS structured kernel config validation is disabled for the sheng
-kernel package so the postmarketOS/Debian configuration can be evaluated
-without being rewritten to Mobile NixOS firewall defaults first.
+kernel package so the imported configuration can be evaluated without being
+rewritten to Mobile NixOS firewall defaults first.
 
 ## How Boot Works
 
@@ -141,12 +137,6 @@ Build all fastboot-facing images in one output:
 nix build ./nixos#mobileFastbootImages -o out/mobile-fastboot
 ```
 
-Build the no-ramdisk Debian-style diagnostic boot image:
-
-```bash
-nix build ./nixos#debianStyleBootimg -o out/debian-style-bootimg
-```
-
 Build the rootfs image:
 
 ```bash
@@ -155,11 +145,9 @@ sudo ./build-nixos-rootfs.sh
 
 ## Flashing
 
-Follow the Mobile NixOS Android device flow, not the old Debian project
-flashing flow. The Debian project is useful as a reference for the sheng
-kernel, device tree, and compiler flags, but this repository boots through a
-Mobile NixOS `boot.img` with a stage-1 initramfs and a Mobile NixOS generated
-rootfs image.
+Use the Mobile NixOS Android device flow. This repository boots through a
+Mobile NixOS `boot.img` with a stage-1 initramfs and a generated ext4 rootfs
+image labeled `linux`.
 
 For a dual-boot test on slot `b`, keep Android on the other slot and flash only
 the inactive slot boot image plus the dedicated `linux` rootfs partition:
@@ -193,19 +181,13 @@ debug shell when the screen is still black. If the device does not show up in
 `adb devices`, treat that as a boot-stage signal and compare it with kernel
 logs or fastboot behavior.
 
-The `debianStyleBootimg` package is a diagnostic artifact only. It reuses the
-same Nix-built kernel package, appends `sm8550-xiaomi-sheng.dtb`, and creates a
-no-ramdisk boot image with Debian-compatible `mkbootimg` offsets. It is useful
-for isolating whether the failure is tied to the Mobile NixOS initramfs path,
-but it is not the normal install flow for this repository.
-
 ## What Is Not Maintained Here
 
-The old Debian-style repository carried scripts and package fragments for many
-distributions. Those are intentionally out of scope now:
+This repository intentionally stays focused on the Mobile NixOS port. The
+following are out of scope for this tree:
 
-- no Debian package directories;
-- no Ubuntu/Fedora/Arch rootfs builders;
+- no distribution-specific rootfs builders;
+- no package-manager-specific kernel packages;
 - no bundled `parted` or one-off helper binaries;
 - no separate shell script that manually clones and packs the kernel.
 

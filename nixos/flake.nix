@@ -58,8 +58,6 @@
         chmod 1777 tmp
         ln -sfn ../init sbin/init
       '';
-      mobileKernelPackage =
-        mobileEval.config.mobile.outputs.stage-0.mobile.boot.stage-1.kernel.package;
     in
     {
       nixosConfigurations.sheng = nixpkgs.lib.nixosSystem {
@@ -73,35 +71,6 @@
         mobileAndroidBootimg = mobileEval.outputs.android.android-bootimg;
         mobileFastbootImages = mobileEval.outputs.android.android-fastboot-images;
         mobileRootfsImage = mobileEval.outputs.generatedFilesystems.rootfs;
-        debianStyleBootimg = pkgs.runCommand "sheng-debian-style-bootimg" {
-          nativeBuildInputs = with pkgs.buildPackages; [
-            findutils
-            mkbootimg
-          ];
-        } ''
-          mkdir -p $out
-
-          image="$(find ${mobileKernelPackage} -type f -name Image.gz | head -n 1 || true)"
-          dtb="$(find ${mobileKernelPackage} -type f -name sm8550-xiaomi-sheng.dtb | head -n 1 || true)"
-
-          if [ -z "$image" ] || [ -z "$dtb" ]; then
-            echo "Unable to find Image.gz or sm8550-xiaomi-sheng.dtb in ${mobileKernelPackage}" >&2
-            echo "Kernel package contents:" >&2
-            find ${mobileKernelPackage} -maxdepth 5 -print | sort >&2
-            exit 1
-          fi
-
-          cat "$image" "$dtb" > zImage_sheng
-          mkbootimg \
-            --kernel zImage_sheng \
-            --cmdline "root=PARTLABEL=linux" \
-            --base 0x00000000 \
-            --kernel_offset 0x00008000 \
-            --tags_offset 0x01e00000 \
-            --pagesize 4096 \
-            --id \
-            -o $out/boot_sheng_nixos_debian_style.img
-        '';
         mobileStage1Initrd = pkgs.runCommand "sheng-mobile-stage1-initrd" {} ''
           mkdir -p $out
           cp ${mobileEval.outputs.initrd} $out/initrd
