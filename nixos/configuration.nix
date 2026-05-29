@@ -12,11 +12,13 @@
 
   networking.hostName = "nixos-sheng";
   networking.networkmanager.enable = true;
+  networking.useDHCP = lib.mkDefault true;
 
   time.timeZone = "Asia/Shanghai";
   i18n.defaultLocale = "en_US.UTF-8";
 
-  users.users.root.initialPassword = "1234";
+  # Bring-up only: replace or remove this once stage-2 access is stable.
+  users.users.root.initialPassword = "123456";
   users.users.luser = {
     isNormalUser = true;
     initialPassword = "luser";
@@ -26,6 +28,10 @@
   security.sudo.wheelNeedsPassword = false;
 
   services.openssh.enable = true;
+  services.openssh.settings = {
+    PermitRootLogin = "yes";
+    PasswordAuthentication = true;
+  };
 
   services.getty = {
     autologinUser = "luser";
@@ -51,10 +57,13 @@
 
   environment.systemPackages = with pkgs; [
     curl
+    e2fsprogs
     gitMinimal
+    iproute2
     kmod
     nano
     pciutils
+    util-linux
     usbutils
     vim
     wget
