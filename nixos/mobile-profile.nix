@@ -70,7 +70,7 @@ in
 
   mobile.boot.stage-1.fail.reboot = false;
 
-  mobile.adbd.enable = lib.mkDefault false;
+  mobile.adbd.enable = lib.mkDefault true;
 
   mobile.beautification.silentBoot = lib.mkForce false;
 
