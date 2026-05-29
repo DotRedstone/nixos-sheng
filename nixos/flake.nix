@@ -44,7 +44,6 @@
       };
       pkgs = import nixpkgs {
         inherit system;
-        overlays = [ shengOverlay ];
       };
       shengSystem = self.nixosConfigurations.sheng.config.system.build.toplevel;
       mobileEval = import "${mobile-nixos}/lib/eval-with-configuration.nix" {
@@ -52,7 +51,7 @@
         device = ./devices/xiaomi-sheng;
         configuration = [
           ({ ... }: {
-            nixpkgs.pkgs = pkgs;
+            nixpkgs.overlays = [ shengOverlay ];
           })
           ./configuration.nix
           ./mobile-profile.nix
@@ -69,7 +68,7 @@
         inherit system;
         modules = [
           ({ ... }: {
-            nixpkgs.pkgs = pkgs;
+            nixpkgs.overlays = [ shengOverlay ];
           })
           ./configuration.nix
         ];
