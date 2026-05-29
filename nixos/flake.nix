@@ -19,9 +19,11 @@
       shengOverlay = final: prev: {
         inherit shengKernelSrc;
         gadget-tool = prev.gadget-tool.overrideAttrs (old: {
-          cmakeFlags = (old.cmakeFlags or []) ++ [
-            "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
-          ];
+          postPatch = (old.postPatch or "") + ''
+            substituteInPlace CMakeLists.txt \
+              --replace-fail "cmake_minimum_required(VERSION 2.8)" \
+                             "cmake_minimum_required(VERSION 3.5)"
+          '';
         });
         mobile-nixos = prev.mobile-nixos // {
           kernel-builder-clang = args:
