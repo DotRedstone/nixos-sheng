@@ -41,7 +41,7 @@ in
     device = "/dev/disk/by-partlabel/linux";
     fsType = "ext4";
     neededForBoot = true;
-    autoResize = true;
+    autoResize = false;
     options = [ "noatime" "errors=remount-ro" ];
   };
 
