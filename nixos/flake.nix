@@ -49,6 +49,11 @@
           ({ lib, ... }: {
             nixpkgs.overlays = lib.mkAfter [ shengOverlay ];
           })
+          ({ pkgs, ... }: {
+            mobile.boot.stage-1.tasks = [
+              (pkgs.writeTextDir "zz-sheng-switch-root-delay.rb" (builtins.readFile ./patches/stage-1-switch-root-delay.rb))
+            ];
+          })
           ./configuration.nix
           ./mobile-profile.nix
         ];
