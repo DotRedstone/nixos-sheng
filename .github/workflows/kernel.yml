@@ -41,9 +41,46 @@ jobs:
 
       - name: Build boot image
         run: |
+          set -o pipefail
+
+          set +e
           nix --extra-experimental-features "nix-command flakes" \
-            build -L ./nixos#mobileAndroidBootimg \
+            build ./nixos#mobileAndroidBootimg \
             --out-link out/mobile-bootimg
+          status=$?
+          set -e
+
+          if [ "$status" -ne 0 ]; then
+            echo "===== nix build failed; collecting concise diagnostics ====="
+
+            drv="$(nix --extra-experimental-features "nix-command flakes" \
+              path-info --derivation ./nixos#mobileAndroidBootimg 2>/dev/null || true)"
+
+            echo "top-level drv: $drv"
+
+            linux_drv=""
+            if [ -n "$drv" ]; then
+              linux_drv="$(nix-store -q --references "$drv" 2>/dev/null \
+                | grep -E '/linux-7\.0\.0\.drv$' \
+                | head -1 || true)"
+              echo "linux drv: $linux_drv"
+            fi
+
+            diag_pattern='=====|CONFIG_IO_URING|CONFIG_EXT4_FS|CONFIG_BLK_DEV_INITRD|CONFIG_DEVTMPFS|CONFIG_TMPFS|CONFIG_KERNEL_MODE_NEON|CONFIG_COMPAT|CONFIG_COMPAT_VDSO|CONFIG_KUSER_HELPERS|CONFIG_BRIDGE|CONFIG_BRIDGE_NETFILTER|CONFIG_NF_TABLES|CONFIG_NETFILTER_XTABLES|CONFIG_IP6_NF_IPTABLES|CONFIG_NETFILTER|olddefconfig|oldconfig|nix-wrapped compiler|unknown type name|fatal error| error:|Error [0-9]+|Makefile:'
+
+            echo "===== recent nix log excerpts ====="
+            if [ -n "$drv" ]; then
+              nix log "$drv" 2>&1 | grep -nE "$diag_pattern" | tail -300 || true
+            fi
+
+            if [ -n "$linux_drv" ]; then
+              echo "===== recent linux drv log excerpts ====="
+              nix log "$linux_drv" 2>&1 | grep -nE "$diag_pattern" | tail -300 || true
+            fi
+
+            exit "$status"
+          fi
+
           mkdir -p out/kernel
           cp out/mobile-bootimg out/kernel/boot_sheng_nixos.img
 

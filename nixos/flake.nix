@@ -29,10 +29,17 @@
                 mobile-nixos = prev.mobile-nixos // {
                   kernel-builder-clang = args:
                     (prev.mobile-nixos.kernel-builder-clang args).overrideAttrs (old: {
-                      configurePhase = builtins.replaceStrings
-                        [ "oldconfig" ]
-                        [ "olddefconfig" ]
-                        old.configurePhase;
+                      # Temporary troubleshooting override: keep Mobile NixOS' builder
+                      # shape, but force the non-interactive config update while making
+                      # the effective mode visible in CI logs.
+                      configurePhase = ''
+                        echo "===== mobile-nixos kernel configure override: replacing oldconfig with olddefconfig ====="
+                        ${builtins.replaceStrings
+                          [ "oldconfig" ]
+                          [ "olddefconfig" ]
+                          old.configurePhase}
+                        echo "===== mobile-nixos kernel configure override: olddefconfig configurePhase completed ====="
+                      '';
                     });
                 };
               })

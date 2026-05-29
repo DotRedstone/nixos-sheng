@@ -20,16 +20,30 @@ mobile-nixos.kernel-builder-clang {
     buildPackages.llvmPackages.llvm
   ];
   makeFlags = [
-    "CC=clang"
     "LLVM=1"
     "KCFLAGS=-Wno-error=unused-command-line-argument"
     "KCPPFLAGS=-Wno-error=unused-command-line-argument"
   ];
 
   postConfigure = ''
-    echo "===== effective io_uring config ====="
-    grep -n "IO_URING" build/.config || true
-    echo "===== effective bpf config ====="
-    grep -n "BPF" build/.config | head -80 || true
+    echo "===== effective kernel config diagnostics ====="
+
+    echo "--- io_uring ---"
+    grep -nE '^CONFIG_IO_URING=|^# CONFIG_IO_URING is not set' build/.config || true
+
+    echo "--- rootfs essentials ---"
+    grep -nE '^CONFIG_EXT4_FS=|^CONFIG_BLK_DEV_INITRD=|^CONFIG_DEVTMPFS=|^CONFIG_TMPFS=' build/.config || true
+
+    echo "--- compat / neon ---"
+    grep -nE '^CONFIG_COMPAT=|^# CONFIG_COMPAT is not set|^CONFIG_COMPAT_VDSO=|^# CONFIG_COMPAT_VDSO is not set|^CONFIG_KUSER_HELPERS=|^# CONFIG_KUSER_HELPERS is not set|^CONFIG_KERNEL_MODE_NEON=|^# CONFIG_KERNEL_MODE_NEON is not set' build/.config || true
+
+    echo "--- mobile-nixos network validation related ---"
+    grep -nE '^CONFIG_BRIDGE=|^CONFIG_BRIDGE_NETFILTER=|^CONFIG_NF_TABLES=|^CONFIG_NETFILTER_XTABLES=|^CONFIG_IP6_NF_IPTABLES=' build/.config || true
+
+    echo "--- compiler identity ---"
+    command -v clang || true
+    clang --version | head -3 || true
+    clang -print-target-triple || true
+    clang -print-resource-dir || true
   '';
 }
