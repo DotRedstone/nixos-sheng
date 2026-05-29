@@ -18,6 +18,9 @@
       system = "aarch64-linux";
       shengOverlay = final: prev: {
         inherit shengKernelSrc;
+        libinput = prev.libinput.override {
+          luaSupport = false;
+        };
         mobile-nixos = prev.mobile-nixos // {
           kernel-builder-clang = args:
             (prev.mobile-nixos.kernel-builder-clang args).overrideAttrs (old: {
