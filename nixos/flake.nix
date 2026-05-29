@@ -63,6 +63,9 @@
       nixosConfigurations.sheng = nixpkgs.lib.nixosSystem {
         inherit system;
         modules = [
+          ({ ... }: {
+            nixpkgs.pkgs = pkgs;
+          })
           ./configuration.nix
         ];
       };
