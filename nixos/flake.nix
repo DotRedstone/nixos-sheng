@@ -50,11 +50,73 @@
           ./mobile-profile.nix
         ];
       };
+      mobilePkgs = mobileEval.pkgs;
+      mobileSystem = mobileEval.config.system.build.toplevel;
       rootfsExtraCommands = pkgs.writeScript "sheng-rootfs-extra-commands.sh" ''
         mkdir -p dev proc sys tmp var sbin
         chmod 1777 tmp
         ln -sfn ../init sbin/init
       '';
+      mkRootfsTarball = systemBuild:
+        mobilePkgs.callPackage "${nixpkgs}/nixos/lib/make-system-tarball.nix" {
+          fileName = "nixos-sheng-aarch64-linux";
+          contents = [
+            {
+              source = "${systemBuild}/.";
+              target = "./";
+            }
+          ];
+          storeContents = [
+            {
+              object = systemBuild;
+              symlink = "run/current-system";
+            }
+            {
+              object = mobilePkgs.stdenv;
+              symlink = "none";
+            }
+          ];
+          extraArgs = "--owner=0";
+          extraCommands = rootfsExtraCommands;
+        };
+      mobileRootfsTarball = mkRootfsTarball mobileSystem;
+      fullRootfsImage = (mobilePkgs.image-builder.evaluateFilesystemImage {
+        config = {
+          name = "nixos-sheng-full-rootfs";
+          filesystem = "ext4";
+          label = "linux";
+          location = "/rootfs.img";
+          extraPadding = 1024 * 1024 * 1024;
+          ext4.partitionID = "ee8d3593-59b1-480e-a3b6-4fefb17ee7d8";
+          nativeBuildInputs = with mobilePkgs.buildPackages; [
+            gnutar
+            xz
+            zstd
+          ];
+          populateCommands = ''
+            tarball="$(${mobilePkgs.buildPackages.findutils}/bin/find ${mobileRootfsTarball} -maxdepth 1 -type f \( -name "*.tar.xz" -o -name "*.tar.zst" -o -name "*.tar.gz" -o -name "*.tgz" \) | ${mobilePkgs.buildPackages.coreutils}/bin/head -n 1)"
+            if [ -z "$tarball" ] || [ ! -f "$tarball" ]; then
+              echo "Could not find rootfs tarball in ${mobileRootfsTarball}"
+              exit 1
+            fi
+
+            echo "Extracting full rootfs from $tarball"
+            case "$tarball" in
+              *.tar.xz) ${mobilePkgs.buildPackages.gnutar}/bin/tar -xJf "$tarball" -C . ;;
+              *.tar.zst) ${mobilePkgs.buildPackages.gnutar}/bin/tar --zstd -xf "$tarball" -C . ;;
+              *.tar.gz|*.tgz) ${mobilePkgs.buildPackages.gnutar}/bin/tar -xzf "$tarball" -C . ;;
+              *)
+                echo "Unsupported tarball format: $tarball"
+                exit 1
+                ;;
+            esac
+
+            test -e ./etc
+            test -e ./sbin/init
+            test -d ./nix/store
+          '';
+        };
+      }).config.output;
     in
     {
       nixosConfigurations.sheng = nixpkgs.lib.nixosSystem {
@@ -71,32 +133,12 @@
         mobileAndroidBootimg = mobileEval.outputs.android.android-bootimg;
         mobileFastbootImages = mobileEval.outputs.android.android-fastboot-images;
         mobileRootfsImage = mobileEval.outputs.generatedFilesystems.rootfs;
+        inherit fullRootfsImage;
         mobileStage1Initrd = pkgs.runCommand "sheng-mobile-stage1-initrd" {} ''
           mkdir -p $out
           cp ${mobileEval.outputs.initrd} $out/initrd
         '';
-        rootfsTarball =
-          pkgs.callPackage "${nixpkgs}/nixos/lib/make-system-tarball.nix" {
-            fileName = "nixos-sheng-aarch64-linux";
-            contents = [
-              {
-                source = "${shengSystem}/.";
-                target = "./";
-              }
-            ];
-            storeContents = [
-              {
-                object = shengSystem;
-                symlink = "run/current-system";
-              }
-              {
-                object = pkgs.stdenv;
-                symlink = "none";
-              }
-            ];
-            extraArgs = "--owner=0";
-            extraCommands = rootfsExtraCommands;
-          };
+        rootfsTarball = mkRootfsTarball shengSystem;
       };
     };
 }

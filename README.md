@@ -69,6 +69,8 @@ Android bootloader
 
 linux partition
   -> ext4 rootfs
+       -> /etc
+       -> /sbin/init
        -> /nix/store
        -> NixOS userspace
        -> Mobile NixOS generation metadata
@@ -125,10 +127,10 @@ Build the boot image:
 nix build ./nixos#mobileAndroidBootimg -o out/mobile-bootimg
 ```
 
-Build the Mobile NixOS rootfs image:
+Build the flashable full rootfs image:
 
 ```bash
-nix build ./nixos#mobileRootfsImage -o out/mobile-rootfs
+nix build ./nixos#fullRootfsImage -o out/full-rootfs
 ```
 
 Build all fastboot-facing images in one output:
@@ -155,26 +157,28 @@ the inactive slot boot image plus the dedicated `linux` rootfs partition:
 ```bash
 fastboot erase dtbo_b
 fastboot flash boot_b out/mobile-bootimg
-fastboot flash linux out/mobile-rootfs/rootfs.img
+fastboot flash linux out/full-rootfs/rootfs.img
 fastboot set_active b
 fastboot reboot
 ```
 
 If you build `mobileFastbootImages`, its output contains Mobile NixOS' own
-`boot.img`, `system.img`, and `flash-critical.sh` helper. The helper flashes the
-boot image; the rootfs still needs to be flashed manually to this device's
+`boot.img`, `system.img`, and `flash-critical.sh` helper. For this port, use it
+only for the boot-side helper and flash `fullRootfsImage` to the dedicated
 `linux` partition:
 
 ```bash
 nix build ./nixos#mobileFastbootImages -o out/mobile-fastboot
+nix build ./nixos#fullRootfsImage -o out/full-rootfs
 ./out/mobile-fastboot/flash-critical.sh
-fastboot flash linux ./out/mobile-fastboot/system.img
+fastboot flash linux ./out/full-rootfs/rootfs.img
 ```
 
-If you build the rootfs directly with `nix build ./nixos#mobileRootfsImage`,
-flash the generated ext4 image to `linux`. Do not flash `rootfsTarball` to the
-`linux` partition: that tarball is a NixOS system archive, not the Mobile NixOS
-ext4 image expected by fastboot.
+If you build the rootfs directly with `nix build ./nixos#fullRootfsImage`,
+flash the generated `rootfs.img` to `linux`. Do not flash `rootfsTarball` to the
+`linux` partition: that tarball is a NixOS system archive, not an ext4 image
+expected by fastboot. `mobileRootfsImage` is kept for Mobile NixOS' generated
+filesystem output, but the flashable rootfs for this port is `fullRootfsImage`.
 
 ADB is enabled in this bring-up profile so stage-1 or userspace can expose a
 debug shell when the screen is still black. If the device does not show up in

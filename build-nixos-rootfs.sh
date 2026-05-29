@@ -2,7 +2,7 @@
 set -euo pipefail
 
 IMAGE_SIZE="${IMAGE_SIZE:-auto}"
-ROOTFS_BACKEND="${ROOTFS_BACKEND:-mobile}"
+ROOTFS_BACKEND="${ROOTFS_BACKEND:-full}"
 FILESYSTEM_UUID="${FILESYSTEM_UUID:-ee8d3593-59b1-480e-a3b6-4fefb17ee7d8}"
 TIMESTAMP="$(date +"%Y%m%d_%H%M%S")"
 ROOTFS_IMG="nixos-sheng-${TIMESTAMP}.img"
@@ -32,7 +32,30 @@ fi
 
 mkdir -p "${OUT_DIR}"
 
-if [ "${ROOTFS_BACKEND}" = "mobile" ]; then
+if [ "${ROOTFS_BACKEND}" = "full" ]; then
+    echo "==> Building full NixOS rootfs image"
+    nix --extra-experimental-features "nix-command flakes" \
+        build ./nixos#fullRootfsImage \
+        --out-link "${OUT_DIR}/nixos-sheng-full-rootfs"
+
+    FULL_ROOTFS_DIR="$(readlink -f "${OUT_DIR}/nixos-sheng-full-rootfs")"
+    FULL_ROOTFS="$(find "${FULL_ROOTFS_DIR}" -type f -name "rootfs.img" | head -n 1)"
+    if [ -z "${FULL_ROOTFS}" ] || [ ! -f "${FULL_ROOTFS}" ]; then
+        echo "Could not find rootfs.img in ${FULL_ROOTFS_DIR}"
+        exit 1
+    fi
+
+    echo "==> Copying rootfs image to ${OUT_DIR}/${ROOTFS_IMG}"
+    cp "${FULL_ROOTFS}" "${OUT_DIR}/${ROOTFS_IMG}"
+    chmod +w "${OUT_DIR}/${ROOTFS_IMG}"
+
+    if [ "${IMAGE_SIZE}" != "auto" ]; then
+        echo "==> Resizing rootfs image to ${IMAGE_SIZE}"
+        e2fsck -fy "${OUT_DIR}/${ROOTFS_IMG}"
+        truncate -s "${IMAGE_SIZE}" "${OUT_DIR}/${ROOTFS_IMG}"
+        resize2fs "${OUT_DIR}/${ROOTFS_IMG}"
+    fi
+elif [ "${ROOTFS_BACKEND}" = "mobile" ]; then
     echo "==> Building Mobile NixOS rootfs image"
     nix --extra-experimental-features "nix-command flakes" \
         build ./nixos#mobileRootfsImage \

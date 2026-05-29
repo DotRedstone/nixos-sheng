@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       image_size:
-        description: "RootFS image size, or auto for Mobile NixOS computed size"
+        description: "RootFS image size, or auto for computed full ext4 size"
         required: true
         default: "auto"
       skip_release:
