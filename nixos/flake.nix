@@ -52,6 +52,9 @@
       };
       mobilePkgs = mobileEval.pkgs;
       mobileSystem = mobileEval.config.system.build.toplevel;
+      mobileClosureInfo = mobilePkgs.buildPackages.closureInfo {
+        rootPaths = [ mobileSystem ];
+      };
       rootfsExtraCommands = pkgs.writeScript "sheng-rootfs-extra-commands.sh" ''
         mkdir -p dev proc sys tmp var sbin
         chmod 1777 tmp
@@ -79,7 +82,6 @@
           extraArgs = "--owner=0";
           extraCommands = rootfsExtraCommands;
         };
-      mobileRootfsTarball = mkRootfsTarball mobileSystem;
       fullRootfsImage = (mobilePkgs.image-builder.evaluateFilesystemImage {
         config = {
           name = "nixos-sheng-full-rootfs";
@@ -88,29 +90,33 @@
           location = "/rootfs.img";
           extraPadding = 1024 * 1024 * 1024;
           ext4.partitionID = "ee8d3593-59b1-480e-a3b6-4fefb17ee7d8";
-          nativeBuildInputs = with mobilePkgs.buildPackages; [
-            gnutar
-            xz
-            zstd
-          ];
           populateCommands = ''
-            tarball="$(${mobilePkgs.buildPackages.findutils}/bin/find ${mobileRootfsTarball} -type f \( -name "*.tar.xz" -o -name "*.tar.zst" -o -name "*.tar.gz" -o -name "*.tgz" \) | ${mobilePkgs.buildPackages.coreutils}/bin/head -n 1)"
-            if [ -z "$tarball" ] || [ ! -f "$tarball" ]; then
-              echo "Could not find rootfs tarball in ${mobileRootfsTarball}"
-              ${mobilePkgs.buildPackages.findutils}/bin/find ${mobileRootfsTarball} -maxdepth 3 -print
-              exit 1
+            mkdir -p ./dev ./nix/store ./proc ./run ./sbin ./sys ./tmp ./var
+            chmod 1777 ./tmp
+
+            echo "Copying system top-level..."
+            cp -prf ${mobileSystem}/. .
+
+            echo "Copying system closure..."
+            err=0
+            while IFS= read -r path; do
+              echo "  Copying $path"
+              if test -e "$path"; then
+                cp -prf "$path" ./nix/store
+              else
+                2>&1 printf "ERROR: path %q does not exist...\n" "$path"
+                (( ++err ))
+              fi
+            done < "${mobileClosureInfo}/store-paths"
+
+            if (( err > 0 )); then
+              2>&1 printf "... Bailing out, %d errors.\n" "$err"
+              exit 2
             fi
 
-            echo "Extracting full rootfs from $tarball"
-            case "$tarball" in
-              *.tar.xz) ${mobilePkgs.buildPackages.gnutar}/bin/tar -xJf "$tarball" -C . ;;
-              *.tar.zst) ${mobilePkgs.buildPackages.gnutar}/bin/tar --zstd -xf "$tarball" -C . ;;
-              *.tar.gz|*.tgz) ${mobilePkgs.buildPackages.gnutar}/bin/tar -xzf "$tarball" -C . ;;
-              *)
-                echo "Unsupported tarball format: $tarball"
-                exit 1
-                ;;
-            esac
+            ln -sfn ${mobileSystem} ./run/current-system
+            ln -sfn ../run/current-system/init ./sbin/init
+            cp -v ${mobileClosureInfo}/registration ./nix-path-registration
 
             test -e ./etc
             test -e ./sbin/init
