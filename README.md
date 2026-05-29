@@ -127,7 +127,25 @@ Local builds require an aarch64 Linux environment with Nix flakes enabled.
 Build the boot image:
 
 ```bash
-nix build ./nixos#mobileAndroidBootimg
+nix build ./nixos#mobileAndroidBootimg -o out/mobile-bootimg
+```
+
+Build the Mobile NixOS rootfs image:
+
+```bash
+nix build ./nixos#mobileRootfsImage -o out/mobile-rootfs
+```
+
+Build all fastboot-facing images in one output:
+
+```bash
+nix build ./nixos#mobileFastbootImages -o out/mobile-fastboot
+```
+
+Build the no-ramdisk Debian-style diagnostic boot image:
+
+```bash
+nix build ./nixos#debianStyleBootimg -o out/debian-style-bootimg
 ```
 
 Build the rootfs image:
@@ -138,24 +156,49 @@ sudo ./build-nixos-rootfs.sh
 
 ## Flashing
 
-If the `linux` partition already exists from the old project flow, the expected
-test path is:
+Follow the Mobile NixOS Android device flow, not the old Debian project
+flashing flow. The Debian project is useful as a reference for the sheng
+kernel, device tree, and compiler flags, but this repository boots through a
+Mobile NixOS `boot.img` with a stage-1 initramfs and a Mobile NixOS generated
+rootfs image.
+
+For a dual-boot test on slot `b`, keep Android on the other slot and flash only
+the inactive slot boot image plus the dedicated `linux` rootfs partition:
 
 ```bash
 fastboot erase dtbo_b
-fastboot flash boot_b boot_sheng_nixos.img
-fastboot flash linux nixos-sheng-*.img
+fastboot flash boot_b out/mobile-bootimg
+fastboot flash linux out/mobile-rootfs/rootfs.img
 fastboot set_active b
 fastboot reboot
 ```
 
-After the first successful boot, the rootfs can be expanded:
+If you build `mobileFastbootImages`, its output contains Mobile NixOS' own
+`boot.img`, `system.img`, and `flash-critical.sh` helper. The helper flashes the
+boot image; the rootfs still needs to be flashed manually to this device's
+`linux` partition:
 
 ```bash
-resize2fs /dev/sda30
+nix build ./nixos#mobileFastbootImages -o out/mobile-fastboot
+./out/mobile-fastboot/flash-critical.sh
+fastboot flash linux ./out/mobile-fastboot/system.img
 ```
 
-Check the actual block device on your device before running resize commands.
+If you build the rootfs directly with `nix build ./nixos#mobileRootfsImage`,
+flash the generated ext4 image to `linux`. Do not flash `rootfsTarball` to the
+`linux` partition: that tarball is a NixOS system archive, not the Mobile NixOS
+ext4 image expected by fastboot.
+
+ADB is enabled in this bring-up profile so stage-1 or userspace can expose a
+debug shell when the screen is still black. If the device does not show up in
+`adb devices`, treat that as a boot-stage signal and compare it with kernel
+logs or fastboot behavior.
+
+The `debianStyleBootimg` package is a diagnostic artifact only. It reuses the
+same Nix-built kernel package, appends `sm8550-xiaomi-sheng.dtb`, and creates a
+no-ramdisk boot image with Debian-compatible `mkbootimg` offsets. It is useful
+for isolating whether the failure is tied to the Mobile NixOS initramfs path,
+but it is not the normal install flow for this repository.
 
 ## What Is Not Maintained Here
 
