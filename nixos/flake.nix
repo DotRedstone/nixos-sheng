@@ -18,13 +18,6 @@
       system = "aarch64-linux";
       shengOverlay = final: prev: {
         inherit shengKernelSrc;
-        gadget-tool = prev.gadget-tool.overrideAttrs (old: {
-          postPatch = (old.postPatch or "") + ''
-            substituteInPlace CMakeLists.txt \
-              --replace-fail "cmake_minimum_required(VERSION 2.8)" \
-                             "cmake_minimum_required(VERSION 3.5)"
-          '';
-        });
         mobile-nixos = prev.mobile-nixos // {
           kernel-builder-clang = args:
             (prev.mobile-nixos.kernel-builder-clang args).overrideAttrs (old: {
@@ -50,8 +43,8 @@
         inherit pkgs;
         device = ./devices/xiaomi-sheng;
         configuration = [
-          ({ ... }: {
-            nixpkgs.overlays = [ shengOverlay ];
+          ({ lib, ... }: {
+            nixpkgs.overlays = lib.mkAfter [ shengOverlay ];
           })
           ./configuration.nix
           ./mobile-profile.nix
@@ -67,8 +60,8 @@
       nixosConfigurations.sheng = nixpkgs.lib.nixosSystem {
         inherit system;
         modules = [
-          ({ ... }: {
-            nixpkgs.overlays = [ shengOverlay ];
+          ({ lib, ... }: {
+            nixpkgs.overlays = lib.mkAfter [ shengOverlay ];
           })
           ./configuration.nix
         ];

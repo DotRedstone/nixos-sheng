@@ -74,6 +74,38 @@ in
 
   mobile.beautification.silentBoot = lib.mkForce false;
 
+  systemd.services.adbd = lib.mkIf config.mobile.adbd.enable {
+    script = lib.mkForce ''
+      ${pkgs.adbd}/bin/adbd &
+
+      # Wait a bit so the FunctionFS userspace endpoint is ready before binding.
+      sleep 1
+
+      if [ -e /sys/kernel/config/usb_gadget ]; then
+        for gadget in /sys/kernel/config/usb_gadget/*; do
+          [ -d "$gadget" ] || continue
+          [ -e "$gadget/UDC" ] || continue
+
+          read -r current_udc < "$gadget/UDC" || current_udc=""
+          udc_name="$current_udc"
+
+          if [ -z "$udc_name" ]; then
+            for udc in /sys/class/udc/*; do
+              [ -e "$udc" ] || continue
+              udc_name="''${udc##*/}"
+              break
+            done
+          fi
+
+          [ -n "$udc_name" ] || continue
+          printf '%s' "$udc_name" > "$gadget/UDC" || true
+        done
+      fi
+
+      wait
+    '';
+  };
+
   boot.postBootCommands = lib.mkBefore ''
     if [ -f /nix-path-registration ]; then
       ${config.nix.package.out}/bin/nix-store --load-db < /nix-path-registration
