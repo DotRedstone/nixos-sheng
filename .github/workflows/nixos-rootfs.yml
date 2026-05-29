@@ -29,7 +29,7 @@ jobs:
       - name: Install host tools
         run: |
           sudo apt update
-          sudo apt install -y e2fsprogs gh unzip xz-utils zip zstd
+          sudo apt install -y e2fsprogs gh xz-utils zstd
 
       - name: Install Nix
         uses: cachix/install-nix-action@v27
@@ -49,7 +49,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: nixos-sheng-rootfs
-          path: out/nixos-sheng-*.img.zip
+          path: out/nixos-sheng-*.img
           retention-days: 14
 
       - name: Create release
@@ -58,7 +58,7 @@ jobs:
         with:
           tag_name: nixos-rootfs-${{ github.run_number }}
           name: "NixOS Sheng RootFS ${{ github.run_number }}"
-          files: out/nixos-sheng-*.img.zip
+          files: out/nixos-sheng-*.img
           draft: false
           prerelease: true
         env:

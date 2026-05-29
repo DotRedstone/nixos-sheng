@@ -93,7 +93,4 @@ fi
 
 tune2fs -U "${FILESYSTEM_UUID}" "${OUT_DIR}/${ROOTFS_IMG}" >/dev/null
 
-echo "==> Packing image as zip"
-(cd "${OUT_DIR}" && zip -9 "${ROOTFS_IMG}.zip" "${ROOTFS_IMG}")
-
-echo "Done: ${OUT_DIR}/${ROOTFS_IMG}.zip"
+echo "Done: ${OUT_DIR}/${ROOTFS_IMG}"

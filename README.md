@@ -114,8 +114,7 @@ userspace that the kernel switches into.
 Open the Actions tab and run these workflows on the `sheng` branch:
 
 - `Build Sheng Kernel`: builds `boot_sheng_nixos.img`.
-- `Build NixOS RootFS`: builds `nixos-sheng-*.img` and a single-layer
-  `nixos-sheng-*.img.zip`.
+- `Build NixOS RootFS`: builds the flashable `nixos-sheng-*.img`.
 
 For test builds, keep `Skip GitHub release` enabled so the workflow only
 uploads artifacts.
