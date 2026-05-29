@@ -39,7 +39,7 @@ in
       mobile.system.type = "android";
       mobile.system.android = {
         ab_partitions = true;
-        boot_as_recovery = true;
+        boot_as_recovery = false;
         has_recovery_partition = false;
         boot_partition_destination = "boot";
         system_partition_destination = "linux";
