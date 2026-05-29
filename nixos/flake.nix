@@ -94,9 +94,10 @@
             zstd
           ];
           populateCommands = ''
-            tarball="$(${mobilePkgs.buildPackages.findutils}/bin/find ${mobileRootfsTarball} -maxdepth 1 -type f \( -name "*.tar.xz" -o -name "*.tar.zst" -o -name "*.tar.gz" -o -name "*.tgz" \) | ${mobilePkgs.buildPackages.coreutils}/bin/head -n 1)"
+            tarball="$(${mobilePkgs.buildPackages.findutils}/bin/find ${mobileRootfsTarball} -type f \( -name "*.tar.xz" -o -name "*.tar.zst" -o -name "*.tar.gz" -o -name "*.tgz" \) | ${mobilePkgs.buildPackages.coreutils}/bin/head -n 1)"
             if [ -z "$tarball" ] || [ ! -f "$tarball" ]; then
               echo "Could not find rootfs tarball in ${mobileRootfsTarball}"
+              ${mobilePkgs.buildPackages.findutils}/bin/find ${mobileRootfsTarball} -maxdepth 3 -print
               exit 1
             fi
 
