@@ -26,6 +26,11 @@
             nixpkgs.overlays = [
               (final: prev: {
                 inherit shengKernelSrc;
+                gadget-tool = prev.gadget-tool.overrideAttrs (old: {
+                  cmakeFlags = (old.cmakeFlags or []) ++ [
+                    "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+                  ];
+                });
                 mobile-nixos = prev.mobile-nixos // {
                   kernel-builder-clang = args:
                     (prev.mobile-nixos.kernel-builder-clang args).overrideAttrs (old: {
