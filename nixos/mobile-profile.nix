@@ -31,6 +31,7 @@ in
     bootConfig = {
       log.level = "DEBUG";
       boot.fail.shell = true;
+      gui.enable = false;
       splash.disabled = true;
     };
 

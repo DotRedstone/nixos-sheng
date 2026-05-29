@@ -1,15 +1,18 @@
-class Tasks::Splash
-  def splash_disabled?()
-    Configuration["splash"] && Configuration["splash"]["disabled"]
+module ShengHeadlessStage1
+  def self.enabled?()
+    (Configuration["gui"] && Configuration["gui"]["enable"] == false) ||
+      (Configuration["splash"] && Configuration["splash"]["disabled"])
   end
+end
 
+class Tasks::Splash
   def initialize()
-    add_dependency(:Target, :Graphics) unless splash_disabled?
+    add_dependency(:Target, :Graphics) unless ShengHeadlessStage1.enabled?
     add_dependency(:Task, Tasks::ProgressSocket.instance)
   end
 
   def run()
-    return if splash_disabled?
+    return if ShengHeadlessStage1.enabled?
     args = []
     if LOG_LEVEL == Logger::DEBUG
       args << "--verbose"
@@ -29,7 +32,7 @@ class Tasks::Splash
   end
 
   def quit(reason, sticky: nil)
-    return if splash_disabled?
+    return if ShengHeadlessStage1.enabled?
     return if @pid.nil?
     count = 0
     Progress.update({progress: 100, label: reason})
@@ -50,12 +53,8 @@ class Tasks::Splash
 end
 
 class Tasks::Graphics
-  def splash_disabled?()
-    Configuration["splash"] && Configuration["splash"]["disabled"]
-  end
-
   def initialize()
-    unless splash_disabled?
+    unless ShengHeadlessStage1.enabled?
       add_dependency(
         :Any,
         Dependencies::Task.new(FBDev.instance),
@@ -68,12 +67,8 @@ class Tasks::Graphics
 end
 
 class Tasks::Graphics::FBDev
-  def splash_disabled?()
-    Configuration["splash"] && Configuration["splash"]["disabled"]
-  end
-
   def initialize()
-    return if splash_disabled?
+    return if ShengHeadlessStage1.enabled?
     add_dependency(
       :Files,
       "/sys/class/graphics/fb0",
@@ -83,16 +78,35 @@ class Tasks::Graphics::FBDev
 end
 
 class Tasks::Graphics::DRM
-  def splash_disabled?()
-    Configuration["splash"] && Configuration["splash"]["disabled"]
-  end
-
   def initialize()
-    return if splash_disabled?
+    return if ShengHeadlessStage1.enabled?
     add_dependency(
       :Files,
       "/dev/dri/card0",
     )
     add_dependency(:Mount, "/dev")
+  end
+end
+
+class Tasks::SwitchRoot
+  def selected_generation()
+    return @selected_generation if @selected_generation
+
+    if Hal::Recovery.wants_recovery? && !ShengHeadlessStage1.enabled?
+      Tasks::Splash.instance.quit("Continuing to recovery menu")
+      @selected_generation = choose_generation()
+    else
+      if Hal::Recovery.wants_recovery?
+        $logger.info("Headless stage-1: skipping recovery generation menu.")
+      end
+
+      @selected_generation = NixOSGeneration.new(default_selection_path())
+      if will_kexec?()
+        Tasks::Splash.instance.quit("Rebooting in generation kernel", sticky: true)
+      else
+        Tasks::Splash.instance.quit("Continuing to stage-2")
+      end
+    end
+    @selected_generation
   end
 end
