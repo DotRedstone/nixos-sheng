@@ -3,9 +3,10 @@
 Experimental Mobile NixOS port for the Xiaomi Pad 6S Pro 12.4 (`sheng`,
 Qualcomm SM8550).
 
-This repository is a NixOS-only device port. The goal is to keep the tablet
-definition, kernel build, boot image, and rootfs image in Nix so Mobile NixOS
-can produce the artifacts used for flashing and bring-up.
+This repository is a NixOS-only device port. The maintained flashing path is
+the Mobile NixOS Android boot flow: a `boot.img` for the inactive Android slot
+and a Mobile NixOS generated ext4 rootfs image for the dedicated `linux`
+partition.
 
 ## Status
 
@@ -14,45 +15,25 @@ This is an early bring-up project.
 | Area | Status | Notes |
 | --- | --- | --- |
 | Device framework | Mobile NixOS | Device definition lives in `nixos/devices/xiaomi-sheng` |
-| Kernel | Upstream sheng kernel | Built from `map220v/sm8550-mainline` through Nix |
-| Boot image | Work in progress | Mobile NixOS Android boot image for `boot_b` |
-| RootFS | Minimal image | ext4 image labeled `linux` |
-| Display/console | Bring-up | Kernel and stage-1 still need real-device testing |
-| TWRP generation switcher | Planned | Future goal for selecting NixOS generations |
+| Kernel | Sheng mainline kernel | Built from `map220v/sm8550-mainline` through Nix |
+| Boot image | Bring-up | Mobile NixOS Android boot image for `boot_b` |
+| RootFS | Mobile NixOS generated rootfs | ext4 image labeled `linux` |
+| Display/console | Bring-up | Stage-1 currently runs headless until display works |
+| Debug access | Bring-up | Stage-1/stage-2 ADB is enabled through Mobile NixOS |
 
 ## Upstream Projects
 
-This project is mainly glue between two upstream efforts:
-
 - [mobile-nixos/mobile-nixos](https://github.com/mobile-nixos/mobile-nixos)
-  provides the mobile device framework, stage-1 initramfs, Android boot image
-  builder, generated rootfs support, and device-port conventions.
+  provides the device framework, stage-1 initramfs, Android boot image builder,
+  generated rootfs support, USB gadget setup, and device-port conventions.
 - [map220v/sm8550-mainline](https://github.com/map220v/sm8550-mainline)
-  provides the Xiaomi Pad 6S Pro mainline kernel work: device tree, display,
-  storage, USB, panel, and other hardware support.
-
-Mobile NixOS provides the device framework, stage-1 initramfs, Android boot
-image builder, and generated rootfs support. The sheng kernel input provides
-the device-specific kernel and device tree support.
+  provides the Xiaomi Pad 6S Pro mainline kernel work.
 
 The kernel source is configured in `nixos/flake.nix`:
 
 ```nix
 shengKernelSrc.url = "github:map220v/sm8550-mainline/sheng-7.0";
 ```
-
-The kernel configuration starts from the postmarketOS sheng configuration:
-
-```text
-device/testing/linux-postmarketos-qcom-sm8550/config-postmarketos-qcom-sm8550.aarch64
-```
-
-The Mobile NixOS kernel builder is kept aligned with that flow by completing
-configuration through `olddefconfig`, then building `Image.gz`, modules, and
-DTBs through the Mobile NixOS Android boot image pipeline. For this test path,
-Mobile NixOS structured kernel config validation is disabled for the sheng
-kernel package so the imported configuration can be evaluated without being
-rewritten to Mobile NixOS firewall defaults first.
 
 ## How Boot Works
 
@@ -64,27 +45,20 @@ Android bootloader
        -> sheng kernel
        -> sm8550-xiaomi-sheng.dtb
        -> Mobile NixOS stage-1 initramfs
-            -> mounts the linux partition
-            -> switches into the NixOS system closure
+            -> mounts /dev/disk/by-partlabel/linux
+            -> reads nix-path-registration
+            -> switches into the selected NixOS system closure
 
 linux partition
-  -> ext4 rootfs
-       -> /etc
-       -> /sbin/init
-       -> /nix/store
-       -> NixOS userspace
-       -> Mobile NixOS generation metadata
+  -> Mobile NixOS generated ext4 rootfs
+       -> nix/store
+       -> nix-path-registration
 ```
 
-So there are two important artifacts:
-
-- `boot_sheng_nixos.img`: Android boot image containing kernel + DTB +
-  Mobile NixOS stage-1.
-- `nixos-sheng-*.img`: ext4 rootfs image for the `linux` partition.
-
-The kernel is not stored in the rootfs in the PC-style `/boot` sense. On this
-device the Android bootloader loads the kernel from `boot_b`; the rootfs is the
-userspace that the kernel switches into.
+The rootfs image is intentionally not a normal PC-style root directory. Seeing
+only `nix/store` and `nix-path-registration` at the top level is expected for
+the Mobile NixOS generated rootfs: stage-1 uses that registration data to find
+the NixOS system closure and then runs its `init`.
 
 ## Repository Layout
 
@@ -99,11 +73,14 @@ userspace that the kernel switches into.
 |   |   `-- kernel/
 |   |       |-- default.nix # Nix kernel builder for the sheng kernel
 |   |       `-- config.aarch64
+|   |-- patches/            # Small stage-1 bring-up patches
 |   |-- flake.nix
 |   |-- configuration.nix
 |   |-- hardware-sheng.nix
 |   |-- mobile-profile.nix
 |   `-- services/
+|-- scripts/
+|   `-- inspect-bootimg.sh  # Offline boot.img/initrd inspection helper
 `-- build-nixos-rootfs.sh
 ```
 
@@ -127,29 +104,28 @@ Build the boot image:
 nix build ./nixos#mobileAndroidBootimg -o out/mobile-bootimg
 ```
 
-Build the flashable full rootfs image:
+Build the flashable Mobile NixOS rootfs image:
 
 ```bash
-nix build ./nixos#fullRootfsImage -o out/full-rootfs
+nix build ./nixos#mobileRootfsImage -o out/mobile-rootfs
 ```
 
-Build all fastboot-facing images in one output:
+Build all Mobile NixOS fastboot-facing images in one output:
 
 ```bash
 nix build ./nixos#mobileFastbootImages -o out/mobile-fastboot
 ```
 
-Build the rootfs image:
+Build and copy the rootfs image into `out/nixos-sheng-*.img`:
 
 ```bash
-sudo ./build-nixos-rootfs.sh
+./build-nixos-rootfs.sh
 ```
 
-## Flashing
+`fullRootfsImage` is kept as a compatibility alias for older commands. It points
+to the same Mobile NixOS generated rootfs as `mobileRootfsImage`.
 
-Use the Mobile NixOS Android device flow. This repository boots through a
-Mobile NixOS `boot.img` with a stage-1 initramfs and a generated ext4 rootfs
-image labeled `linux`.
+## Flashing
 
 For a dual-boot test on slot `b`, keep Android on the other slot and flash only
 the inactive slot boot image plus the dedicated `linux` rootfs partition:
@@ -157,54 +133,35 @@ the inactive slot boot image plus the dedicated `linux` rootfs partition:
 ```bash
 fastboot erase dtbo_b
 fastboot flash boot_b out/mobile-bootimg
-fastboot flash linux out/full-rootfs/rootfs.img
-fastboot set_active b
+fastboot flash linux out/nixos-sheng-YYYYMMDD_HHMMSS.img
+fastboot --set-active=b
 fastboot reboot
 ```
 
-If you build `mobileFastbootImages`, its output contains Mobile NixOS' own
-`boot.img`, `system.img`, and `flash-critical.sh` helper. For this port, use it
-only for the boot-side helper and flash `fullRootfsImage` to the dedicated
-`linux` partition:
+If you built the rootfs directly with `nix build ./nixos#mobileRootfsImage`, the
+file to flash is the generated `rootfs.img`:
 
 ```bash
-nix build ./nixos#mobileFastbootImages -o out/mobile-fastboot
-nix build ./nixos#fullRootfsImage -o out/full-rootfs
-./out/mobile-fastboot/flash-critical.sh
-fastboot flash linux ./out/full-rootfs/rootfs.img
+fastboot flash linux out/mobile-rootfs/rootfs.img
 ```
 
-If you build the rootfs directly with `nix build ./nixos#fullRootfsImage`,
-flash the generated `rootfs.img` to `linux`. Do not flash `rootfsTarball` to the
-`linux` partition: that tarball is a NixOS system archive, not an ext4 image
-expected by fastboot. `mobileRootfsImage` is kept for Mobile NixOS' generated
-filesystem output, but the flashable rootfs for this port is `fullRootfsImage`.
+If stage-1 code or the Android boot configuration changed, rebuild and flash
+`boot_b`. If only the NixOS userspace/rootfs changed, rebuild and flash
+`linux`.
 
-ADB is enabled in this bring-up profile so stage-1 or userspace can expose a
-debug shell when the screen is still black. If the device does not show up in
-`adb devices`, treat that as a boot-stage signal and compare it with kernel
-logs or fastboot behavior.
+## Debugging
 
-## What Is Not Maintained Here
+ADB is enabled through `mobile.adbd.enable`. During a successful transition,
+stage-1 ADB may briefly disconnect while stage-2 takes over USB gadget setup.
 
-This repository intentionally stays focused on the Mobile NixOS port. The
-following are out of scope for this tree:
+To inspect a generated boot image offline:
 
-- no distribution-specific rootfs builders;
-- no package-manager-specific kernel packages;
-- no bundled `parted` or one-off helper binaries;
-- no separate shell script that manually clones and packs the kernel.
+```bash
+scripts/inspect-bootimg.sh out/mobile-bootimg
+```
 
-For this project, the maintained base is:
-
-- Mobile NixOS framework;
-- configured sheng upstream kernel;
-- Nix device definition;
-- GitHub Actions that build the Nix outputs.
-
-Firmware, ALSA UCM data, display quirks, and TWRP generation switching can still
-be added later, but they should be expressed as Nix packages/modules rather than
-as ad-hoc tarballs copied into a rootfs.
+The helper prints `/etc/boot/config`, initrd applets, and key boot flags such as
+`boot_as_recovery`, `splash.disabled`, rootfs mount settings, and USB features.
 
 ## Default Login
 
@@ -212,7 +169,7 @@ The bring-up image currently keeps simple credentials:
 
 - user: `luser`
 - password: `luser`
-- root password: `1234`
+- root password: `123456`
 
 Change these before publishing images for general use.
 

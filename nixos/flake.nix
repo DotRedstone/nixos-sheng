@@ -21,6 +21,18 @@
         libinput = prev.libinput.override {
           luaSupport = false;
         };
+        gadget-tool = prev.gadget-tool.overrideAttrs (old: {
+          cmakeFlags = (old.cmakeFlags or []) ++ [
+            "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+          ];
+          postPatch = (old.postPatch or "") + ''
+            if grep -q "cmake_minimum_required(VERSION 2.8)" CMakeLists.txt; then
+              substituteInPlace CMakeLists.txt \
+                --replace-fail "cmake_minimum_required(VERSION 2.8)" \
+                               "cmake_minimum_required(VERSION 3.5)"
+            fi
+          '';
+        });
         mobile-nixos = prev.mobile-nixos // {
           kernel-builder-clang = args:
             (prev.mobile-nixos.kernel-builder-clang args).overrideAttrs (old: {
@@ -41,7 +53,6 @@
       pkgs = import nixpkgs {
         inherit system;
       };
-      shengSystem = self.nixosConfigurations.sheng.config.system.build.toplevel;
       mobileEval = import "${mobile-nixos}/lib/eval-with-configuration.nix" {
         inherit pkgs;
         device = ./devices/xiaomi-sheng;
@@ -49,90 +60,10 @@
           ({ lib, ... }: {
             nixpkgs.overlays = lib.mkAfter [ shengOverlay ];
           })
-          ({ pkgs, ... }: {
-            mobile.boot.stage-1.tasks = [
-              (pkgs.writeTextDir "zz-sheng-switch-root-delay.rb" (builtins.readFile ./patches/stage-1-switch-root-delay.rb))
-            ];
-          })
           ./configuration.nix
           ./mobile-profile.nix
         ];
       };
-      mobilePkgs = mobileEval.pkgs;
-      mobileSystem = mobileEval.config.system.build.toplevel;
-      mobileClosureInfo = mobilePkgs.buildPackages.closureInfo {
-        rootPaths = [ mobileSystem ];
-      };
-      rootfsExtraCommands = pkgs.writeScript "sheng-rootfs-extra-commands.sh" ''
-        mkdir -p dev proc sys tmp var sbin
-        chmod 1777 tmp
-        ln -sfn ../init sbin/init
-      '';
-      mkRootfsTarball = systemBuild:
-        mobilePkgs.callPackage "${nixpkgs}/nixos/lib/make-system-tarball.nix" {
-          fileName = "nixos-sheng-aarch64-linux";
-          contents = [
-            {
-              source = "${systemBuild}/.";
-              target = "./";
-            }
-          ];
-          storeContents = [
-            {
-              object = systemBuild;
-              symlink = "run/current-system";
-            }
-            {
-              object = mobilePkgs.stdenv;
-              symlink = "none";
-            }
-          ];
-          extraArgs = "--owner=0";
-          extraCommands = rootfsExtraCommands;
-        };
-      fullRootfsImage = (mobilePkgs.image-builder.evaluateFilesystemImage {
-        config = {
-          name = "nixos-sheng-full-rootfs";
-          filesystem = "ext4";
-          label = "linux";
-          location = "/rootfs.img";
-          extraPadding = 1024 * 1024 * 1024;
-          ext4.partitionID = "ee8d3593-59b1-480e-a3b6-4fefb17ee7d8";
-          populateCommands = ''
-            mkdir -p ./dev ./nix/store ./proc ./run ./sbin ./sys ./tmp ./var
-            chmod 1777 ./tmp
-
-            echo "Copying system top-level..."
-            cp -prf ${mobileSystem}/. .
-			chmod 0755 .
-
-            echo "Copying system closure..."
-            err=0
-            while IFS= read -r path; do
-              echo "  Copying $path"
-              if test -e "$path"; then
-                cp -prf "$path" ./nix/store
-              else
-                2>&1 printf "ERROR: path %q does not exist...\n" "$path"
-                (( ++err ))
-              fi
-            done < "${mobileClosureInfo}/store-paths"
-
-            if (( err > 0 )); then
-              2>&1 printf "... Bailing out, %d errors.\n" "$err"
-              exit 2
-            fi
-
-            ln -sfn ${mobileSystem} ./run/current-system
-            ln -sfn ../run/current-system/init ./sbin/init
-			install -m 0644 ${mobileClosureInfo}/registration ./nix-path-registration
-
-            test -e ./etc
-            test -e ./sbin/init
-            test -d ./nix/store
-          '';
-        };
-      }).config.output;
     in
     {
       nixosConfigurations.sheng = nixpkgs.lib.nixosSystem {
@@ -149,12 +80,13 @@
         mobileAndroidBootimg = mobileEval.outputs.android.android-bootimg;
         mobileFastbootImages = mobileEval.outputs.android.android-fastboot-images;
         mobileRootfsImage = mobileEval.outputs.generatedFilesystems.rootfs;
-        inherit fullRootfsImage;
+        # Compatibility alias for older workflow names. This is the Mobile NixOS
+        # generated rootfs, not a separate hand-built filesystem.
+        fullRootfsImage = mobileEval.outputs.generatedFilesystems.rootfs;
         mobileStage1Initrd = pkgs.runCommand "sheng-mobile-stage1-initrd" {} ''
           mkdir -p $out
           cp ${mobileEval.outputs.initrd} $out/initrd
         '';
-        rootfsTarball = mkRootfsTarball shengSystem;
       };
     };
 }

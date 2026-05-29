@@ -1,4 +1,6 @@
+.gitattributes text eol=lf
 *.sh text eol=lf
+*.rb text eol=lf
 *.nix text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
