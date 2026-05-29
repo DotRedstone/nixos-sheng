@@ -16,40 +16,39 @@
   outputs = { self, mobile-nixos, nixpkgs, shengKernelSrc }:
     let
       system = "aarch64-linux";
-      pkgs = nixpkgs.legacyPackages.${system};
+      shengOverlay = final: prev: {
+        inherit shengKernelSrc;
+        gadget-tool = prev.gadget-tool.overrideAttrs (old: {
+          cmakeFlags = (old.cmakeFlags or []) ++ [
+            "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+          ];
+        });
+        mobile-nixos = prev.mobile-nixos // {
+          kernel-builder-clang = args:
+            (prev.mobile-nixos.kernel-builder-clang args).overrideAttrs (old: {
+              # Temporary troubleshooting override: keep Mobile NixOS' builder
+              # shape, but force the non-interactive config update while making
+              # the effective mode visible in CI logs.
+              configurePhase = ''
+                echo "===== mobile-nixos kernel configure override: replacing oldconfig with olddefconfig ====="
+                ${builtins.replaceStrings
+                  [ "oldconfig" ]
+                  [ "olddefconfig" ]
+                  old.configurePhase}
+                echo "===== mobile-nixos kernel configure override: olddefconfig configurePhase completed ====="
+              '';
+            });
+        };
+      };
+      pkgs = import nixpkgs {
+        inherit system;
+        overlays = [ shengOverlay ];
+      };
       shengSystem = self.nixosConfigurations.sheng.config.system.build.toplevel;
       mobileEval = import "${mobile-nixos}/lib/eval-with-configuration.nix" {
-        inherit system;
+        inherit pkgs;
         device = ./devices/xiaomi-sheng;
         configuration = [
-          ({ ... }: {
-            nixpkgs.overlays = [
-              (final: prev: {
-                inherit shengKernelSrc;
-                gadget-tool = prev.gadget-tool.overrideAttrs (old: {
-                  cmakeFlags = (old.cmakeFlags or []) ++ [
-                    "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
-                  ];
-                });
-                mobile-nixos = prev.mobile-nixos // {
-                  kernel-builder-clang = args:
-                    (prev.mobile-nixos.kernel-builder-clang args).overrideAttrs (old: {
-                      # Temporary troubleshooting override: keep Mobile NixOS' builder
-                      # shape, but force the non-interactive config update while making
-                      # the effective mode visible in CI logs.
-                      configurePhase = ''
-                        echo "===== mobile-nixos kernel configure override: replacing oldconfig with olddefconfig ====="
-                        ${builtins.replaceStrings
-                          [ "oldconfig" ]
-                          [ "olddefconfig" ]
-                          old.configurePhase}
-                        echo "===== mobile-nixos kernel configure override: olddefconfig configurePhase completed ====="
-                      '';
-                    });
-                };
-              })
-            ];
-          })
           ./configuration.nix
           ./mobile-profile.nix
         ];
