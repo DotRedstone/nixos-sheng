@@ -23,6 +23,7 @@ mobile-nixos.kernel-builder-clang {
     buildPackages.llvmPackages.clang
     buildPackages.llvmPackages.llvm
     pkgs.buildPackages.python3
+    pkgs.buildPackages.zstd
   ];
   makeFlags = [
     "LLVM=1"
