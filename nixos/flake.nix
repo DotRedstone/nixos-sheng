@@ -96,6 +96,7 @@
 
             echo "Copying system top-level..."
             cp -prf ${mobileSystem}/. .
+			chmod 0755 .
 
             echo "Copying system closure..."
             err=0
@@ -116,7 +117,7 @@
 
             ln -sfn ${mobileSystem} ./run/current-system
             ln -sfn ../run/current-system/init ./sbin/init
-            cp -v ${mobileClosureInfo}/registration ./nix-path-registration
+			install -m 0644 ${mobileClosureInfo}/registration ./nix-path-registration
 
             test -e ./etc
             test -e ./sbin/init
