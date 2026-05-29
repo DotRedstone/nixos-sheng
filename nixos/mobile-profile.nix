@@ -42,7 +42,7 @@ in
     fsType = "ext4";
     neededForBoot = true;
     autoResize = false;
-    options = [ "noatime" "errors=remount-ro" ];
+    options = [ "noatime" ];
   };
 
   mobile.boot.stage-1 = {
@@ -55,11 +55,7 @@ in
     };
 
     gui = {
-      enable = true;
-      waitForDevices = {
-        enable = true;
-        delay = 2;
-      };
+      enable = false;
     };
 
     shell.shellOnFail = true;
