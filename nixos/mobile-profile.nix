@@ -56,6 +56,54 @@ let
         @pid = nil
       end
     end
+
+    class Tasks::Graphics
+      def splash_disabled?()
+        Configuration["splash"] && Configuration["splash"]["disabled"]
+      end
+
+      def initialize()
+        unless splash_disabled?
+          add_dependency(
+            :Any,
+            Dependencies::Task.new(FBDev.instance),
+            Dependencies::Task.new(DRM.instance),
+          )
+        end
+
+        Targets[:Graphics].add_dependency(:Task, self)
+      end
+    end
+
+    class Tasks::Graphics::FBDev
+      def splash_disabled?()
+        Configuration["splash"] && Configuration["splash"]["disabled"]
+      end
+
+      def initialize()
+        return if splash_disabled?
+        add_dependency(
+          :Files,
+          "/sys/class/graphics/fb0",
+        )
+        add_dependency(:Mount, "/dev")
+      end
+    end
+
+    class Tasks::Graphics::DRM
+      def splash_disabled?()
+        Configuration["splash"] && Configuration["splash"]["disabled"]
+      end
+
+      def initialize()
+        return if splash_disabled?
+        add_dependency(
+          :Files,
+          "/dev/dri/card0",
+        )
+        add_dependency(:Mount, "/dev")
+      end
+    end
   '';
 in
 {
