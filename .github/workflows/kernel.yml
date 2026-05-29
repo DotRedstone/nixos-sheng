@@ -43,39 +43,29 @@ jobs:
         run: |
           set -o pipefail
 
+          build_log="$(mktemp)"
+
           set +e
           nix --extra-experimental-features "nix-command flakes" \
             build ./nixos#mobileAndroidBootimg \
-            --out-link out/mobile-bootimg
-          status=$?
+            --out-link out/mobile-bootimg 2>&1 | tee "$build_log"
+          status=${PIPESTATUS[0]}
           set -e
 
           if [ "$status" -ne 0 ]; then
-            echo "===== nix build failed; collecting concise diagnostics ====="
+            echo "===== nix build failed; collecting diagnostics ====="
 
-            drv="$(nix --extra-experimental-features "nix-command flakes" \
-              path-info --derivation ./nixos#mobileAndroidBootimg 2>/dev/null || true)"
-
-            echo "top-level drv: $drv"
-
-            linux_drv=""
-            if [ -n "$drv" ]; then
-              linux_drv="$(nix-store -q --references "$drv" 2>/dev/null \
-                | grep -E '/linux-7\.0\.0\.drv$' \
-                | head -1 || true)"
-              echo "linux drv: $linux_drv"
-            fi
-
-            diag_pattern='=====|CONFIG_IO_URING|CONFIG_EXT4_FS|CONFIG_BLK_DEV_INITRD|CONFIG_DEVTMPFS|CONFIG_TMPFS|CONFIG_KERNEL_MODE_NEON|CONFIG_COMPAT|CONFIG_COMPAT_VDSO|CONFIG_KUSER_HELPERS|CONFIG_BRIDGE|CONFIG_BRIDGE_NETFILTER|CONFIG_NF_TABLES|CONFIG_NETFILTER_XTABLES|CONFIG_IP6_NF_IPTABLES|CONFIG_NETFILTER|olddefconfig|oldconfig|nix-wrapped compiler|unknown type name|fatal error| error:|Error [0-9]+|Makefile:'
-
-            echo "===== recent nix log excerpts ====="
-            if [ -n "$drv" ]; then
-              nix log "$drv" 2>&1 | grep -nE "$diag_pattern" | tail -300 || true
-            fi
+            linux_drv="$(grep -oE '/nix/store/[^ ]+-linux-[^ ]+\.drv' "$build_log" | tail -1 || true)"
+            echo "linux drv: ${linux_drv:-not found}"
 
             if [ -n "$linux_drv" ]; then
-              echo "===== recent linux drv log excerpts ====="
+              diag_pattern='=====|---|CONFIG_IO_URING|CONFIG_EXT4_FS|CONFIG_BLK_DEV_INITRD|CONFIG_DEVTMPFS|CONFIG_TMPFS|CONFIG_KERNEL_MODE_NEON|CONFIG_COMPAT|CONFIG_COMPAT_VDSO|CONFIG_KUSER_HELPERS|CONFIG_BRIDGE|CONFIG_BRIDGE_NETFILTER|CONFIG_NF_TABLES|CONFIG_NETFILTER_XTABLES|CONFIG_IP6_NF_IPTABLES|CONFIG_NETFILTER|olddefconfig|oldconfig|nix-wrapped compiler|unknown type name|fatal error| error:|Error [0-9]+|Makefile:'
+
+              echo "===== linux drv diagnostic excerpts ====="
               nix log "$linux_drv" 2>&1 | grep -nE "$diag_pattern" | tail -300 || true
+
+              echo "===== linux drv last 500 lines ====="
+              nix log "$linux_drv" 2>&1 | tail -500 || true
             fi
 
             exit "$status"
