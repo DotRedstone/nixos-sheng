@@ -75,12 +75,11 @@
     wantedBy = [ "getty.target" ];
   };
 
-  systemd.services.sheng-usb-debug-gadget = {
-    description = "xiaomi-sheng stage-2 USB debug gadget";
+  systemd.services."sheng-usb-serial-gadget" = {
+    description = "xiaomi-sheng stage-2 USB serial debug gadget";
     wantedBy = [ "multi-user.target" ];
     after = [ "local-fs.target" ];
     path = with pkgs; [
-      android-tools
       coreutils
       util-linux
     ];
@@ -91,20 +90,20 @@
     script = ''
       set -u
 
-      echo "sheng-usb-debug-gadget: mounting configfs"
+      echo "sheng-usb-serial-gadget: mounting configfs"
       mountpoint -q /sys/kernel/config || mount -t configfs none /sys/kernel/config
 
       UDC="$(ls /sys/class/udc | head -n1 || true)"
       if [ -z "$UDC" ]; then
-        echo "sheng-usb-debug-gadget: no UDC found"
+        echo "sheng-usb-serial-gadget: no UDC found"
         exit 1
       fi
-      echo "sheng-usb-debug-gadget: selected UDC $UDC"
+      echo "sheng-usb-serial-gadget: selected UDC $UDC"
 
       G=/sys/kernel/config/usb_gadget/sheng
 
       if [ -d "$G" ]; then
-        echo "sheng-usb-debug-gadget: cleaning old gadget"
+        echo "sheng-usb-serial-gadget: cleaning old gadget"
         echo "" > "$G/UDC" 2>/dev/null || true
         for link in "$G"/configs/c.1/*; do
           [ -L "$link" ] && rm -f "$link" || true
@@ -126,31 +125,18 @@
       mkdir -p "$G/strings/0x409"
       echo "xiaomi-sheng" > "$G/strings/0x409/serialnumber"
       echo "DotRedstone" > "$G/strings/0x409/manufacturer"
-      echo "NixOS Debug Gadget" > "$G/strings/0x409/product"
+      echo "NixOS USB Serial" > "$G/strings/0x409/product"
 
       mkdir -p "$G/configs/c.1/strings/0x409"
-      echo "ADB + Serial" > "$G/configs/c.1/strings/0x409/configuration"
+      echo "Serial" > "$G/configs/c.1/strings/0x409/configuration"
       echo 250 > "$G/configs/c.1/MaxPower"
 
-      echo "sheng-usb-debug-gadget: creating ffs.adb"
-      mkdir -p "$G/functions/ffs.adb"
-      mkdir -p /dev/usb-ffs/adb
-      mountpoint -q /dev/usb-ffs/adb || mount -t functionfs adb /dev/usb-ffs/adb
-
-      echo "sheng-usb-debug-gadget: creating acm.usb0"
+      echo "sheng-usb-serial-gadget: creating acm.usb0"
       mkdir -p "$G/functions/acm.usb0"
       ln -s "$G/functions/acm.usb0" "$G/configs/c.1/acm.usb0"
+      echo "sheng-usb-serial-gadget: acm.usb0 linked"
 
-      if command -v adbd >/dev/null 2>&1; then
-        ADBD="$(command -v adbd)"
-        echo "sheng-usb-debug-gadget: starting adbd from $ADBD"
-        ln -s "$G/functions/ffs.adb" "$G/configs/c.1/ffs.adb"
-        "$ADBD" &
-      else
-        echo "sheng-usb-debug-gadget: adbd not found; ADB function created but not bound; use ttyGS0 serial fallback"
-      fi
-
-      echo "sheng-usb-debug-gadget: binding UDC"
+      echo "sheng-usb-serial-gadget: binding UDC"
       echo "$UDC" > "$G/UDC"
     '';
   };
