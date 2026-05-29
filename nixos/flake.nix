@@ -49,6 +49,9 @@
         inherit pkgs;
         device = ./devices/xiaomi-sheng;
         configuration = [
+          ({ ... }: {
+            nixpkgs.pkgs = pkgs;
+          })
           ./configuration.nix
           ./mobile-profile.nix
         ];
