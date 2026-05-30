@@ -16,6 +16,7 @@ mobile-nixos.kernel-builder-clang {
   patches = [
     ./0001-disable-dp0-sheng.patch
     ./0002-ucsi-glink-debug-retry.patch
+    ./0003-pdr-pd-mapper-debug.patch
   ];
 
   isModular = true;

@@ -1,0 +1,179 @@
+diff --git a/drivers/soc/qcom/pdr_interface.c b/drivers/soc/qcom/pdr_interface.c
+index 72259f489..3fced5136 100644
+--- a/drivers/soc/qcom/pdr_interface.c
++++ b/drivers/soc/qcom/pdr_interface.c
+@@ -85,6 +85,8 @@ static int pdr_locator_new_server(struct qmi_handle *qmi,
+ 	pdr->locator_init_complete = true;
+ 	mutex_unlock(&pdr->lock);
+ 
++	pr_info("PDR: locator new server node=%d port=%d\n", svc->node, svc->port);
++
+ 	/* Service pending lookup requests */
+ 	schedule_work(&pdr->locator_work);
+ 
+@@ -386,6 +388,9 @@ static int pdr_get_domain_list(struct servreg_get_domain_list_req *req,
+ 		return -EREMOTEIO;
+ 	}
+ 
++	pr_info("PDR: %s get domain list returned %d domains (of %d total)\n",
++		req->service_name, resp->domain_list_len, resp->total_domains);
++
+ 	return 0;
+ }
+ 
+@@ -435,6 +440,8 @@ static int pdr_locate_service(struct pdr_handle *pdr, struct pdr_service *pds)
+ 		domains_read += resp->domain_list_len;
+ 	} while (domains_read < resp->total_domains);
+ 
++	pr_err("PDR: %s service '%s' not found in %d domains\n", pds->service_name, pds->service_path, domains_read);
++
+ 	return ret;
+ }
+ 
+@@ -540,6 +547,9 @@ struct pdr_service *pdr_add_lookup(struct pdr_handle *pdr,
+ 	list_add(&pds->node, &pdr->lookups);
+ 	mutex_unlock(&pdr->list_lock);
+ 
++	pr_info("PDR: adding lookup for service_name=%s service_path=%s\n",
++		service_name, service_path);
++
+ 	schedule_work(&pdr->locator_work);
+ 
+ 	return_ptr(pds);
+diff --git a/drivers/soc/qcom/pmic_glink.c b/drivers/soc/qcom/pmic_glink.c
+index 627f96ca3..98d334fab 100644
+--- a/drivers/soc/qcom/pmic_glink.c
++++ b/drivers/soc/qcom/pmic_glink.c
+@@ -231,6 +231,8 @@ static void pmic_glink_pdr_callback(int state, char *svc_path, void *priv)
+ {
+ 	struct pmic_glink *pg = priv;
+ 
++	dev_info(pg->dev, "pmic_glink_pdr_callback: svc_path=%s state=%d\n", svc_path, state);
++
+ 	guard(mutex)(&pg->state_lock);
+ 	pg->pdr_state = state;
+ 
+@@ -249,6 +251,8 @@ static int pmic_glink_rpmsg_probe(struct rpmsg_device *rpdev)
+ 	dev_set_drvdata(&rpdev->dev, pg);
+ 	pg->pdr_available = rpdev->id.driver_data;
+ 
++	dev_info(&rpdev->dev, "pmic_glink_rpmsg_probe: pg->pdr_available=%d\n", pg->pdr_available);
++
+ 	guard(mutex)(&pg->state_lock);
+ 	pg->ept = rpdev->ept;
+ 	if (!pg->pdr_available)
+@@ -338,12 +342,14 @@ static int pmic_glink_probe(struct platform_device *pdev)
+ 			goto out_release_altmode_aux;
+ 	}
+ 
++	dev_info(&pdev->dev, "pmic_glink_probe: calling pdr_add_lookup for tms/servreg, msm/adsp/charger_pd\n");
+ 	service = pdr_add_lookup(pg->pdr, "tms/servreg", "msm/adsp/charger_pd");
+ 	if (IS_ERR(service)) {
+ 		ret = dev_err_probe(&pdev->dev, PTR_ERR(service),
+ 				    "failed adding pdr lookup for charger_pd\n");
+ 		goto out_release_aux_devices;
+ 	}
++	dev_info(&pdev->dev, "pmic_glink_probe: pdr_add_lookup successful\n");
+ 
+ 	mutex_lock(&__pmic_glink_lock);
+ 	__pmic_glink = pg;
+diff --git a/drivers/soc/qcom/qcom_pd_mapper.c b/drivers/soc/qcom/qcom_pd_mapper.c
+index dc10bc859..adb7d60e0 100644
+--- a/drivers/soc/qcom/qcom_pd_mapper.c
++++ b/drivers/soc/qcom/qcom_pd_mapper.c
+@@ -198,7 +198,7 @@ static void qcom_pdm_get_domain_list(struct qmi_handle *qmi,
+ 		}
+ 	}
+ 
+-	pr_debug("PDM: service '%s' offset %d returning %d domains (of %d)\n", req->service_name,
++	pr_info("PDM: service '%s' offset %d returning %d domains (of %d)\n", req->service_name,
+ 		 req->domain_offset_valid ? req->domain_offset : -1, rsp->domain_list_len, rsp->total_domains);
+ 
+ 	ret = qmi_send_response(qmi, sq, txn, SERVREG_GET_DOMAIN_LIST_REQ,
+@@ -663,6 +663,8 @@ static struct qcom_pdm_data *qcom_pdm_start(void)
+ 		goto err_stop;
+ 	}
+ 
++	pr_info("PDM: qcom_pdm_start completed successfully\n");
++
+ 	return data;
+ 
+ err_stop:
+@@ -671,61 +673,43 @@ static struct qcom_pdm_data *qcom_pdm_start(void)
+ 	return ERR_PTR(ret);
+ }
+ 
+-static int qcom_pdm_probe(struct auxiliary_device *auxdev,
+-			  const struct auxiliary_device_id *id)
+-
++static int __init qcom_pdm_init(void)
+ {
+ 	struct qcom_pdm_data *data;
+-	int ret = 0;
++
++	pr_info("PDM: starting globally\n");
+ 
+ 	mutex_lock(&qcom_pdm_mutex);
+ 
+ 	if (!__qcom_pdm_data) {
+ 		data = qcom_pdm_start();
+ 
+-		if (IS_ERR(data))
+-			ret = PTR_ERR(data);
+-		else
++		if (IS_ERR(data)) {
++			pr_err("PDM: qcom_pdm_start failed: %ld\n", PTR_ERR(data));
++		} else {
+ 			__qcom_pdm_data = data;
+-	} else {
+-		refcount_inc(&__qcom_pdm_data->refcnt);
++		}
+ 	}
+ 
+-	auxiliary_set_drvdata(auxdev, __qcom_pdm_data);
+-
+ 	mutex_unlock(&qcom_pdm_mutex);
+ 
+-	return ret;
++	return 0;
+ }
+ 
+-static void qcom_pdm_remove(struct auxiliary_device *auxdev)
++static void __exit qcom_pdm_exit(void)
+ {
+-	struct qcom_pdm_data *data;
+-
+-	data = auxiliary_get_drvdata(auxdev);
+-	if (!data)
+-		return;
++	mutex_lock(&qcom_pdm_mutex);
+ 
+-	if (refcount_dec_and_mutex_lock(&data->refcnt, &qcom_pdm_mutex)) {
++	if (__qcom_pdm_data) {
++		qcom_pdm_stop(__qcom_pdm_data);
+ 		__qcom_pdm_data = NULL;
+-		qcom_pdm_stop(data);
+-		mutex_unlock(&qcom_pdm_mutex);
+ 	}
+-}
+ 
+-static const struct auxiliary_device_id qcom_pdm_table[] = {
+-	{ .name = "qcom_common.pd-mapper" },
+-	{},
+-};
+-MODULE_DEVICE_TABLE(auxiliary, qcom_pdm_table);
++	mutex_unlock(&qcom_pdm_mutex);
++}
+ 
+-static struct auxiliary_driver qcom_pdm_drv = {
+-	.name = "qcom-pdm-mapper",
+-	.id_table = qcom_pdm_table,
+-	.probe = qcom_pdm_probe,
+-	.remove = qcom_pdm_remove,
+-};
+-module_auxiliary_driver(qcom_pdm_drv);
++module_init(qcom_pdm_init);
++module_exit(qcom_pdm_exit);
+ 
+ MODULE_DESCRIPTION("Qualcomm Protection Domain Mapper");
+ MODULE_LICENSE("GPL");
