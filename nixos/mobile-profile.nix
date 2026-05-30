@@ -4,6 +4,9 @@ let
   headlessStage1Task = pkgs.writeTextDir "zz-sheng-headless-stage1.rb" (
     builtins.readFile ./patches/stage-1-headless-no-gui.rb
   );
+  udevTolerantTask = pkgs.writeTextDir "zz-sheng-udev-tolerant.rb" (
+    builtins.readFile ./patches/stage-1-udev-trigger-tolerant.rb
+  );
   closureInfo = pkgs.buildPackages.closureInfo {
     rootPaths = config.system.build.toplevel;
   };
@@ -78,6 +81,7 @@ in
 
     tasks = [
       headlessStage1Task
+      udevTolerantTask
     ];
 
     shell.shellOnFail = true;
