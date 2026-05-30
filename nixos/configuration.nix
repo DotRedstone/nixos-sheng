@@ -82,17 +82,25 @@
   boot.loader.generic-extlinux-compatible.enable = false;
 
   boot.kernelParams = [
+    "console=tty0"
+    "console=tty1"
     "console=ttyMSM0,115200n8"
+    "fbcon=map:0"
+    "fbcon=rotate:1"
     "root=PARTLABEL=linux"
     "rootwait"
-    "quiet"
-    "loglevel=3"
-    "systemd.show_status=false"
-    "udev.log_level=3"
-    "rd.udev.log_level=3"
-    "vt.global_cursor_default=0"
     "logo.nologo"
+    "loglevel=7"
+    "systemd.show_status=true"
+    "systemd.log_level=debug"
+    "systemd.log_target=console"
+    "udev.log_level=debug"
+    "rd.udev.log_level=debug"
+    "vt.global_cursor_default=1"
   ];
+
+  boot.consoleLogLevel = 7;
+  boot.initrd.verbose = true;
 
   boot.supportedFilesystems = [ "ext4" ];
 }
