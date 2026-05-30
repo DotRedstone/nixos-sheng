@@ -51,6 +51,9 @@ mobile-nixos.kernel-builder-clang {
     echo "--- compat / neon ---"
     grep -nE '^CONFIG_COMPAT=|^# CONFIG_COMPAT is not set|^CONFIG_COMPAT_VDSO=|^# CONFIG_COMPAT_VDSO is not set|^CONFIG_KUSER_HELPERS=|^# CONFIG_KUSER_HELPERS is not set|^CONFIG_KERNEL_MODE_NEON=|^# CONFIG_KERNEL_MODE_NEON is not set' build/.config || true
 
+    echo "--- gpio shared proxy ---"
+    grep -nE '^CONFIG_HAVE_SHARED_GPIOS=|^CONFIG_GPIO_SHARED=|^CONFIG_GPIO_SHARED_PROXY=' build/.config || true
+
     echo "--- mobile-nixos network validation related ---"
     grep -nE '^CONFIG_BRIDGE=|^CONFIG_BRIDGE_NETFILTER=|^CONFIG_NF_TABLES=|^CONFIG_NETFILTER_XTABLES=|^CONFIG_IP6_NF_IPTABLES=' build/.config || true
 
