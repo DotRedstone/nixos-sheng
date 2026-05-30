@@ -10,6 +10,19 @@ let
   closureInfo = pkgs.buildPackages.closureInfo {
     rootPaths = config.system.build.toplevel;
   };
+  udevadmWrapper = pkgs.writeShellScript "udevadm-trigger-wrapper" ''
+    out=$(${config.systemd.package}/bin/udevadm trigger "$@" 2>&1)
+    ret=$?
+    
+    if [ $ret -ne 0 ]; then
+      filtered=$(echo "$out" | grep -v 'qcom-battmgr' | grep -v 'Resource temporarily unavailable' || true)
+      if [ -n "$filtered" ]; then
+        echo "$filtered" >&2
+        exit $ret
+      fi
+      exit 0
+    fi
+  '';
 in
 {
   mobile.enable = true;
@@ -97,4 +110,11 @@ in
   mobile.beautification.silentBoot = lib.mkForce false;
 
   documentation.enable = false;
+
+  # Wrap udevadm trigger in stage-2 to prevent qcom-battmgr from polluting the journal with fatal errors
+  systemd.services.systemd-udev-trigger.serviceConfig.ExecStart = lib.mkForce [
+    ""
+    "${udevadmWrapper} --type=subsystems --action=add"
+    "${udevadmWrapper} --type=devices --action=add"
+  ];
 }

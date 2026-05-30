@@ -16,11 +16,23 @@ class Tasks::UDev < SingletonTask
     udevd
 
     begin
-      udevadm("trigger", "--action=add")
+      System.run(
+        "sh", "-c",
+        "out=$(udevadm trigger --action=add 2>&1); " \
+        "ret=$?; " \
+        "if [ $ret -ne 0 ]; then " \
+        "  filtered=$(echo \"$out\" | grep -v 'qcom-battmgr' | grep -v 'Resource temporarily unavailable' || true); " \
+        "  if [ -n \"$filtered\" ]; then " \
+        "    echo \"$filtered\" >&2; " \
+        "    exit $ret; " \
+        "  fi; " \
+        "  exit 0; " \
+        "fi"
+      )
     rescue System::CommandError => e
       $logger.warn(
         "udevadm trigger returned non-zero (#{e}); " \
-        "continuing because qcom-battmgr power_supply may return EAGAIN during initrd"
+        "continuing despite unrecognized errors"
       )
     end
 
