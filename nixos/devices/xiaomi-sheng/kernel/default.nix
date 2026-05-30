@@ -13,6 +13,9 @@ mobile-nixos.kernel-builder-clang {
   modDirVersion = "7.0.0";
   src = shengKernelSrc;
   configfile = ./config.aarch64;
+  patches = [
+    ./0001-disable-dp0-sheng.patch
+  ];
 
   isModular = true;
   isCompressed = "gz";
