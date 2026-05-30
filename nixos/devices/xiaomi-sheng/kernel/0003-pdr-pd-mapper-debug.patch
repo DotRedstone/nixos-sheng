@@ -1,5 +1,5 @@
 diff --git a/drivers/soc/qcom/pdr_interface.c b/drivers/soc/qcom/pdr_interface.c
-index 72259f489..3fced5136 100644
+index 72259f4..8b661ba 100644
 --- a/drivers/soc/qcom/pdr_interface.c
 +++ b/drivers/soc/qcom/pdr_interface.c
 @@ -85,6 +85,8 @@ static int pdr_locator_new_server(struct qmi_handle *qmi,
@@ -21,7 +21,16 @@ index 72259f489..3fced5136 100644
  	return 0;
  }
  
-@@ -435,6 +440,8 @@ static int pdr_locate_service(struct pdr_handle *pdr, struct pdr_service *pds)
+@@ -414,6 +419,8 @@ static int pdr_locate_service(struct pdr_handle *pdr, struct pdr_service *pds)
+ 		for (i = 0; i < resp->domain_list_len; i++) {
+ 			entry = &resp->domain_list[i];
+ 
++			pr_info("PDR: domain candidate: name='%s' instance=%u\n", entry->name, entry->instance);
++
+ 			if (strnlen(entry->name, sizeof(entry->name)) == sizeof(entry->name))
+ 				continue;
+ 
+@@ -435,6 +442,8 @@ static int pdr_locate_service(struct pdr_handle *pdr, struct pdr_service *pds)
  		domains_read += resp->domain_list_len;
  	} while (domains_read < resp->total_domains);
  
@@ -30,7 +39,7 @@ index 72259f489..3fced5136 100644
  	return ret;
  }
  
-@@ -540,6 +547,9 @@ struct pdr_service *pdr_add_lookup(struct pdr_handle *pdr,
+@@ -540,6 +549,9 @@ struct pdr_service *pdr_add_lookup(struct pdr_handle *pdr,
  	list_add(&pds->node, &pdr->lookups);
  	mutex_unlock(&pdr->list_lock);
  
@@ -41,7 +50,7 @@ index 72259f489..3fced5136 100644
  
  	return_ptr(pds);
 diff --git a/drivers/soc/qcom/pmic_glink.c b/drivers/soc/qcom/pmic_glink.c
-index 627f96ca3..98d334fab 100644
+index 627f96c..98d334f 100644
 --- a/drivers/soc/qcom/pmic_glink.c
 +++ b/drivers/soc/qcom/pmic_glink.c
 @@ -231,6 +231,8 @@ static void pmic_glink_pdr_callback(int state, char *svc_path, void *priv)
@@ -78,7 +87,7 @@ index 627f96ca3..98d334fab 100644
  	mutex_lock(&__pmic_glink_lock);
  	__pmic_glink = pg;
 diff --git a/drivers/soc/qcom/qcom_pd_mapper.c b/drivers/soc/qcom/qcom_pd_mapper.c
-index dc10bc859..adb7d60e0 100644
+index dc10bc8..d7a06c8 100644
 --- a/drivers/soc/qcom/qcom_pd_mapper.c
 +++ b/drivers/soc/qcom/qcom_pd_mapper.c
 @@ -198,7 +198,7 @@ static void qcom_pdm_get_domain_list(struct qmi_handle *qmi,
@@ -99,81 +108,3 @@ index dc10bc859..adb7d60e0 100644
  	return data;
  
  err_stop:
-@@ -671,61 +673,43 @@ static struct qcom_pdm_data *qcom_pdm_start(void)
- 	return ERR_PTR(ret);
- }
- 
--static int qcom_pdm_probe(struct auxiliary_device *auxdev,
--			  const struct auxiliary_device_id *id)
--
-+static int __init qcom_pdm_init(void)
- {
- 	struct qcom_pdm_data *data;
--	int ret = 0;
-+
-+	pr_info("PDM: starting globally\n");
- 
- 	mutex_lock(&qcom_pdm_mutex);
- 
- 	if (!__qcom_pdm_data) {
- 		data = qcom_pdm_start();
- 
--		if (IS_ERR(data))
--			ret = PTR_ERR(data);
--		else
-+		if (IS_ERR(data)) {
-+			pr_err("PDM: qcom_pdm_start failed: %ld\n", PTR_ERR(data));
-+		} else {
- 			__qcom_pdm_data = data;
--	} else {
--		refcount_inc(&__qcom_pdm_data->refcnt);
-+		}
- 	}
- 
--	auxiliary_set_drvdata(auxdev, __qcom_pdm_data);
--
- 	mutex_unlock(&qcom_pdm_mutex);
- 
--	return ret;
-+	return 0;
- }
- 
--static void qcom_pdm_remove(struct auxiliary_device *auxdev)
-+static void __exit qcom_pdm_exit(void)
- {
--	struct qcom_pdm_data *data;
--
--	data = auxiliary_get_drvdata(auxdev);
--	if (!data)
--		return;
-+	mutex_lock(&qcom_pdm_mutex);
- 
--	if (refcount_dec_and_mutex_lock(&data->refcnt, &qcom_pdm_mutex)) {
-+	if (__qcom_pdm_data) {
-+		qcom_pdm_stop(__qcom_pdm_data);
- 		__qcom_pdm_data = NULL;
--		qcom_pdm_stop(data);
--		mutex_unlock(&qcom_pdm_mutex);
- 	}
--}
- 
--static const struct auxiliary_device_id qcom_pdm_table[] = {
--	{ .name = "qcom_common.pd-mapper" },
--	{},
--};
--MODULE_DEVICE_TABLE(auxiliary, qcom_pdm_table);
-+	mutex_unlock(&qcom_pdm_mutex);
-+}
- 
--static struct auxiliary_driver qcom_pdm_drv = {
--	.name = "qcom-pdm-mapper",
--	.id_table = qcom_pdm_table,
--	.probe = qcom_pdm_probe,
--	.remove = qcom_pdm_remove,
--};
--module_auxiliary_driver(qcom_pdm_drv);
-+module_init(qcom_pdm_init);
-+module_exit(qcom_pdm_exit);
- 
- MODULE_DESCRIPTION("Qualcomm Protection Domain Mapper");
- MODULE_LICENSE("GPL");

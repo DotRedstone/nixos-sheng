@@ -11,13 +11,21 @@
       url = "github:map220v/sm8550-mainline/sheng-7.0";
       flake = false;
     };
+    shengFirmware = {
+      url = "github:map220v/sheng-firmware";
+      flake = false;
+    };
   };
 
-  outputs = { self, mobile-nixos, nixpkgs, shengKernelSrc }:
+  outputs = { self, mobile-nixos, nixpkgs, shengKernelSrc, shengFirmware }:
     let
       system = "aarch64-linux";
       shengOverlay = final: prev: {
         inherit shengKernelSrc;
+        sheng-firmware = prev.runCommand "sheng-firmware" {} ''
+          mkdir -p $out/lib/firmware
+          cp -r ${shengFirmware}/* $out/lib/firmware/
+        '';
         libinput = prev.libinput.override {
           luaSupport = false;
         };

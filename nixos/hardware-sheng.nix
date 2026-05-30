@@ -10,6 +10,7 @@
   zramSwap.enable = false;
 
   hardware.enableRedistributableFirmware = true;
+  hardware.firmware = [ pkgs.sheng-firmware ];
 
   boot.initrd.availableKernelModules = [
     "ext4"
