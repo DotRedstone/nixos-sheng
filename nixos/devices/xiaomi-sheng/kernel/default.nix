@@ -66,6 +66,9 @@ mobile-nixos.kernel-builder-clang {
     echo "--- qcom typec/pdr config ---"
     grep -nE '^CONFIG_QRTR=|^CONFIG_QCOM_PD_MAPPER=|^CONFIG_QCOM_PDR_HELPERS=|^CONFIG_QCOM_PMIC_GLINK=|^CONFIG_UCSI_PMIC_GLINK=|^CONFIG_TYPEC_UCSI=|^CONFIG_USB_ROLE_SWITCH=' build/.config || true
 
+    echo "--- pmic glink power supply config ---"
+    grep -nE '^CONFIG_POWER_SUPPLY=|^CONFIG_BATTERY_QCOM_BATTMGR=|^CONFIG_QCOM_PMIC_GLINK=|^CONFIG_UCSI_PMIC_GLINK=|^CONFIG_TYPEC_UCSI=|^CONFIG_TYPEC=|^CONFIG_QRTR=|^CONFIG_QCOM_PD_MAPPER=' build/.config || true
+
     echo "--- compiler identity ---"
     command -v clang || true
     clang --version | head -3 || true
