@@ -1,0 +1,103 @@
+diff --git a/drivers/usb/typec/ucsi/ucsi_glink.c b/drivers/usb/typec/ucsi/ucsi_glink.c
+index 11b3e24e3..af91debbe 100644
+--- a/drivers/usb/typec/ucsi/ucsi_glink.c
++++ b/drivers/usb/typec/ucsi/ucsi_glink.c
+@@ -4,6 +4,7 @@
+  * Copyright (c) 2023, Linaro Ltd
+  */
+ #include <linux/auxiliary_bus.h>
++#include <linux/delay.h>
+ #include <linux/module.h>
+ #include <linux/mutex.h>
+ #include <linux/of_device.h>
+@@ -73,10 +74,11 @@ struct pmic_glink_ucsi {
+ 	struct mutex lock;	/* protects concurrent access to PMIC Glink interface */
+ 
+ 	struct work_struct notify_work;
+-	struct work_struct register_work;
++	struct delayed_work register_work;
+ 	spinlock_t state_lock;
+ 	bool ucsi_registered;
+ 	bool pd_running;
++	int register_retries;
+ 
+ 	u8 read_buf[UCSI_BUF_V2_SIZE];
+ };
+@@ -121,7 +123,14 @@ out_unlock:
+ 
+ static int pmic_glink_ucsi_read_version(struct ucsi *ucsi, u16 *version)
+ {
+-	return pmic_glink_ucsi_read(ucsi, UCSI_VERSION, version, sizeof(*version));
++	struct pmic_glink_ucsi *udata = ucsi_get_drvdata(ucsi);
++	int ret;
++
++	ret = pmic_glink_ucsi_read(ucsi, UCSI_VERSION, version, sizeof(*version));
++	dev_info(udata->dev,
++		 "UCSI read_version: ret=%d raw_version=0x%04x\n",
++		 ret, ret ? 0 : *version);
++	return ret;
+ }
+ 
+ static int pmic_glink_ucsi_read_cci(struct ucsi *ucsi, u32 *cci)
+@@ -312,17 +321,40 @@ static void pmic_glink_ucsi_notify(struct work_struct *work)
+ 
+ static void pmic_glink_ucsi_register(struct work_struct *work)
+ {
+-	struct pmic_glink_ucsi *ucsi = container_of(work, struct pmic_glink_ucsi, register_work);
++	struct pmic_glink_ucsi *ucsi = container_of(work, struct pmic_glink_ucsi,
++						    register_work.work);
+ 	unsigned long flags;
+ 	bool pd_running;
++	int ret;
+ 
+ 	spin_lock_irqsave(&ucsi->state_lock, flags);
+ 	pd_running = ucsi->pd_running;
+ 	spin_unlock_irqrestore(&ucsi->state_lock, flags);
+ 
++	dev_info(ucsi->dev,
++		 "UCSI register_work: pd_running=%d registered=%d retries=%d\n",
++		 pd_running, ucsi->ucsi_registered, ucsi->register_retries);
++
+ 	if (!ucsi->ucsi_registered && pd_running) {
+-		ucsi_register(ucsi->ucsi);
+-		ucsi->ucsi_registered = true;
++		ret = ucsi_register(ucsi->ucsi);
++		if (ret) {
++			dev_err(ucsi->dev,
++				"UCSI register failed: %d (attempt %d/10)\n",
++				ret, ucsi->register_retries + 1);
++			/*
++			 * Qualcomm PMIC GLINK UCSI version read can return
++			 * -ETIMEDOUT or version=0 if PD firmware is not
++			 * fully ready.  Retry with 500ms spacing.
++			 */
++			if (ucsi->register_retries < 10) {
++				ucsi->register_retries++;
++				schedule_delayed_work(&ucsi->register_work,
++						      msecs_to_jiffies(500));
++			}
++		} else {
++			dev_info(ucsi->dev, "UCSI registered successfully\n");
++			ucsi->ucsi_registered = true;
++		}
+ 	} else if (ucsi->ucsi_registered && !pd_running) {
+ 		ucsi_unregister(ucsi->ucsi);
+ 		ucsi->ucsi_registered = false;
+@@ -355,7 +387,7 @@ static void pmic_glink_ucsi_pdr_notify(void *priv, int state)
+ 	spin_lock_irqsave(&ucsi->state_lock, flags);
+ 	ucsi->pd_running = (state == SERVREG_SERVICE_STATE_UP);
+ 	spin_unlock_irqrestore(&ucsi->state_lock, flags);
+-	schedule_work(&ucsi->register_work);
++	schedule_delayed_work(&ucsi->register_work, 0);
+ }
+ 
+ static void pmic_glink_ucsi_destroy(void *data)
+@@ -398,7 +430,7 @@ static int pmic_glink_ucsi_probe(struct auxiliary_device *adev,
+ 	dev_set_drvdata(dev, ucsi);
+ 
+ 	INIT_WORK(&ucsi->notify_work, pmic_glink_ucsi_notify);
+-	INIT_WORK(&ucsi->register_work, pmic_glink_ucsi_register);
++	INIT_DELAYED_WORK(&ucsi->register_work, pmic_glink_ucsi_register);
+ 	init_completion(&ucsi->read_ack);
+ 	init_completion(&ucsi->write_ack);
+ 	spin_lock_init(&ucsi->state_lock);
