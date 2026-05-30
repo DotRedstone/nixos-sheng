@@ -88,23 +88,18 @@
 
   boot.kernelParams = [
     "console=tty0"
-    "console=tty1"
     "console=ttyMSM0,115200n8"
-    "fbcon=map:0"
-    "fbcon=rotate:1"
     "root=PARTLABEL=linux"
     "rootwait"
     "logo.nologo"
-    "loglevel=7"
+    "loglevel=4"
     "systemd.show_status=true"
-    "systemd.log_level=debug"
-    "systemd.log_target=console"
-    "udev.log_level=debug"
-    "rd.udev.log_level=debug"
+    "udev.log_level=info"
+    "rd.udev.log_level=info"
     "vt.global_cursor_default=1"
   ];
 
-  boot.consoleLogLevel = 7;
+  boot.consoleLogLevel = 4;
   boot.initrd.verbose = true;
 
   boot.supportedFilesystems = [ "ext4" ];
