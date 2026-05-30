@@ -97,6 +97,7 @@
     "udev.log_level=info"
     "rd.udev.log_level=info"
     "vt.global_cursor_default=1"
+    "androidboot.force_normal_boot=1"
   ];
 
   boot.consoleLogLevel = 4;
