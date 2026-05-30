@@ -55,12 +55,17 @@
     '';
   };
 
-  environment.systemPackages = with pkgs; [
+  environment.systemPackages = let
+    sheng-check = pkgs.writeShellScriptBin "sheng-check" (builtins.readFile ./scripts/sheng-check.sh);
+  in with pkgs; [
+    sheng-check
     curl
     e2fsprogs
+    evtest
     gitMinimal
     iproute2
     kmod
+    libinput
     nano
     pciutils
     util-linux
