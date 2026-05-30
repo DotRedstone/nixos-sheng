@@ -7,7 +7,7 @@
     options = [ "noatime" "errors=remount-ro" ];
   };
 
-  zramSwap.enable = true;
+  zramSwap.enable = false;
 
   hardware.enableRedistributableFirmware = true;
 
