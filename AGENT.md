@@ -297,3 +297,106 @@ dmesg | grep -Ei 'adsp|cdsp|firmware|charger_pd|pd_running|ucsi|typec|ath12k|mhi
 
 `AGENTS.md` 只写协作规则和操作边界，不写当前 TODO。
 当前任务、路线图、已知问题应放在 README、docs、TODO.md 或 GitHub Issues。
+
+## Release 与 Actions 规则
+
+本项目的构建产物面向真实刷机使用，因此每次修改后必须明确影响范围，并触发对应构建。
+
+### 版本规则
+
+使用语义化版本，并在硬件 bring-up 阶段使用 alpha / beta 标记：
+
+* `v0.1.0-alpha.1`：首个可启动测试镜像
+* `v0.1.0-alpha.N`：每次修通一个用户可感知硬件功能后递增
+* `v0.1.0-beta.N`：主要硬件基本可用后使用
+* `v0.1.0`：达到可公开日用测试标准后使用
+
+不要因为普通文档修改、日志降噪、小型重构发布 release。
+每修通一个明确硬件能力，例如 Wi-Fi、触摸、蓝牙、音频、传感器、相机，可以考虑发布新的 alpha release。
+
+### 构建产物规则
+
+根据修改范围选择构建目标：
+
+| 修改范围                                                                                      | Actions 构建目标  | Release 附件               |
+| ----------------------------------------------------------------------------------------- | ------------- | ------------------------ |
+| kernel config / kernel patch / DTS / DTB / initrd / cmdline                               | boot image    | `sheng-boot-*.img`       |
+| firmware / systemd / udev / packages / desktop / rootfs layout / kernel modules in rootfs | rootfs image  | `sheng-rootfs-*.img.zst` |
+| 同时影响 boot 和 rootfs                                                                        | boot + rootfs | 两者都上传                    |
+| 仅文档                                                                                       | 不构建刷机包        | 不发布 release              |
+
+修改 rootfs 内容后，不要只构建 boot。
+修改 kernel modules、firmware、桌面环境、普通软件包后，必须构建 rootfs。
+修改 kernel config、DTS、kernel patch 后，必须构建 boot；如果模块也进入 rootfs，则 rootfs 也要构建。
+
+### Actions 触发规则
+
+普通分支或 PR：
+
+* 可以运行构建检查。
+* 可以上传临时 artifact。
+* 不自动发布 GitHub Release。
+
+手动 workflow_dispatch：
+
+* 可选择构建 `boot`、`rootfs` 或 `both`。
+* 可选择是否上传 artifact。
+* 默认不发布 release，除非显式传入 release/tag 参数。
+
+tag 推送：
+
+* `v*` tag 可以触发正式 release workflow。
+* release workflow 必须生成校验文件。
+* release workflow 必须上传刷机说明或在 release notes 中写清楚刷机方式。
+
+### Release 附件规则
+
+Release 至少包含：
+
+* boot 镜像，如果本版本需要刷 `boot_b`
+* rootfs 镜像，如果本版本需要刷 `linux`
+* `sha256sums.txt`
+* 简要刷机说明
+* Known issues
+
+推荐命名：
+
+```text
+sheng-v0.1.0-alpha.1-boot.img
+sheng-v0.1.0-alpha.1-rootfs-minimal.img.zst
+sheng-v0.1.0-alpha.1-sha256sums.txt
+```
+
+GNOME 或其它大桌面环境不要默认塞进 minimal 镜像。
+如果提供 GNOME 测试镜像，使用单独附件：
+
+```text
+sheng-v0.1.0-alpha.N-rootfs-gnome.img.zst
+```
+
+### Release notes 必须包含
+
+每个 release 必须写清楚：
+
+* 当前版本适用设备
+* 当前可用硬件
+* 当前不可用硬件
+* 需要刷哪些分区
+* 是否需要扩容 linux 分区
+* 是否需要同时刷 `boot_b` 和 `linux`
+* 回滚方式
+* 不要刷 `userdata` 的提醒
+
+### 安全规则
+
+Actions 和 release 中不得包含：
+
+* token
+* cookie
+* session
+* 私人账号信息
+* 原始敏感日志
+* Android userdata 内容
+* 未清理的调试 dump
+
+所有 release 附件必须来自可复现的 Actions 构建或明确记录的本地构建流程。
