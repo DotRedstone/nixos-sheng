@@ -10,6 +10,18 @@ let
   closureInfo = pkgs.buildPackages.closureInfo {
     rootPaths = config.system.build.toplevel;
   };
+  kernelModulesTree = pkgs.runCommand "sheng-kernel-modules-tree" {
+    nativeBuildInputs = [
+      pkgs.buildPackages.kmod
+    ];
+  } ''
+    mkdir -p $out/lib
+    cp -r ${config.mobile.boot.stage-1.kernel.package}/lib/modules $out/lib/
+    chmod -R u+w $out/lib/modules
+
+    version="$(basename "$out"/lib/modules/*)"
+    depmod -b "$out" "$version"
+  '';
   udevadmWrapper = pkgs.writeShellScript "udevadm-trigger-wrapper" ''
     out=$(${config.systemd.package}/bin/udevadm trigger "$@" 2>&1)
     ret=$?
@@ -62,6 +74,14 @@ in
       echo "Injecting sheng-firmware into /lib/firmware..."
       mkdir -p ./lib/firmware
       cp -r ${pkgs.sheng-firmware}/lib/firmware/* ./lib/firmware/
+
+      echo "Injecting kernel modules into /lib/modules..."
+      if [ -d ${kernelModulesTree}/lib/modules ]; then
+        mkdir -p ./lib/modules
+        cp -r ${kernelModulesTree}/lib/modules/* ./lib/modules/
+      else
+        echo "WARNING: sheng kernel modules tree has no lib/modules directory"
+      fi
     '';
 
     additionalCommands = ''
@@ -113,6 +133,10 @@ in
   mobile.adbd.enable = lib.mkDefault true;
 
   mobile.beautification.silentBoot = lib.mkForce false;
+
+  system.modulesTree = lib.mkForce [
+    kernelModulesTree
+  ];
 
   documentation.enable = false;
 
