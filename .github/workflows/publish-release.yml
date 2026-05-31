@@ -1,0 +1,53 @@
+name: Publish Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Tag name for the release (e.g., v0.1-alpha)"
+        required: true
+        default: "v0.1-alpha"
+      release_name:
+        description: "Release name"
+        required: true
+        default: "v0.1 测试版"
+      kernel_run_id:
+        description: "Run ID for the kernel build (leave empty for latest)"
+        required: false
+      rootfs_run_id:
+        description: "Run ID for the rootfs build (leave empty for latest)"
+        required: false
+
+jobs:
+  release:
+    name: Publish Combined Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Download kernel artifact
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: kernel.yml
+          run_id: ${{ github.event.inputs.kernel_run_id || '' }}
+          name: sheng-mobile-nixos-boot
+          path: release-artifacts
+
+      - name: Download rootfs artifact
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: nixos-rootfs.yml
+          run_id: ${{ github.event.inputs.rootfs_run_id || '' }}
+          name: nixos-sheng-rootfs
+          path: release-artifacts
+
+      - name: Create Combined Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag_name }}
+          name: ${{ github.event.inputs.release_name }}
+          files: release-artifacts/**/*
+          draft: false
+          prerelease: true
+          generate_release_notes: true
