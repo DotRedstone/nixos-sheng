@@ -1,3 +1,5 @@
+[🇨🇳 简体中文](README_zh.md) | [🇬🇧 English](README.md)
+
 # nixos-xiaomi-sheng
 
 Experimental Mobile NixOS port for the Xiaomi Pad 6S Pro 12.4 (`sheng`,

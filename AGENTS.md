@@ -1,3 +1,5 @@
+[🇨🇳 简体中文](AGENTS.md) | [🇬🇧 English](AGENTS_en.md)
+
 # AGENTS.md
 
 本仓库是 Xiaomi Pad 6S Pro 12.4（sheng）的 Mobile NixOS / NixOS 移植项目。
