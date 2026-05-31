@@ -39,4 +39,25 @@
       done
     '';
   };
+
+  hardware.bluetooth = {
+    enable = true;
+    powerOnBoot = true;
+  };
+
+  systemd.services.sheng-bluetooth-modules = {
+    description = "Load sheng WCN7851 Bluetooth modules";
+    wantedBy = [ "bluetooth.service" ];
+    before = [ "bluetooth.service" ];
+    after = [ "systemd-modules-load.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      for module in bluetooth btqca hci_uart rfkill_gpio; do
+        ${pkgs.kmod}/bin/modprobe "$module" || true
+      done
+    '';
+  };
 }
