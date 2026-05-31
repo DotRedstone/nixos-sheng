@@ -118,6 +118,16 @@ Build the flashable Mobile NixOS rootfs image:
 nix build ./nixos#mobileRootfsImage -o out/mobile-rootfs
 ```
 
+Build the optional GNOME hardware-test rootfs image:
+
+```bash
+nix build ./nixos#mobileRootfsImageGnome -o out/mobile-rootfs-gnome
+```
+
+The GNOME profile lives in `nixos/profiles/gnome.nix` and is only included by
+the `mobileRootfsImageGnome` output. The default `mobileRootfsImage` output stays
+minimal.
+
 Build all Mobile NixOS fastboot-facing images in one output:
 
 ```bash
@@ -128,6 +138,12 @@ Build and copy the rootfs image into `out/nixos-sheng-*.img`:
 
 ```bash
 ./build-nixos-rootfs.sh
+```
+
+Build and copy the GNOME rootfs image through the helper:
+
+```bash
+ROOTFS_FLAKE_ATTR=mobileRootfsImageGnome ./build-nixos-rootfs.sh
 ```
 
 `fullRootfsImage` is kept as a compatibility alias for older commands. It points

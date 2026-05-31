@@ -10,6 +10,14 @@ on:
         description: "RootFS image size, or auto for computed full ext4 size"
         required: true
         default: "auto"
+      rootfs_flake_attr:
+        description: "RootFS flake output to build"
+        required: true
+        type: choice
+        options:
+          - mobileRootfsImage
+          - mobileRootfsImageGnome
+        default: "mobileRootfsImage"
       skip_release:
         description: "Skip GitHub release"
         type: boolean
@@ -43,7 +51,7 @@ jobs:
       - name: Build image
         run: |
           chmod +x build-nixos-rootfs.sh
-          sudo env "PATH=$PATH" "NIX_PATH=$NIX_PATH" IMAGE_SIZE="${{ github.event.inputs.image_size }}" ./build-nixos-rootfs.sh
+          sudo env "PATH=$PATH" "NIX_PATH=$NIX_PATH" IMAGE_SIZE="${{ github.event.inputs.image_size }}" ROOTFS_FLAKE_ATTR="${{ github.event.inputs.rootfs_flake_attr }}" ./build-nixos-rootfs.sh
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

@@ -109,6 +109,15 @@ nix build ./nixos#mobileAndroidBootimg -o out/mobile-bootimg
 nix build ./nixos#mobileRootfsImage -o out/mobile-rootfs
 ```
 
+构建可选的 GNOME 硬件测试 rootfs 镜像：
+
+```bash
+nix build ./nixos#mobileRootfsImageGnome -o out/mobile-rootfs-gnome
+```
+
+GNOME profile 位于 `nixos/profiles/gnome.nix`，只会被 `mobileRootfsImageGnome`
+输出引用。默认 `mobileRootfsImage` 仍保持 minimal。
+
 将所有面向 fastboot 的 Mobile NixOS 镜像输出到一个目录中：
 
 ```bash
@@ -119,6 +128,12 @@ nix build ./nixos#mobileFastbootImages -o out/mobile-fastboot
 
 ```bash
 ./build-nixos-rootfs.sh
+```
+
+通过辅助脚本构建并复制 GNOME rootfs 镜像：
+
+```bash
+ROOTFS_FLAKE_ATTR=mobileRootfsImageGnome ./build-nixos-rootfs.sh
 ```
 
 保留了 `fullRootfsImage` 作为旧命令的兼容别名。它与 `mobileRootfsImage` 指向同一个 Mobile NixOS 生成的 rootfs。
