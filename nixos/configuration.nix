@@ -59,6 +59,7 @@
     sheng-check = pkgs.writeShellScriptBin "sheng-check" (builtins.readFile ./scripts/sheng-check.sh);
   in with pkgs; [
     sheng-check
+    alsa-utils
     curl
     e2fsprogs
     evtest
@@ -84,6 +85,13 @@
   services.udev.extraRules = ''
     ENV{ID_INPUT_TOUCHSCREEN}=="1", ENV{LIBINPUT_CALIBRATION_MATRIX}="1 0 0 0 1 0 0 0 1"
   '';
+
+  security.rtkit.enable = true;
+  services.pipewire = {
+    enable = true;
+    alsa.enable = true;
+    pulse.enable = true;
+  };
 
   boot.loader.grub.enable = false;
   boot.loader.generic-extlinux-compatible.enable = false;
