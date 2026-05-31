@@ -31,9 +31,9 @@ index 11b3e24e3..520ad373d 100644
 +	struct pmic_glink_ucsi *udata = ucsi_get_drvdata(ucsi);
 +	int ret;
 +
-+	dev_info(udata->dev, "UCSI read_version: attempting to read version\n");
++	dev_dbg(udata->dev, "UCSI read_version: attempting to read version\n");
 +	ret = pmic_glink_ucsi_read(ucsi, UCSI_VERSION, version, sizeof(*version));
-+	dev_info(udata->dev,
++	dev_dbg(udata->dev,
 +		 "UCSI read_version: ret=%d raw_version=0x%04x\n",
 +		 ret, ret ? 0 : *version);
 +	return ret;
@@ -55,24 +55,24 @@ index 11b3e24e3..520ad373d 100644
  	pd_running = ucsi->pd_running;
  	spin_unlock_irqrestore(&ucsi->state_lock, flags);
  
-+	dev_info(ucsi->dev,
++	dev_dbg(ucsi->dev,
 +		 "UCSI register_work: pd_running=%d registered=%d retries=%d\n",
 +		 pd_running, ucsi->ucsi_registered, ucsi->register_retries);
 +
  	if (!ucsi->ucsi_registered && pd_running) {
 -		ucsi_register(ucsi->ucsi);
 -		ucsi->ucsi_registered = true;
-+		dev_info(ucsi->dev, "UCSI calling ucsi_register...\n");
++		dev_dbg(ucsi->dev, "UCSI calling ucsi_register...\n");
 +		ret = ucsi_register(ucsi->ucsi);
-+		dev_info(ucsi->dev, "UCSI ucsi_register returned %d\n", ret);
-+		
++		dev_dbg(ucsi->dev, "UCSI ucsi_register returned %d\n", ret);
++
 +		if (ret) {
-+			dev_err(ucsi->dev,
++			dev_dbg(ucsi->dev,
 +				"UCSI register failed: %d (attempt %d/60)\n",
 +				ret, ucsi->register_retries + 1);
 +			if (ucsi->register_retries < 60) {
 +				ucsi->register_retries++;
-+				dev_info(ucsi->dev, "UCSI scheduling register_work with 1000ms delay\n");
++				dev_dbg(ucsi->dev, "UCSI scheduling register_work with 1000ms delay\n");
 +				schedule_delayed_work(&ucsi->register_work, msecs_to_jiffies(1000));
 +			} else {
 +				dev_err(ucsi->dev, "UCSI registration failed completely after 60 retries\n");
@@ -84,7 +84,7 @@ index 11b3e24e3..520ad373d 100644
 +		}
 +	} else if (!ucsi->ucsi_registered && !pd_running) {
 +		if (ucsi->register_retries < 60) {
-+			dev_info(ucsi->dev, "PD service not running, retrying register_work (attempt %d/60) in 1s\n",
++			dev_dbg(ucsi->dev, "PD service not running, retrying register_work (attempt %d/60) in 1s\n",
 +				 ucsi->register_retries + 1);
 +			ucsi->register_retries++;
 +			schedule_delayed_work(&ucsi->register_work, msecs_to_jiffies(1000));
@@ -114,7 +114,7 @@ index 11b3e24e3..520ad373d 100644
 +	dev_info(ucsi->dev, "PDR notify: state=%d, pd_running %d -> %d\n",
 +		 state, old_pd_running, ucsi->pd_running);
 +
-+	dev_info(ucsi->dev, "PDR notify: scheduling register_work with 0 delay\n");
++	dev_dbg(ucsi->dev, "PDR notify: scheduling register_work with 0 delay\n");
 +	schedule_delayed_work(&ucsi->register_work, 0);
  }
  
@@ -123,7 +123,7 @@ index 11b3e24e3..520ad373d 100644
  	const struct of_device_id *match;
  	int ret;
  
-+	dev_info(dev, "pmic_glink_ucsi_probe: starting\n");
++	dev_dbg(dev, "pmic_glink_ucsi_probe: starting\n");
 +
  	ucsi = devm_kzalloc(dev, sizeof(*ucsi), GFP_KERNEL);
  	if (!ucsi)
@@ -152,7 +152,7 @@ index 11b3e24e3..520ad373d 100644
  		ucsi->port_orientation[port] = desc;
  	}
  
-+	dev_info(dev, "pmic_glink_ucsi_probe: calling devm_pmic_glink_client_alloc\n");
++	dev_dbg(dev, "pmic_glink_ucsi_probe: calling devm_pmic_glink_client_alloc\n");
  	ucsi->client = devm_pmic_glink_client_alloc(dev, PMIC_GLINK_OWNER_USBC,
  						    pmic_glink_ucsi_callback,
  						    pmic_glink_ucsi_pdr_notify,
@@ -163,10 +163,10 @@ index 11b3e24e3..520ad373d 100644
  		return PTR_ERR(ucsi->client);
 +	}
  
-+	dev_info(dev, "pmic_glink_ucsi_probe: calling pmic_glink_client_register\n");
++	dev_dbg(dev, "pmic_glink_ucsi_probe: calling pmic_glink_client_register\n");
  	pmic_glink_client_register(ucsi->client);
  
-+	dev_info(dev, "pmic_glink_ucsi_probe: completed successfully, scheduling initial register_work\n");
++	dev_dbg(dev, "pmic_glink_ucsi_probe: completed successfully, scheduling initial register_work\n");
 +	/* Ensure register_work is scheduled at least once */
 +	schedule_delayed_work(&ucsi->register_work, msecs_to_jiffies(1000));
 +

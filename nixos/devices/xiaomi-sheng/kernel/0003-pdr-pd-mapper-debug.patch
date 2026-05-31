@@ -6,7 +6,7 @@ index 72259f4..8b661ba 100644
  	pdr->locator_init_complete = true;
  	mutex_unlock(&pdr->lock);
  
-+	pr_info("PDR: locator new server node=%d port=%d\n", svc->node, svc->port);
++	pr_debug("PDR: locator new server node=%d port=%d\n", svc->node, svc->port);
 +
  	/* Service pending lookup requests */
  	schedule_work(&pdr->locator_work);
@@ -15,7 +15,7 @@ index 72259f4..8b661ba 100644
  		return -EREMOTEIO;
  	}
  
-+	pr_info("PDR: %s get domain list returned %d domains (of %d total)\n",
++	pr_debug("PDR: %s get domain list returned %d domains (of %d total)\n",
 +		req->service_name, resp->domain_list_len, resp->total_domains);
 +
  	return 0;
@@ -25,7 +25,7 @@ index 72259f4..8b661ba 100644
  		for (i = 0; i < resp->domain_list_len; i++) {
  			entry = &resp->domain_list[i];
  
-+			pr_info("PDR: domain candidate: name='%s' instance=%u\n", entry->name, entry->instance);
++			pr_debug("PDR: domain candidate: name='%s' instance=%u\n", entry->name, entry->instance);
 +
  			if (strnlen(entry->name, sizeof(entry->name)) == sizeof(entry->name))
  				continue;
@@ -43,7 +43,7 @@ index 72259f4..8b661ba 100644
  	list_add(&pds->node, &pdr->lookups);
  	mutex_unlock(&pdr->list_lock);
  
-+	pr_info("PDR: adding lookup for service_name=%s service_path=%s\n",
++	pr_debug("PDR: adding lookup for service_name=%s service_path=%s\n",
 +		service_name, service_path);
 +
  	schedule_work(&pdr->locator_work);
@@ -57,7 +57,7 @@ index 627f96c..98d334f 100644
  {
  	struct pmic_glink *pg = priv;
  
-+	dev_info(pg->dev, "pmic_glink_pdr_callback: svc_path=%s state=%d\n", svc_path, state);
++	dev_dbg(pg->dev, "pmic_glink_pdr_callback: svc_path=%s state=%d\n", svc_path, state);
 +
  	guard(mutex)(&pg->state_lock);
  	pg->pdr_state = state;
@@ -66,7 +66,7 @@ index 627f96c..98d334f 100644
  	dev_set_drvdata(&rpdev->dev, pg);
  	pg->pdr_available = rpdev->id.driver_data;
  
-+	dev_info(&rpdev->dev, "pmic_glink_rpmsg_probe: pg->pdr_available=%d\n", pg->pdr_available);
++	dev_dbg(&rpdev->dev, "pmic_glink_rpmsg_probe: pg->pdr_available=%d\n", pg->pdr_available);
 +
  	guard(mutex)(&pg->state_lock);
  	pg->ept = rpdev->ept;
@@ -75,14 +75,14 @@ index 627f96c..98d334f 100644
  			goto out_release_altmode_aux;
  	}
  
-+	dev_info(&pdev->dev, "pmic_glink_probe: calling pdr_add_lookup for tms/servreg, msm/adsp/charger_pd\n");
++	dev_dbg(&pdev->dev, "pmic_glink_probe: calling pdr_add_lookup for tms/servreg, msm/adsp/charger_pd\n");
  	service = pdr_add_lookup(pg->pdr, "tms/servreg", "msm/adsp/charger_pd");
  	if (IS_ERR(service)) {
  		ret = dev_err_probe(&pdev->dev, PTR_ERR(service),
  				    "failed adding pdr lookup for charger_pd\n");
  		goto out_release_aux_devices;
  	}
-+	dev_info(&pdev->dev, "pmic_glink_probe: pdr_add_lookup successful\n");
++	dev_dbg(&pdev->dev, "pmic_glink_probe: pdr_add_lookup successful\n");
  
  	mutex_lock(&__pmic_glink_lock);
  	__pmic_glink = pg;
@@ -95,7 +95,7 @@ index dc10bc8..d7a06c8 100644
  	}
  
 -	pr_debug("PDM: service '%s' offset %d returning %d domains (of %d)\n", req->service_name,
-+	pr_info("PDM: service '%s' offset %d returning %d domains (of %d)\n", req->service_name,
++	pr_debug("PDM: service '%s' offset %d returning %d domains (of %d)\n", req->service_name,
  		 req->domain_offset_valid ? req->domain_offset : -1, rsp->domain_list_len, rsp->total_domains);
  
  	ret = qmi_send_response(qmi, sq, txn, SERVREG_GET_DOMAIN_LIST_REQ,
@@ -103,7 +103,7 @@ index dc10bc8..d7a06c8 100644
  		goto err_stop;
  	}
  
-+	pr_info("PDM: qcom_pdm_start completed successfully\n");
++	pr_debug("PDM: qcom_pdm_start completed successfully\n");
 +
  	return data;
  

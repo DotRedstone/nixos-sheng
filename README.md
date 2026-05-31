@@ -98,6 +98,12 @@ uploads artifacts.
 
 Local builds require an aarch64 Linux environment with Nix flakes enabled.
 
+Update the flake lock when inputs need to be refreshed:
+
+```bash
+nix flake lock ./nixos
+```
+
 Build the boot image:
 
 ```bash
@@ -148,6 +154,18 @@ fastboot flash linux out/mobile-rootfs/rootfs.img
 If stage-1 code or the Android boot configuration changed, rebuild and flash
 `boot_b`. If only the NixOS userspace/rootfs changed, rebuild and flash
 `linux`.
+
+Do not flash `userdata`. Firmware, packages, systemd units, users, and other
+rootfs content live in the `linux` partition; flashing only `boot_b` does not
+update `/lib/firmware`.
+
+## Firmware, USB-C, and OTG
+
+USB-C host mode on sheng depends on Qualcomm remoteproc firmware being present
+in the final Mobile NixOS rootfs. See
+[docs/sheng-firmware-and-usbc.md](docs/sheng-firmware-and-usbc.md) for the
+full dependency chain, offline rootfs checks, runtime verification commands,
+and common failure signatures.
 
 ## Debugging
 
