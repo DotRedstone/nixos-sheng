@@ -64,6 +64,7 @@
     evtest
     gitMinimal
     iproute2
+    iw
     kmod
     libinput
     nano
