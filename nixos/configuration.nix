@@ -74,6 +74,7 @@
     gitMinimal
     bluez
     brightnessctl
+    iio-sensor-proxy
     iproute2
     iw
     kmod
