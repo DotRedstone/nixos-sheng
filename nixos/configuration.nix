@@ -65,6 +65,7 @@
     evtest
     gitMinimal
     bluez
+    brightnessctl
     iproute2
     iw
     kmod

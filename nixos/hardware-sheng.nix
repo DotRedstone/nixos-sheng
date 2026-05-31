@@ -115,4 +115,19 @@
       done
     '';
   };
+
+  systemd.services.sheng-led-modules = {
+    description = "Load sheng LED/PWM modules";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "systemd-modules-load.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      for module in leds_qcom_flash leds_qcom_lpg leds_pwm leds_pwm_multicolor; do
+        ${pkgs.kmod}/bin/modprobe "$module" || true
+      done
+    '';
+  };
 }
