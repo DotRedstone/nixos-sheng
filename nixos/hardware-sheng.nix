@@ -75,4 +75,29 @@
       done
     '';
   };
+
+  systemd.services.sheng-audio-modules = {
+    description = "Load sheng Qualcomm audio modules";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "systemd-modules-load.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      for module in \
+        soundwire_qcom \
+        snd_soc_qcom_common \
+        snd_soc_qdsp6 \
+        snd_soc_q6apm \
+        snd_soc_q6prm \
+        snd_soc_wcd938x \
+        snd_soc_wcd938x_sdw \
+        snd_soc_cs35l43 \
+        snd_soc_cs35l43_i2c
+      do
+        ${pkgs.kmod}/bin/modprobe "$module" || true
+      done
+    '';
+  };
 }
