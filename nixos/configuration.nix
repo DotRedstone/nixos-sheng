@@ -63,6 +63,7 @@
     e2fsprogs
     evtest
     gitMinimal
+    bluez
     iproute2
     iw
     kmod
