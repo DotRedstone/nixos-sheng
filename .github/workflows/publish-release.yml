@@ -26,28 +26,60 @@ jobs:
       contents: write
       actions: read
     steps:
-      - name: Download kernel artifact
-        uses: dawidd6/action-download-artifact@v3
-        with:
-          workflow: kernel.yml
-          run_id: ${{ github.event.inputs.kernel_run_id || '' }}
-          name: sheng-mobile-nixos-boot
-          path: release-artifacts
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Download rootfs artifact
-        uses: dawidd6/action-download-artifact@v3
-        with:
-          workflow: nixos-rootfs.yml
-          run_id: ${{ github.event.inputs.rootfs_run_id || '' }}
-          name: nixos-sheng-rootfs
-          path: release-artifacts
+      - name: Download artifacts using gh CLI
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p release-artifacts
+          
+          if [ -n "${{ github.event.inputs.kernel_run_id }}" ]; then
+            KERNEL_RUN="${{ github.event.inputs.kernel_run_id }}"
+          else
+            KERNEL_RUN=$(gh run list --workflow=kernel.yml --status=success --limit=1 --json databaseId -q ".[0].databaseId")
+          fi
+          echo "Downloading kernel from run $KERNEL_RUN"
+          gh run download $KERNEL_RUN --name sheng-mobile-nixos-boot --dir release-artifacts/boot || echo "No kernel artifact found"
+          
+          if [ -n "${{ github.event.inputs.rootfs_run_id }}" ]; then
+            ROOTFS_RUN="${{ github.event.inputs.rootfs_run_id }}"
+          else
+            ROOTFS_RUN=$(gh run list --workflow=nixos-rootfs.yml --status=success --limit=1 --json databaseId -q ".[0].databaseId")
+          fi
+          echo "Downloading rootfs from run $ROOTFS_RUN"
+          gh run download $ROOTFS_RUN --name nixos-sheng-rootfs --dir release-artifacts/rootfs || echo "No rootfs artifact found"
+          
+      - name: Compress and prepare files
+        run: |
+          mkdir -p release-upload
+          # Copy boot image
+          if [ -d release-artifacts/boot ]; then
+            cp release-artifacts/boot/*.img release-upload/ || true
+          fi
+          
+          # Compress rootfs image with zstd as per rules
+          if [ -d release-artifacts/rootfs ]; then
+            for img in release-artifacts/rootfs/*.img; do
+              if [ -f "$img" ]; then
+                echo "Compressing $img..."
+                zstd -T0 -10 "$img" -o release-upload/$(basename "$img").zst
+              fi
+            done
+          fi
+          
+          # Generate sha256sums
+          cd release-upload
+          sha256sum * > sha256sums.txt
+          cd ..
 
       - name: Create Combined Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag_name }}
           name: ${{ github.event.inputs.release_name }}
-          files: release-artifacts/**/*
+          files: release-upload/*
           draft: false
           prerelease: true
           generate_release_notes: true
