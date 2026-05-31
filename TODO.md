@@ -693,6 +693,45 @@ postmarketOS 状态：N
 
 ## 当前优先级
 
+## 并行 bring-up 分支计划
+
+原则：
+
+* 每条硬件链路单独分支、单独提交，不把 Wi-Fi、蓝牙、触摸、音频等问题混在一起。
+* 每个分支都必须写清楚影响范围：只影响 rootfs、只影响 boot，还是 boot + rootfs。
+* 涉及 kernel config、DTS、kernel patch 的分支必须构建 `mobileAndroidBootimg`；如果模块或用户态也进入 rootfs，同时构建 rootfs。
+* 涉及 firmware、systemd、udev、普通包、profile 的分支只构建 rootfs，除非同时改了 kernel/initrd/DTB。
+* 多个分支可以同时触发 Actions，但 artifact 名称和分支必须能对应，避免刷错镜像。
+* 合并时优先合并已经真机验证的最小分支；实验分支未验证前不默认进稳定主线。
+
+建议并行分支：
+
+| 分支 | 目标 | 首要检查点 | 构建目标 | 刷写分区 |
+| --- | --- | --- | --- | --- |
+| `fix/wifi-ath12k-rootfs` | WCN7851 Wi-Fi 枚举与 `wlan0` | ATH12K / MHI / QMI / QRTR 模块、PCIe endpoint、firmware 路径 | 通常 boot + rootfs | `boot_b` + `linux` |
+| `fix/bluetooth-wcn7851` | HCI 控制器与 BlueZ | QCA/BTQCA、UART/serdev、bluetooth service、rfkill | 视修改而定；kernel/模块则 boot + rootfs | `linux`，必要时加 `boot_b` |
+| `fix/touchscreen-nt36532e` | Novatek NT36532E 触摸 input | 触摸模块是否进 rootfs、SPI/I2C probe、input 节点 | 通常 boot + rootfs | `boot_b` + `linux` |
+| `fix/audio-qcom-wcd9380` | ALSA 声卡、扬声器、麦克风基础枚举 | QDSP6、WCD9380、SoundWire、CS35L43、topology | 通常 boot + rootfs | `boot_b` + `linux` |
+| `fix/sensors-iio` | IMU、磁力计、光距传感器 IIO 节点 | ICM42607P、QMC6308、STK36C61-A 驱动与 DTS | 通常 boot + rootfs | `boot_b` + `linux` |
+| `fix/camera-media-graph` | `/dev/video*`、`/dev/media*` 与 media graph | CAMSS、S5KJN1、OV32D40、CCI/CSI/CSIPHY | 通常 boot + rootfs | `boot_b` + `linux` |
+| `fix/led-pwm` | RGB LED / camera flash 节点 | PM8550B PWM、LED class、flash 节点 | 通常 boot + rootfs | `boot_b` + `linux` |
+| `docs/verification-results` | 真机验证结果归档 | 每个 artifact 对应的验证命令与结果 | 不构建刷机包 | 不刷 |
+
+建议 Actions 策略：
+
+* 每个硬件分支 push 后立即触发对应构建，不等待其它分支。
+* rootfs-only 分支触发 rootfs workflow。
+* kernel/DTS/config 分支同时触发 kernel workflow 与 rootfs workflow。
+* GNOME 或其它测试 profile 使用独立 rootfs 输出，不替换默认 minimal。
+* artifact 下载后按分支名记录验证结果，再决定是否合并或继续拆分。
+
+建议合并顺序：
+
+1. 先合并不会改变 kernel 的 rootfs-only 修复。
+2. 再合并单一硬件链路的 kernel/config/DTS 修复。
+3. 最后合并 GNOME 等大型测试 profile 或仅保留为可选输出。
+4. 任何导致 boot 回归的分支立即暂停，保留日志，不和其它硬件修复混合回滚。
+
 ### P0：已修通后补实测记录
 
 * [x] USB-C / OTG：Hub、键盘、鼠标已验证；待验证 U 盘、ADB device 模式
