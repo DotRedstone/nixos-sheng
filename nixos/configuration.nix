@@ -73,6 +73,7 @@
     pciutils
     util-linux
     usbutils
+    v4l-utils
     vim
     wget
   ];

@@ -100,4 +100,19 @@
       done
     '';
   };
+
+  systemd.services.sheng-camera-modules = {
+    description = "Load sheng camera/media modules";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "systemd-modules-load.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      for module in i2c_qcom_cci qcom_camss s5kjn1_sheng ov32d40; do
+        ${pkgs.kmod}/bin/modprobe "$module" || true
+      done
+    '';
+  };
 }
