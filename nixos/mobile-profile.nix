@@ -58,6 +58,10 @@ in
 
       echo "Done copying system closure..."
       cp -v ${closureInfo}/registration ./nix-path-registration
+
+      echo "Injecting sheng-firmware into /lib/firmware..."
+      mkdir -p ./lib/firmware
+      cp -r ${pkgs.sheng-firmware}/lib/firmware/* ./lib/firmware/
     '';
 
     additionalCommands = ''
@@ -101,6 +105,7 @@ in
 
     kernel.modules = [ ];
     kernel.additionalModules = [ ];
+    firmware = [ pkgs.sheng-firmware ];
   };
 
   mobile.boot.stage-1.fail.reboot = false;
