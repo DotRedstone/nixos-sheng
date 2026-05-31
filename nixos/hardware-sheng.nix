@@ -60,4 +60,19 @@
       done
     '';
   };
+
+  systemd.services.sheng-touchscreen-modules = {
+    description = "Load sheng Novatek touchscreen modules";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "systemd-modules-load.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      for module in spi_qcom_geni nt36532e_spi; do
+        ${pkgs.kmod}/bin/modprobe "$module" || true
+      done
+    '';
+  };
 }
