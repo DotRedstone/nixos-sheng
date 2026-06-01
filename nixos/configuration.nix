@@ -87,6 +87,11 @@
     wget
   ];
 
+  environment.variables.ALSA_CONFIG_UCM2 = "/run/current-system/sw/share/alsa/ucm2";
+  systemd.user.extraConfig = ''
+    DefaultEnvironment=ALSA_CONFIG_UCM2=/run/current-system/sw/share/alsa/ucm2
+  '';
+
   systemd.services."serial-getty@ttyMSM0" = {
     enable = true;
     wantedBy = [ "getty.target" ];
