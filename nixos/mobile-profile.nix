@@ -71,6 +71,11 @@ in
       echo "Done copying system closure..."
       cp -v ${closureInfo}/registration ./nix-path-registration
 
+      echo "Creating system profile..."
+      mkdir -p ./nix/var/nix/profiles
+      ln -s ${config.system.build.toplevel} ./nix/var/nix/profiles/system-1-link
+      ln -s system-1-link ./nix/var/nix/profiles/system
+
       echo "Injecting sheng-firmware into /lib/firmware..."
       mkdir -p ./lib/firmware
       cp -r ${pkgs.sheng-firmware}/lib/firmware/* ./lib/firmware/

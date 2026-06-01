@@ -32,20 +32,28 @@ case "${ROOTFS_FLAKE_ATTR}" in
         ;;
 esac
 
+echo "==> Settings:"
+echo "ROOTFS_FLAKE_ATTR: ${ROOTFS_FLAKE_ATTR}"
+echo "OUT_LINK: ${OUT_LINK}"
+echo "OUT_DIR: ${OUT_DIR}"
+
 echo "==> Building Mobile NixOS generated rootfs image: ${ROOTFS_FLAKE_ATTR}"
 nix --extra-experimental-features "nix-command flakes" \
     build "./nixos#${ROOTFS_FLAKE_ATTR}" \
     --out-link "${OUT_LINK}"
 
 ROOTFS_DIR="$(readlink -f "${OUT_LINK}")"
-ROOTFS_SOURCE="$(
-    find "${ROOTFS_DIR}" -type f \( -name "rootfs.img" -o -name "rootfs.img.zst" \) | head -n 1
-)"
+echo "ROOTFS_DIR: ${ROOTFS_DIR}"
 
-if [ -z "${ROOTFS_SOURCE}" ] || [ ! -f "${ROOTFS_SOURCE}" ]; then
-    echo "Could not find rootfs.img or rootfs.img.zst in ${ROOTFS_DIR}"
+readarray -t ROOTFS_CANDIDATES < <(find "${ROOTFS_DIR}" -type f \( -name "rootfs.img" -o -name "rootfs.img.zst" \))
+
+if [ ${#ROOTFS_CANDIDATES[@]} -ne 1 ]; then
+    echo "ERROR: Expected exactly 1 rootfs candidate in ${ROOTFS_DIR}, found ${#ROOTFS_CANDIDATES[@]}:"
+    printf '  - %s\n' "${ROOTFS_CANDIDATES[@]}"
     exit 1
 fi
+
+ROOTFS_SOURCE="${ROOTFS_CANDIDATES[0]}"
 
 echo "==> Copying rootfs image to ${OUT_DIR}/${ROOTFS_IMG}"
 case "${ROOTFS_SOURCE}" in
@@ -72,6 +80,16 @@ fi
 
 echo "==> Setting rootfs UUID ${FILESYSTEM_UUID}"
 tune2fs -U "${FILESYSTEM_UUID}" "${OUT_DIR}/${ROOTFS_IMG}" >/dev/null
+
+echo "==> Sanity checking rootfs image"
+if ! debugfs -R "stat /nix/var/nix/profiles/system/init" "${OUT_DIR}/${ROOTFS_IMG}" 2>/dev/null | grep -q "Inode:"; then
+    echo "ERROR: Stage-2 init not found in rootfs image!"
+    exit 1
+fi
+if ! debugfs -R "stat /nix-path-registration" "${OUT_DIR}/${ROOTFS_IMG}" 2>/dev/null | grep -q "Inode:"; then
+    echo "ERROR: nix-path-registration not found in rootfs image!"
+    exit 1
+fi
 
 echo "Done: ${OUT_DIR}/${ROOTFS_IMG}"
 echo "Note: a Mobile NixOS rootfs is expected to contain nix/store and nix-path-registration."
