@@ -17,6 +17,7 @@ mobile-nixos.kernel-builder-clang {
     ./0001-disable-dp0-sheng.patch
     ./0002-ucsi-glink-debug-retry.patch
     ./0003-pdr-pd-mapper-debug.patch
+    ./0004-pdr-add-sheng-sensor-pd-lookup.patch
   ];
 
   isModular = true;
