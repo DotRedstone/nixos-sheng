@@ -25,21 +25,6 @@
     "qrtr"
   ];
 
-  systemd.services.sheng-iio-modules = {
-    description = "Load sheng IIO sensor modules";
-    wantedBy = [ "multi-user.target" ];
-    after = [ "systemd-modules-load.service" ];
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-    };
-    script = ''
-      for module in inv_icm42600_i2c inv_icm42600_spi stk3310; do
-        ${pkgs.kmod}/bin/modprobe "$module" || true
-      done
-    '';
-  };
-
   systemd.services.sheng-wifi-modules = {
     description = "Load sheng Wi-Fi PCIe/MHI/ath12k modules";
     wantedBy = [ "multi-user.target" ];
