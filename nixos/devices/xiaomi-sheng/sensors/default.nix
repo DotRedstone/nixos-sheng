@@ -46,5 +46,5 @@ in
   services.udev.packages = lib.mkForce [ iio-sensor-proxy-ssc ];
 
   # Also ensure iio-sensor-proxy is enabled
-  services.hardware.sensor.iio.enable = lib.mkDefault true;
+  hardware.sensor.iio.enable = lib.mkDefault true;
 }
