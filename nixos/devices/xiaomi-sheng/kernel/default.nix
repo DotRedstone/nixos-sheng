@@ -73,7 +73,42 @@ mobile-nixos.kernel-builder-clang {
     grep -nE '^CONFIG_POWER_SUPPLY=|^CONFIG_BATTERY_QCOM_BATTMGR=|^CONFIG_QCOM_PMIC_GLINK=|^CONFIG_UCSI_PMIC_GLINK=|^CONFIG_TYPEC_UCSI=|^CONFIG_TYPEC=|^CONFIG_QRTR=|^CONFIG_QCOM_PD_MAPPER=' build/.config || true
 
     echo "--- sensors / iio config ---"
-    grep -nE '^CONFIG_IIO=|^CONFIG_IIO_BUFFER=|^CONFIG_IIO_KFIFO_BUF=|^CONFIG_IIO_TRIGGERED_BUFFER=|^CONFIG_IIO_TRIGGER=|^CONFIG_QCOM_SSC_BLOCK_BUS=|^CONFIG_QCOM_FASTRPC=|^CONFIG_INV_ICM42600=|^CONFIG_INV_ICM42600_I2C=|^CONFIG_INV_ICM42600_SPI=|^CONFIG_IIO_INV_SENSORS_TIMESTAMP=|^CONFIG_STK3310=' build/.config || true
+    sensor_config_pattern='^CONFIG_IIO=|^CONFIG_IIO_BUFFER=|^CONFIG_IIO_KFIFO_BUF=|^CONFIG_IIO_TRIGGERED_BUFFER=|^CONFIG_IIO_TRIGGER=|^CONFIG_QCOM_SSC_BLOCK_BUS=|^CONFIG_QCOM_FASTRPC=|^CONFIG_INV_ICM42600=|^CONFIG_INV_ICM42600_I2C=|^CONFIG_INV_ICM42600_SPI=|^CONFIG_IIO_INV_SENSORS_TIMESTAMP=|^CONFIG_STK3310=|^CONFIG_I2C=|^CONFIG_SPI_MASTER=|^CONFIG_REGMAP_I2C=|^CONFIG_REGMAP_SPI='
+    grep -nE "$sensor_config_pattern" build/.config || true
+
+    echo "--- required sensors / iio config check ---"
+    sensor_config_failed=0
+    require_kernel_config() {
+      symbol="$1"
+      if grep -qE "^''${symbol}=(y|m)$" build/.config; then
+        grep -nE "^''${symbol}=" build/.config
+      else
+        echo "ERROR: required kernel config ''${symbol}=y/m is missing from final build/.config" >&2
+        grep -nE "^''${symbol}=|^# ''${symbol} is not set" build/.config >&2 || \
+          echo "ERROR: ''${symbol} is absent from final build/.config" >&2
+        sensor_config_failed=1
+      fi
+    }
+
+    require_kernel_config CONFIG_IIO
+    require_kernel_config CONFIG_IIO_BUFFER
+    require_kernel_config CONFIG_IIO_KFIFO_BUF
+    require_kernel_config CONFIG_IIO_TRIGGERED_BUFFER
+    require_kernel_config CONFIG_IIO_TRIGGER
+    require_kernel_config CONFIG_I2C
+    require_kernel_config CONFIG_SPI_MASTER
+    require_kernel_config CONFIG_REGMAP_I2C
+    require_kernel_config CONFIG_REGMAP_SPI
+    require_kernel_config CONFIG_QCOM_SSC_BLOCK_BUS
+    require_kernel_config CONFIG_INV_ICM42600
+    require_kernel_config CONFIG_INV_ICM42600_I2C
+    require_kernel_config CONFIG_INV_ICM42600_SPI
+    require_kernel_config CONFIG_STK3310
+
+    if [ "$sensor_config_failed" -ne 0 ]; then
+      echo "ERROR: refusing to build/upload a boot image without the requested sheng IIO sensor configs" >&2
+      exit 1
+    fi
 
     echo "--- compiler identity ---"
     command -v clang || true
