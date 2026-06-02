@@ -27,36 +27,36 @@ in
   # sheng-sensors-file puts them in $out/share/qcom/sm8550/Xiaomi/sheng/registry/
   environment.etc."qcom".source = "${sheng-sensors-file}/share/qcom";
 
-  # 3. Define the root sdsprpcd service
-  systemd.services.sdsprpcd = {
-    description = "SDSP RPC root daemon";
+  # 3. Define the root adsprpcd service
+  systemd.services.adsprpcd = {
+    description = "aDSP RPC root daemon";
     wantedBy = [ "multi-user.target" ];
-    unitConfig.ConditionPathExists = "|/dev/fastrpc-sdsp";
+    unitConfig.ConditionPathExists = "|/dev/fastrpc-adsp";
     serviceConfig = {
       Type = "exec";
-      ExecStart = "${fastrpc}/bin/sdsprpcd";
+      ExecStart = "${fastrpc}/bin/adsprpcd";
       Restart = "on-failure";
       RestartSec = "5";
       Environment = [
-        "DSP_LIBRARY_PATH=/run/current-system/firmware;/lib/firmware;/lib/firmware/qcom/sm8550/sheng"
+        "ADSP_LIBRARY_PATH=/run/current-system/firmware;/lib/firmware;/lib/firmware/qcom/sm8550/sheng"
       ];
     };
   };
 
-  # 4. Define the sdsprpcd-sensorspd service to keep the Sensor PD alive
-  systemd.services.sdsprpcd-sensorspd = {
-    description = "sensorspd SDSP RPC daemon";
+  # 4. Define the adsprpcd-sensorspd service to keep the Sensor PD alive
+  systemd.services.adsprpcd-sensorspd = {
+    description = "sensor_pd aDSP RPC daemon";
     wantedBy = [ "iio-sensor-proxy.service" ];
-    after = [ "sdsprpcd.service" ];
-    requires = [ "sdsprpcd.service" ];
+    after = [ "adsprpcd.service" ];
+    requires = [ "adsprpcd.service" ];
     before = [ "iio-sensor-proxy.service" ];
     
     # Run only if the fastrpc node exists
-    unitConfig.ConditionPathExists = "|/dev/fastrpc-sdsp";
+    unitConfig.ConditionPathExists = "|/dev/fastrpc-adsp";
 
     serviceConfig = {
       Type = "exec";
-      ExecStart = "${fastrpc}/bin/sdsprpcd sensorspd sdsp";
+      ExecStart = "${fastrpc}/bin/adsprpcd sensor_pd adsp";
       Restart = "on-failure";
       RestartSec = "5";
     };
