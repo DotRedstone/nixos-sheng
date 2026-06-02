@@ -74,9 +74,11 @@
     gitMinimal
     bluez
     brightnessctl
+    iio-sensor-proxy
     iproute2
     iw
     kmod
+    libssc
     libinput
     nano
     pciutils
@@ -92,6 +94,12 @@
     DefaultEnvironment=ALSA_CONFIG_UCM2=/run/current-system/sw/share/alsa/ucm2
   '';
 
+  systemd.packages = [ pkgs.iio-sensor-proxy ];
+  services.dbus.packages = [ pkgs.iio-sensor-proxy ];
+  services.udev.packages = [ pkgs.iio-sensor-proxy ];
+
+  systemd.services.iio-sensor-proxy.wantedBy = [ "multi-user.target" ];
+
   systemd.services."serial-getty@ttyMSM0" = {
     enable = true;
     wantedBy = [ "getty.target" ];
@@ -99,6 +107,7 @@
 
   services.udev.extraRules = ''
     ENV{ID_INPUT_TOUCHSCREEN}=="1", ENV{LIBINPUT_CALIBRATION_MATRIX}="1 0 0 0 1 0 0 0 1"
+    SUBSYSTEM=="misc", KERNEL=="fastrpc-*", ENV{ACCEL_MOUNT_MATRIX}+="-1, 0, 0; 0, -1, 0; 0, 0, -1", TAG+="systemd", ENV{SYSTEMD_WANTS}+="iio-sensor-proxy.service"
   '';
 
   security.rtkit.enable = true;
