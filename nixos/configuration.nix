@@ -50,9 +50,9 @@
   services.kmscon = {
     enable = true;
     hwRender = false;
-    extraConfig = ''
-      font-size=18
-    '';
+    config = {
+      "font-size" = 18;
+    };
   };
 
   environment.systemPackages = let
