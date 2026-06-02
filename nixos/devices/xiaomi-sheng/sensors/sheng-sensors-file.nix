@@ -8,7 +8,7 @@ stdenv.mkDerivation rec {
     owner = "alghiffaryfa19";
     repo = "sheng-sensors-file";
     rev = "main";
-    hash = lib.fakeHash;
+    hash = "sha256-yXX8QUxQ45yS0zCkpXQneiOhinOVCZrjNJVc824dHqQ=";
   };
 
   installPhase = ''

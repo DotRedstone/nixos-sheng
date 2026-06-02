@@ -8,7 +8,7 @@ stdenv.mkDerivation rec {
     owner = "qualcomm";
     repo = "fastrpc";
     rev = "v${version}";
-    hash = lib.fakeHash;
+    hash = "sha256-/RXH34zqAxtWty75UHoOvS6fdmB+UfTRtB6G9IZiSWk=";
   };
 
   nativeBuildInputs = [ autoreconfHook ];

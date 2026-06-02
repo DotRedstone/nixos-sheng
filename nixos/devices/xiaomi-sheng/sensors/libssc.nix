@@ -6,8 +6,8 @@ stdenv.mkDerivation {
 
   src = fetchgit {
     url = "https://codeberg.org/DylanVanAssche/libssc.git";
-    rev = "refs/tags/0.3.0";
-    hash = lib.fakeHash;
+    rev = "refs/tags/v0.3.0";
+    hash = "sha256-RmgjZbNUpF1u2vhX63VUxK9FV98MBcx5d9TExEDup0g=";
   };
 
   patches = [
