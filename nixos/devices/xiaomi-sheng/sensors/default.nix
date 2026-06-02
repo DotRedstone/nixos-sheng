@@ -56,7 +56,7 @@ in
 
     serviceConfig = {
       Type = "exec";
-      ExecStart = "${fastrpc}/bin/fastrpc_keepalive \"createstaticpd:sensor_pd&dom=adsp\"";
+      ExecStart = "${fastrpc}/bin/fastrpc_keepalive \"sensor_pd&dom=adsp\"";
       Restart = "on-failure";
       RestartSec = "5";
     };

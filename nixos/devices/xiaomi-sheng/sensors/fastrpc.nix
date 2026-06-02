@@ -36,17 +36,21 @@ stdenv.mkDerivation rec {
     #include <stdio.h>
     #include <unistd.h>
     #include "remote.h"
+    #define ITRANSPORT_PREFIX "'\":;./\\"
+    #define CREATE_STATICPD "createstaticpd:"
     int main(int argc, char **argv) {
         if (argc < 2) {
-            printf("Usage: %s <uri>\n", argv[0]);
+            printf("Usage: %s <uri_suffix>\n", argv[0]);
             return 1;
         }
+        char name[256];
+        snprintf(name, sizeof(name), "%s%s%s", ITRANSPORT_PREFIX, CREATE_STATICPD, argv[1]);
         remote_handle64 fd;
-        if (remote_handle64_open(argv[1], &fd) == 0) {
-            printf("Handle opened for %s. Sleeping forever.\n", argv[1]);
+        if (remote_handle64_open(name, &fd) == 0) {
+            printf("Handle opened for %s. Sleeping forever.\n", name);
             while (1) pause();
         } else {
-            printf("Failed to open handle for %s.\n", argv[1]);
+            printf("Failed to open handle for %s.\n", name);
             return 1;
         }
         return 0;
