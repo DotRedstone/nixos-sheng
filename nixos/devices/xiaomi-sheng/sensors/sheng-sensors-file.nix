@@ -18,7 +18,7 @@ stdenv.mkDerivation rec {
 
   meta = with lib; {
     description = "Sensor configuration files for Xiaomi Pad 6S Pro (sheng)";
-    license = licenses.unfree;
+    license = licenses.mit;
     platforms = platforms.linux;
   };
 }
