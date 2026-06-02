@@ -4,6 +4,10 @@ let
   cfg = config.mobile.hardware.socs."qualcomm-sm8550";
 in
 {
+  imports = [
+    ./sensors
+  ];
+
   options.mobile.hardware.socs."qualcomm-sm8550".enable = lib.mkOption {
     type = lib.types.bool;
     default = false;
