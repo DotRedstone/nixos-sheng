@@ -29,6 +29,30 @@ stdenv.mkDerivation rec {
     rm -rf $out/share/fastrpc_test
     rm -f $out/bin/fastrpc_test
 
+    # Compile a simple client to keep a PD alive without registering a listener
+    gcc -O2 -o $out/bin/fastrpc_keepalive -Iinc -Isrc -L$out/lib -ladsprpc \
+      -Wl,-rpath,$out/lib \
+      -xc - <<'EOF'
+    #include <stdio.h>
+    #include <unistd.h>
+    #include "remote.h"
+    int main(int argc, char **argv) {
+        if (argc < 2) {
+            printf("Usage: %s <uri>\n", argv[0]);
+            return 1;
+        }
+        remote_handle64 fd;
+        if (remote_handle64_open(argv[1], &fd) == 0) {
+            printf("Handle opened for %s. Sleeping forever.\n", argv[1]);
+            while (1) pause();
+        } else {
+            printf("Failed to open handle for %s.\n", argv[1]);
+            return 1;
+        }
+        return 0;
+    }
+    EOF
+
     # Wrap binaries so dlopen can confidently find the listener libraries
     for p in adsprpcd cdsprpcd sdsprpcd gdsprpcd; do
       if [ -f $out/bin/$p ]; then
