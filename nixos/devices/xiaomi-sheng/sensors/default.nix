@@ -5,17 +5,21 @@ let
   libssc = pkgs.callPackage ./libssc.nix { };
   sheng-sensors-file = pkgs.callPackage ./sheng-sensors-file.nix { };
 
-  # iio-sensor-proxy with SSC support enabled
-  iio-sensor-proxy-ssc = pkgs.iio-sensor-proxy.overrideAttrs (old: {
-    mesonFlags = (old.mesonFlags or []) ++ [ "-Dssc-support=enabled" ];
-    buildInputs = (old.buildInputs or []) ++ [ libssc ];
-  });
 in
 {
-  # 1. Provide the user-space daemon and registry files in system path
+  # 1. Overlay to patch iio-sensor-proxy with SSC support
+  nixpkgs.overlays = [
+    (final: prev: {
+      iio-sensor-proxy = prev.iio-sensor-proxy.overrideAttrs (old: {
+        mesonFlags = (old.mesonFlags or []) ++ [ "-Dssc-support=enabled" ];
+        buildInputs = (old.buildInputs or []) ++ [ libssc ];
+      });
+    })
+  ];
+
+  # 2. Provide the user-space daemon and registry files in system path
   environment.systemPackages = [
     fastrpc
-    iio-sensor-proxy-ssc
     sheng-sensors-file
   ];
 
@@ -40,11 +44,6 @@ in
     };
   };
 
-  # 4. Override systemd/udev/dbus packages to use the SSC patched version of iio-sensor-proxy
-  systemd.packages = lib.mkForce [ iio-sensor-proxy-ssc ];
-  services.dbus.packages = lib.mkForce [ iio-sensor-proxy-ssc ];
-  services.udev.packages = lib.mkForce [ iio-sensor-proxy-ssc ];
-
-  # Also ensure iio-sensor-proxy is enabled
+  # 5. Ensure iio-sensor-proxy is enabled
   hardware.sensor.iio.enable = lib.mkDefault true;
 }
