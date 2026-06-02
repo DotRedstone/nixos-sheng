@@ -1,4 +1,4 @@
-{ lib, stdenv, fetchgit, meson, ninja, pkg-config, glib, protobufc, libqmi, libmbim }:
+{ lib, stdenv, fetchgit, meson, ninja, pkg-config, glib, protobufc, protobuf, libqmi, libmbim }:
 
 stdenv.mkDerivation {
   pname = "libssc";
@@ -14,7 +14,7 @@ stdenv.mkDerivation {
     ./wait_for_qmi_service.patch
   ];
 
-  nativeBuildInputs = [ meson ninja pkg-config protobufc ];
+  nativeBuildInputs = [ meson ninja pkg-config protobufc protobuf ];
   buildInputs = [ glib protobufc libqmi libmbim ];
 
   meta = with lib; {

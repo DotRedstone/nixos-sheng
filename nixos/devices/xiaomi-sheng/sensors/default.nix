@@ -7,7 +7,7 @@ let
 
   # iio-sensor-proxy with SSC support enabled
   iio-sensor-proxy-ssc = pkgs.iio-sensor-proxy.overrideAttrs (old: {
-    mesonFlags = (old.mesonFlags or []) ++ [ "-Dssc-support=true" ];
+    mesonFlags = (old.mesonFlags or []) ++ [ "-Dssc-support=enabled" ];
     buildInputs = (old.buildInputs or []) ++ [ libssc ];
   });
 in

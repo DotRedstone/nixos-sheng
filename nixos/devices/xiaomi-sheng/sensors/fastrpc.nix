@@ -1,4 +1,4 @@
-{ lib, stdenv, fetchFromGitHub, autoreconfHook, yaml-cpp }:
+{ lib, stdenv, fetchFromGitHub, autoreconfHook, pkg-config, libyaml }:
 
 stdenv.mkDerivation rec {
   pname = "fastrpc";
@@ -11,10 +11,14 @@ stdenv.mkDerivation rec {
     hash = "sha256-/RXH34zqAxtWty75UHoOvS6fdmB+UfTRtB6G9IZiSWk=";
   };
 
-  nativeBuildInputs = [ autoreconfHook ];
-  buildInputs = [ yaml-cpp ];
+  nativeBuildInputs = [ autoreconfHook pkg-config ];
+  buildInputs = [ libyaml ];
 
   # Note: The original APKBUILD skips tests
+  preAutoreconf = ''
+    mkdir -p m4
+  '';
+
   preConfigure = ''
     rm -rf src/fastrpc_test.c
     rm -rf src/fastrpc_test
