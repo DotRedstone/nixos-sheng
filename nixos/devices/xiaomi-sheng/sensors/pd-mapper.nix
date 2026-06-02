@@ -12,6 +12,11 @@ stdenv.mkDerivation rec {
   nativeBuildInputs = [ pkg-config ];
   buildInputs = [ qrtr xz ];
 
+  postPatch = ''
+    substituteInPlace pd-mapper.c \
+      --replace-fail "/lib/firmware/" "/run/current-system/firmware/"
+  '';
+
   makeFlags = [ "prefix=$(out)" "servicedir=$(out)/lib/systemd/system" "CC=${stdenv.cc.targetPrefix}cc" ];
 
   meta = with lib; {
