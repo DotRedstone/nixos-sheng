@@ -4,6 +4,8 @@ let
   fastrpc = pkgs.callPackage ./fastrpc.nix { };
   libssc = pkgs.callPackage ./libssc.nix { };
   sheng-sensors-file = pkgs.callPackage ./sheng-sensors-file.nix { };
+  qrtr = pkgs.callPackage ./qrtr.nix { };
+  pd-mapper = pkgs.callPackage ./pd-mapper.nix { inherit qrtr; };
 
 in
 {
@@ -21,6 +23,8 @@ in
   environment.systemPackages = [
     fastrpc
     sheng-sensors-file
+    qrtr
+    pd-mapper
   ];
 
   # 2. Make registry files available where libssc expects them (typically /usr/share/qcom or /etc/qcom)
@@ -43,12 +47,26 @@ in
     };
   };
 
-  # 4. Define the adsprpcd-sensorspd service to keep the Sensor PD alive
+  # 4. Define the pd-mapper service to serve firmware requests over QRTR
+  systemd.services.pd-mapper = {
+    description = "Qualcomm Protection Domain Mapper";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "adsprpcd.service" ];
+    before = [ "adsprpcd-sensorspd.service" ];
+    serviceConfig = {
+      Type = "exec";
+      ExecStart = "${pd-mapper}/bin/pd-mapper";
+      Restart = "on-failure";
+      RestartSec = "5";
+    };
+  };
+
+  # 5. Define the adsprpcd-sensorspd service to keep the Sensor PD alive
   systemd.services.adsprpcd-sensorspd = {
     description = "sensor_pd aDSP RPC daemon";
     wantedBy = [ "iio-sensor-proxy.service" ];
-    after = [ "adsprpcd.service" ];
-    requires = [ "adsprpcd.service" ];
+    after = [ "adsprpcd.service" "pd-mapper.service" ];
+    requires = [ "adsprpcd.service" "pd-mapper.service" ];
     before = [ "iio-sensor-proxy.service" ];
     
     # Run only if the fastrpc node exists
@@ -62,6 +80,6 @@ in
     };
   };
 
-  # 5. Ensure iio-sensor-proxy is enabled
+  # 6. Ensure iio-sensor-proxy is enabled
   hardware.sensor.iio.enable = lib.mkDefault true;
 }
