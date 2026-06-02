@@ -41,6 +41,9 @@ in
       ExecStart = "${fastrpc}/bin/adsprpcd sensorspd";
       Restart = "on-failure";
       RestartSec = "5";
+      Environment = [
+        "ADSP_LIBRARY_PATH=/run/current-system/firmware;/lib/firmware;/lib/firmware/qcom/sm8550/sheng"
+      ];
     };
   };
 
