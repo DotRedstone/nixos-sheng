@@ -38,7 +38,7 @@ in
 
     serviceConfig = {
       Type = "exec";
-      ExecStart = "${fastrpc}/bin/adsprpcd sensorspd";
+      ExecStart = "${fastrpc}/bin/adsprpcd";
       Restart = "on-failure";
       RestartSec = "5";
       Environment = [
