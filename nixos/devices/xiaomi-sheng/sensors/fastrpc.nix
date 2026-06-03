@@ -14,6 +14,10 @@ stdenv.mkDerivation rec {
   nativeBuildInputs = [ autoreconfHook pkg-config makeWrapper ];
   buildInputs = [ libyaml ];
 
+  patches = [
+    ./fastrpc-rflags.patch
+  ];
+
   # Note: The original APKBUILD skips tests
   preAutoreconf = ''
     mkdir -p m4
@@ -22,9 +26,6 @@ stdenv.mkDerivation rec {
   preConfigure = ''
     rm -rf src/fastrpc_test.c
     rm -rf src/fastrpc_test
-    # The DSP sends rflags=0 when requesting heap memory, but mainline fastrpc requires ADSP_MMAP_ADD_PAGES (0x1000).
-    # If we don't patch rflags, userspace allocates the buffer and passes vaddrin!=0, which mainline rejects.
-    sed -i 's/uint64_t \*vadsp) __QAIC_IMPL_ATTRIBUTE {/uint64_t \*vadsp) __QAIC_IMPL_ATTRIBUTE {\n  if (rflags == 0) rflags = 0x1000;/g' src/apps_mem_imp.c
   '';
 
   postInstall = ''
