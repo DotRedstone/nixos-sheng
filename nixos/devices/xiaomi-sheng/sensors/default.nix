@@ -31,10 +31,18 @@ in
   # sheng-sensors-file puts them in $out/share/qcom/sm8550/Xiaomi/sheng/registry/
   environment.etc."qcom".source = "${sheng-sensors-file}/share/qcom";
 
+  # 2b. sns_reg_config hardcodes paths to /usr/share/qcom/..., but NixOS uses /etc/qcom
+  #     Create a symlink so the ADSP firmware can find the files
+  systemd.tmpfiles.rules = [
+    "d /usr/share 0755 root root -"
+    "L+ /usr/share/qcom - - - - /etc/qcom"
+  ];
+
   # 3. Define the root adsprpcd service
   systemd.services.adsprpcd = {
     description = "aDSP RPC root daemon";
     wantedBy = [ "multi-user.target" ];
+    after = [ "systemd-tmpfiles-setup.service" ];
     unitConfig.ConditionPathExists = "|/dev/fastrpc-adsp";
     serviceConfig = {
       Type = "exec";
@@ -42,7 +50,7 @@ in
       Restart = "on-failure";
       RestartSec = "5";
       Environment = [
-        "ADSP_LIBRARY_PATH=/run/pd-mapper-firmware;/run/pd-mapper-firmware/qcom/sm8550/sheng;/run/pd-mapper-firmware/rfsa/adsp;/run/current-system/firmware;/lib/firmware;/lib/firmware/qcom/sm8550/sheng;/run/current-system/firmware/rfsa/adsp"
+        "ADSP_LIBRARY_PATH=/usr/share/qcom/sm8550/Xiaomi/sheng;/run/pd-mapper-firmware;/run/pd-mapper-firmware/qcom/sm8550/sheng;/run/pd-mapper-firmware/rfsa/adsp;/run/current-system/firmware;/lib/firmware;/lib/firmware/qcom/sm8550/sheng;/run/current-system/firmware/rfsa/adsp"
       ];
     };
   };
@@ -71,22 +79,25 @@ in
     };
   };
 
-  # 5. Define the adsprpcd-sensorspd service to keep the Sensor PD alive
+  # 5. Define the adsprpcd-sensorspd service (sensor PD fastrpc channel)
   systemd.services.adsprpcd-sensorspd = {
-    description = "sensor_pd aDSP RPC daemon";
-    wantedBy = [ "iio-sensor-proxy.service" ];
-    after = [ "adsprpcd.service" "pd-mapper.service" ];
+    description = "sensorspd aDSP RPC daemon";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "adsprpcd.service" "pd-mapper.service" "systemd-tmpfiles-setup.service" ];
     requires = [ "adsprpcd.service" "pd-mapper.service" ];
     before = [ "iio-sensor-proxy.service" ];
-    
+
     # Run only if the fastrpc node exists
     unitConfig.ConditionPathExists = "|/dev/fastrpc-adsp";
 
     serviceConfig = {
       Type = "exec";
-      ExecStart = "${fastrpc}/bin/fastrpc_keepalive \"sensor_pd&_dom=adsp\"";
+      ExecStart = "${fastrpc}/bin/adsprpcd sensorspd";
       Restart = "on-failure";
       RestartSec = "5";
+      Environment = [
+        "ADSP_LIBRARY_PATH=/usr/share/qcom/sm8550/Xiaomi/sheng;/run/pd-mapper-firmware;/run/pd-mapper-firmware/qcom/sm8550/sheng;/lib/firmware/qcom/sm8550/sheng"
+      ];
     };
   };
 
