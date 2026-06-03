@@ -32,7 +32,7 @@ GNOME、KDE 等现代桌面环境天然支持通过 D-Bus 监听 `org.freedeskto
 DSP 内的 `sensor_pd` 在启动时必须能读取以下文件，否则会默默崩溃且不会通过 QRTR 注册（导致 `qrtr-lookup 400` 为空）：
 1. **校准数据与注册表**：位于 `/mnt/vendor/persist/sensors/registry/registry`。NixOS 必须开机静态挂载安卓的 `persist` 分区到该路径。
 2. **硬件配置**：位于 `/vendor/etc/sensors/sns_reg_config`。由于 NixOS 是无状态系统，必须通过 `systemd.tmpfiles.rules` 将固件包内的 `/etc/sensors` 链接到 `/vendor/etc/sensors`。
-3. **FastRPC DMA Memory Mapping (flags=0)**：Android 的 `fastrpc` 驱动允许用户态库发送 `flags=0` 的内存映射请求，但在上游主线内核 (Mainline Linux) 中，`flags=0` 被视为非法参数并返回 `EINVAL`，导致 DSP 无法映射共享内存，RPC 调用直接崩溃。NixOS 中必须修补 `fastrpc` 用户态库，将 `flags=0` 强制转换为 `1 (ADSP_MMAP_ADD_PAGES)`。
+3. **FastRPC DMA Memory Mapping (flags=0)**：Android 的 `fastrpc` 驱动允许用户态库发送 `flags=0` 的内存映射请求，但在上游主线内核 (Mainline Linux) 中，`flags=0` 被视为非法参数并返回 `EINVAL`，导致 DSP 无法映射共享内存，RPC 调用直接崩溃。NixOS 中必须修补 `fastrpc` 用户态库，将 `flags=0` 强制转换为 `0x1000 (ADSP_MMAP_ADD_PAGES)`。
 
 ## 失败排查步骤
 1. **检查 FastRPC 节点**：`ls -la /dev/fastrpc*` 是否存在。若无，检查内核 `CONFIG_QCOM_SSC_BLOCK_BUS` 与设备树。
