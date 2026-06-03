@@ -42,7 +42,7 @@ in
       Restart = "on-failure";
       RestartSec = "5";
       Environment = [
-        "ADSP_LIBRARY_PATH=/run/current-system/firmware;/lib/firmware;/lib/firmware/qcom/sm8550/sheng"
+        "ADSP_LIBRARY_PATH=/run/pd-mapper-firmware;/run/pd-mapper-firmware/qcom/sm8550/sheng;/run/current-system/firmware;/lib/firmware;/lib/firmware/qcom/sm8550/sheng"
       ];
     };
   };
@@ -60,7 +60,7 @@ in
         mkdir -p /run/pd-mapper-firmware
         # Mirror the directory structure and decompress ZSTD JSON files
         cd /run/current-system/firmware
-        find -L . -name "*.jsn.zst" | while read file; do
+        find -L ./qcom -name "*.zst" | while read file; do
           mkdir -p "/run/pd-mapper-firmware/$(dirname "$file")"
           zstd -d -f "$file" -o "/run/pd-mapper-firmware/''${file%.zst}"
         done
