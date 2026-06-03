@@ -11,6 +11,7 @@ let
 in
 {
   # 1. Overlay to patch iio-sensor-proxy with SSC support
+  nixpkgs.config.allowUnfree = true;
   nixpkgs.overlays = [
     (final: prev: {
       iio-sensor-proxy = prev.iio-sensor-proxy.overrideAttrs (old: {
