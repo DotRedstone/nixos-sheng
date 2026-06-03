@@ -28,6 +28,11 @@ GNOME、KDE 等现代桌面环境天然支持通过 D-Bus 监听 `org.freedeskto
 2. 运行 `busctl tree org.freedesktop.SensorProxy` 能看到相关 D-Bus 路径。
 3. 运行 `monitor-sensor` 能读到方位 (orientation)、加速度 (accelerometer) 或光线 (light) 数据。
 
+## 关键依赖（踩坑记录）
+DSP 内的 `sensor_pd` 在启动时必须能读取以下文件，否则会默默崩溃且不会通过 QRTR 注册（导致 `qrtr-lookup 400` 为空）：
+1. **校准数据与注册表**：位于 `/mnt/vendor/persist/sensors/registry/registry`。NixOS 必须开机静态挂载安卓的 `persist` 分区到该路径。
+2. **硬件配置**：位于 `/vendor/etc/sensors/sns_reg_config`。由于 NixOS 是无状态系统，必须通过 `systemd.tmpfiles.rules` 将固件包内的 `/etc/sensors` 链接到 `/vendor/etc/sensors`。
+
 ## 失败排查步骤
 1. **检查 FastRPC 节点**：`ls -la /dev/fastrpc*` 是否存在。若无，检查内核 `CONFIG_QCOM_SSC_BLOCK_BUS` 与设备树。
 2. **检查 PDR**：`dmesg | grep -i pdr` 确认 `sensor_pd` 是否已注册。

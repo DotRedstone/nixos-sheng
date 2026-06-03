@@ -28,6 +28,8 @@ This is an early bring-up project.
 - [mobile-nixos/mobile-nixos](https://github.com/mobile-nixos/mobile-nixos)
   provides the device framework, stage-1 initramfs, Android boot image builder,
   generated rootfs support, USB gadget setup, and device-port conventions.
+- [DotRedstone/sheng-firmware-full](https://github.com/DotRedstone/sheng-firmware-full)
+  provides the complete proprietary firmware, ADSP sensor communication configs, and registry.
 - [map220v/sm8550-mainline](https://github.com/map220v/sm8550-mainline)
   provides the Xiaomi Pad 6S Pro mainline kernel work.
 
@@ -161,13 +163,14 @@ Do not flash `userdata`. Firmware, packages, systemd units, users, and other
 rootfs content live in the `linux` partition; flashing only `boot_b` does not
 update `/lib/firmware`.
 
-## Firmware, USB-C, and OTG
+## Firmware, Sensors, and USB-C
 
-USB-C host mode on sheng depends on Qualcomm remoteproc firmware being present
-in the final Mobile NixOS rootfs. See
-[docs/sheng-firmware-and-usbc.md](docs/sheng-firmware-and-usbc.md) for the
-full dependency chain, offline rootfs checks, runtime verification commands,
-and common failure signatures.
+USB-C host mode and various sensors on sheng heavily depend on the complete Qualcomm remoteproc firmware (including ADSP and CDSP).
+Since NixOS is stateless, we introduced [sheng-firmware-full](https://github.com/DotRedstone/sheng-firmware-full) to manage all proprietary files, and configured the system to mount the native Android `persist` partition to provide the registry required by the DSP sensors.
+
+For the full dependency chain, offline rootfs checks, runtime verification commands, and common failure signatures, see:
+- [docs/sheng-firmware-and-usbc.md](docs/sheng-firmware-and-usbc.md)
+- [docs/sensors-ssc-userland.md](docs/sensors-ssc-userland.md)
 
 ## Debugging
 
