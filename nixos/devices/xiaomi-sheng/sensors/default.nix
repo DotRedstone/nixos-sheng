@@ -42,7 +42,7 @@ in
       Restart = "on-failure";
       RestartSec = "5";
       Environment = [
-        "ADSP_LIBRARY_PATH=/run/pd-mapper-firmware;/run/pd-mapper-firmware/qcom/sm8550/sheng;/run/current-system/firmware;/lib/firmware;/lib/firmware/qcom/sm8550/sheng"
+        "ADSP_LIBRARY_PATH=/run/pd-mapper-firmware;/run/pd-mapper-firmware/qcom/sm8550/sheng;/run/pd-mapper-firmware/rfsa/adsp;/run/current-system/firmware;/lib/firmware;/lib/firmware/qcom/sm8550/sheng;/run/current-system/firmware/rfsa/adsp"
       ];
     };
   };

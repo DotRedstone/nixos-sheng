@@ -12,8 +12,8 @@
       flake = false;
     };
     shengFirmware = {
-      url = "github:map220v/sheng-firmware";
-      flake = false;
+      url = "github:DotRedstone/sheng-firmware-full";
+      # Note: This is now a true flake, so we remove `flake = false;`
     };
   };
 
@@ -22,10 +22,7 @@
       system = "aarch64-linux";
       shengOverlay = final: prev: {
         inherit shengKernelSrc;
-        sheng-firmware = prev.runCommand "sheng-firmware" {} ''
-          mkdir -p $out/lib/firmware
-          cp -r ${shengFirmware}/* $out/lib/firmware/
-        '';
+        sheng-firmware = shengFirmware.packages.${prev.system}.default;
         libinput = prev.libinput.override {
           luaSupport = false;
         };
