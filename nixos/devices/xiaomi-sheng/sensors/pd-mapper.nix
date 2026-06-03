@@ -14,6 +14,7 @@ stdenv.mkDerivation rec {
 
   postPatch = ''
     substituteInPlace pd-mapper.c \
+      --replace-fail 'fw_param_path = open(FIRMWARE_PARAM_PATH, O_RDONLY);' 'fw_param_path = -1;' \
       --replace-fail "/lib/firmware/" "/run/pd-mapper-firmware/"
   '';
 
