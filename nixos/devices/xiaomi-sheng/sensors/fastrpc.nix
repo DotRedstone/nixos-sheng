@@ -22,6 +22,10 @@ stdenv.mkDerivation rec {
   preConfigure = ''
     rm -rf src/fastrpc_test.c
     rm -rf src/fastrpc_test
+    # The mainline fastrpc kernel driver rejects mmap requests with flags=0.
+    # The DSP often sends flags=0, causing remote_mmap64_internal to fail with EINVAL.
+    # Force flags to 1 (ADSP_MMAP_ADD_PAGES) when it is 0.
+    sed -i 's/int64_t size, uint64_t \*vaddrout) {/int64_t size, uint64_t \*vaddrout) {\n  if (flags == 0) flags = 1;/g' src/fastrpc_mem.c
   '';
 
   postInstall = ''
