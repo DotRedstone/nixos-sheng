@@ -53,8 +53,18 @@ in
     wantedBy = [ "multi-user.target" ];
     after = [ "adsprpcd.service" ];
     before = [ "adsprpcd-sensorspd.service" ];
+    path = [ pkgs.zstd pkgs.coreutils pkgs.findutils ];
     serviceConfig = {
       Type = "exec";
+      ExecStartPre = pkgs.writeShellScript "pd-mapper-prep" ''
+        mkdir -p /run/pd-mapper-firmware
+        # Mirror the directory structure and decompress ZSTD JSON files
+        cd /run/current-system/firmware
+        find . -name "*.jsn.zst" -type f | while read file; do
+          mkdir -p "/run/pd-mapper-firmware/$(dirname "$file")"
+          zstd -d -f "$file" -o "/run/pd-mapper-firmware/''${file%.zst}"
+        done
+      '';
       ExecStart = "${pd-mapper}/bin/pd-mapper";
       Restart = "on-failure";
       RestartSec = "5";

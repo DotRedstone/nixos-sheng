@@ -14,7 +14,7 @@ stdenv.mkDerivation rec {
 
   postPatch = ''
     substituteInPlace pd-mapper.c \
-      --replace-fail "/lib/firmware/" "/run/current-system/firmware/"
+      --replace-fail "/lib/firmware/" "/run/pd-mapper-firmware/"
   '';
 
   makeFlags = [ "prefix=$(out)" "servicedir=$(out)/lib/systemd/system" "CC=${stdenv.cc.targetPrefix}cc" ];
