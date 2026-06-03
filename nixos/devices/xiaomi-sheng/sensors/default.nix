@@ -60,7 +60,7 @@ in
         mkdir -p /run/pd-mapper-firmware
         # Mirror the directory structure and decompress ZSTD JSON files
         cd /run/current-system/firmware
-        find . -name "*.jsn.zst" | while read file; do
+        find -L . -name "*.jsn.zst" | while read file; do
           mkdir -p "/run/pd-mapper-firmware/$(dirname "$file")"
           zstd -d -f "$file" -o "/run/pd-mapper-firmware/''${file%.zst}"
         done
