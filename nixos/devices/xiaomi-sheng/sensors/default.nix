@@ -6,6 +6,7 @@ let
   sheng-sensors-file = pkgs.callPackage ./sheng-sensors-file.nix { };
   qrtr = pkgs.callPackage ./qrtr.nix { };
   pd-mapper = pkgs.callPackage ./pd-mapper.nix { inherit qrtr; };
+  sheng-devauth = pkgs.callPackage ./devauth.nix { };
 
 in
 {
@@ -25,17 +26,17 @@ in
     sheng-sensors-file
     qrtr
     pd-mapper
+    sheng-devauth
   ];
 
-  # 2. Make registry files available where libssc expects them (typically /usr/share/qcom or /etc/qcom)
-  # sheng-sensors-file puts them in $out/share/qcom/sm8550/Xiaomi/sheng/registry/
-  environment.etc."qcom".source = "${sheng-sensors-file}/share/qcom";
-
-  # 2b. sns_reg_config hardcodes paths to /usr/share/qcom/..., but NixOS uses /etc/qcom
-  #     Create a symlink so the ADSP firmware can find the files
+  # 2b. sns_reg_config hardcodes paths to /usr/share/qcom/..., but NixOS uses read-only store paths.
+  #     We must make it writable because ADSP sensor registry writes a temp.json cache to this dir.
+  #     Copy the static files to /var/lib/qcom and symlink /usr/share/qcom to it.
   systemd.tmpfiles.rules = [
+    "C /var/lib/qcom - - - - ${sheng-sensors-file}/share/qcom"
+    "z /var/lib/qcom 0755 root root - -"
     "d /usr/share 0755 root root -"
-    "L+ /usr/share/qcom - - - - /etc/qcom"
+    "L+ /usr/share/qcom - - - - /var/lib/qcom"
   ];
 
   # 3. Define the root adsprpcd service
@@ -79,11 +80,25 @@ in
     };
   };
 
+  # 4b. Define xiaomi_devauth service for Nanosic Authentication
+  systemd.services.sheng-devauth = {
+    description = "Xiaomi Proprietary Sensor and Keyboard Authentication Daemon";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "adsprpcd.service" "systemd-modules-load.service" ];
+    before = [ "adsprpcd-sensorspd.service" ];
+    serviceConfig = {
+      Type = "simple";
+      ExecStart = "${sheng-devauth}/bin/xiaomi_devauth";
+      Restart = "on-failure";
+      RestartSec = "5s";
+    };
+  };
+
   # 5. Define the adsprpcd-sensorspd service (sensor PD fastrpc channel)
   systemd.services.adsprpcd-sensorspd = {
     description = "sensorspd aDSP RPC daemon";
     wantedBy = [ "multi-user.target" ];
-    after = [ "adsprpcd.service" "pd-mapper.service" "systemd-tmpfiles-setup.service" ];
+    after = [ "adsprpcd.service" "pd-mapper.service" "sheng-devauth.service" "systemd-tmpfiles-setup.service" ];
     requires = [ "adsprpcd.service" "pd-mapper.service" ];
     before = [ "iio-sensor-proxy.service" ];
 
