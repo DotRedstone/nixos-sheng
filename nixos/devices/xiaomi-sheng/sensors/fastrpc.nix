@@ -22,10 +22,9 @@ stdenv.mkDerivation rec {
   preConfigure = ''
     rm -rf src/fastrpc_test.c
     rm -rf src/fastrpc_test
-    # The mainline fastrpc kernel driver rejects mmap requests with flags=0.
-    # The DSP often sends flags=0, causing remote_mmap64_internal to fail with EINVAL.
-    # Force flags to 0x1000 (ADSP_MMAP_ADD_PAGES) when it is 0.
-    sed -i 's/int64_t size, uint64_t \*vaddrout) {/int64_t size, uint64_t \*vaddrout) {\n  if (flags == 0) flags = 0x1000;/g' src/fastrpc_mem.c
+    # The DSP sends rflags=0 when requesting heap memory, but mainline fastrpc requires ADSP_MMAP_ADD_PAGES (0x1000).
+    # If we don't patch rflags, userspace allocates the buffer and passes vaddrin!=0, which mainline rejects.
+    sed -i 's/uint64_t \*vadsp) __QAIC_IMPL_ATTRIBUTE {/uint64_t \*vadsp) __QAIC_IMPL_ATTRIBUTE {\n  if (rflags == 0) rflags = 0x1000;/g' src/apps_mem_imp.c
   '';
 
   postInstall = ''
