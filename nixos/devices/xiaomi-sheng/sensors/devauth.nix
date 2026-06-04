@@ -1,16 +1,20 @@
 { stdenv
 , lib
-, sheng-firmware
+, fetchurl
 }:
 
-# xiaomi_devauth is a precompiled aarch64 binary shipped inside sheng-firmware-full.
-# We simply copy it out into its own derivation so that systemd can reference it.
-# No patching is needed because the binary is statically linked.
+# xiaomi_devauth is a precompiled aarch64 binary for Xiaomi sensor/keyboard authentication.
+# We fetch it directly from the sheng-firmware-full repository to avoid flake.lock sync issues.
 stdenv.mkDerivation {
   pname = "xiaomi-devauth";
   version = "1.0.0";
 
-  # No build required
+  src = fetchurl {
+    url = "https://raw.githubusercontent.com/DotRedstone/sheng-firmware-full/main/bin/xiaomi_devauth";
+    sha256 = "b814988c0aaef534121a8234796e85118fa07259479eb2f3fae72a953d91752f";
+  };
+
+  # No build required — this is a precompiled binary
   dontUnpack = true;
   dontBuild = true;
   dontFixup = true;
@@ -19,7 +23,7 @@ stdenv.mkDerivation {
   installPhase = ''
     runHook preInstall
     mkdir -p $out/bin
-    cp ${sheng-firmware}/bin/xiaomi_devauth $out/bin/xiaomi_devauth
+    cp $src $out/bin/xiaomi_devauth
     chmod +x $out/bin/xiaomi_devauth
     runHook postInstall
   '';
