@@ -23,6 +23,8 @@ Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的实验性 Mobile NixOS 移�
 
 - [mobile-nixos/mobile-nixos](https://github.com/mobile-nixos/mobile-nixos)
   提供设备框架、stage-1 initramfs、Android boot image 构建器、生成的 rootfs 支持、USB gadget 设置以及设备移植约定。
+- [DotRedstone/sheng-firmware-full](https://github.com/DotRedstone/sheng-firmware-full)
+  提供完整的闭源固件、ADSP 传感器通信配置与注册表。
 - [map220v/sm8550-mainline](https://github.com/map220v/sm8550-mainline)
   提供 Xiaomi Pad 6S Pro 的主线内核支持。
 
@@ -145,9 +147,14 @@ fastboot flash linux out/mobile-rootfs/rootfs.img
 
 不要刷入 `userdata`。固件、软件包、systemd 单元、用户和其他 rootfs 内容都位于 `linux` 分区；仅刷入 `boot_b` 并不会更新 `/lib/firmware`。
 
-## 固件、USB-C 与 OTG
+## 固件、传感器与 USB-C
 
-sheng 上的 USB-C 主机模式依赖于最终 Mobile NixOS rootfs 中存在的 Qualcomm remoteproc 固件。有关完整的依赖链、离线 rootfs 检查、运行时验证命令以及常见的故障特征，请参阅 [docs/sheng-firmware-and-usbc.md](docs/sheng-firmware-and-usbc.md)。
+sheng 上的 USB-C 主机模式和各类传感器均强依赖于完整的 Qualcomm remoteproc 固件（包含 ADSP 与 CDSP）。
+由于 NixOS 是无状态的，我们在系统中引入了 [sheng-firmware-full](https://github.com/DotRedstone/sheng-firmware-full) 来管理所有闭源文件，并配置了系统去挂载原生的 Android `persist` 分区以提供 DSP 传感器所需的注册表。
+
+有关完整的依赖链、离线 rootfs 检查、运行时验证命令以及常见的故障特征，请参阅：
+- [docs/sheng-firmware-and-usbc.md](docs/sheng-firmware-and-usbc.md)
+- [docs/sensors-ssc-userland.md](docs/sensors-ssc-userland.md)
 
 ## 调试
 
