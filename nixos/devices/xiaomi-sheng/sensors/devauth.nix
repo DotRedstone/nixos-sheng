@@ -1,6 +1,7 @@
 { stdenv
 , lib
 , fetchurl
+, autoPatchelfHook
 }:
 
 # xiaomi_devauth is a precompiled aarch64 binary for Xiaomi sensor/keyboard authentication.
@@ -14,10 +15,17 @@ stdenv.mkDerivation {
     sha256 = "b814988c0aaef534121a8234796e85118fa07259479eb2f3fae72a953d91752f";
   };
 
+  nativeBuildInputs = [
+    autoPatchelfHook
+  ];
+
+  buildInputs = [
+    stdenv.cc.cc.lib
+  ];
+
   # No build required — this is a precompiled binary
   dontUnpack = true;
   dontBuild = true;
-  dontFixup = true;
   dontStrip = true;
 
   installPhase = ''
