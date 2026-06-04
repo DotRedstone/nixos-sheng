@@ -375,11 +375,12 @@ postmarketOS 状态：Y
 * [ ] 当前无 `wlan0`
 * [ ] 当前 `iw dev` 为空
 * [ ] `nmcli device` 只有 loopback
-* [x] WCN7850/WCN7851 相关 firmware 存在
-* [ ] `/lib/modules` 中未看到 ath12k / MHI / QMI / QRTR 相关模块
-* [x] `/sys/bus/platform/devices` 可见 `1c00000.pcie:pcie@0:wifi@0`
-* [ ] `/sys/bus/pci/devices` 当前为空
-* [ ] 优先检查 ath12k / MHI / PCIe 驱动与模块是否进入 rootfs
+* [x] PCIe Root Port 与 WCN7850 endpoint 可枚举：`0000:01:00.0 [17cb:1107]`
+* [x] `ath12k_wifi7` / `ath12k` / `mhi` / `cfg80211` / `mac80211` 模块已加载
+* [ ] 当前 rootfs 未找到 `ath12k/WCN7850/hw2.0/amss.bin`
+* [ ] dmesg 显示 `Direct firmware load for ath12k/WCN7850/hw2.0/amss.bin failed with error -2`
+* [ ] `ath12k_wifi7_pci` 因 MHI firmware 加载失败，probe 返回 `-110`
+* [ ] 优先补齐 WCN7850/WCN7851 ath12k firmware 与 board 文件进入 rootfs
 * [ ] 修复后验证 NetworkManager 扫描与连接
 
 验证命令：
@@ -740,29 +741,36 @@ postmarketOS 状态：N
 
 ## 下一步建议
 
-### 建议 P0：Wi-Fi
+### 建议 P0：Touchscreen
+
+理由：
+
+* 当前 dmesg 明确显示 `NVT-ts-spi` 缺 `novatek/novatek_nt36532e_fw.bin`。
+* 没有触摸会严重影响本机交互。
+* 该问题边界清晰，优先检查 firmware 是否进入 rootfs，以及 NT36532E SPI 驱动加载后的 input 设备。
+
+建议检查顺序：
+
+1. `/lib/firmware/novatek/novatek_nt36532e_fw.bin` 是否存在
+2. `NVT-ts-spi` dmesg 是否仍报 firmware `-2`
+3. `/proc/bus/input/devices` 是否出现触摸屏
+4. `libinput list-devices` 是否识别触摸设备
+
+### 建议 P1：Wi-Fi
 
 理由：
 
 * postmarketOS 标记为可用，说明硬件链路理论上已有参考实现。
 * Wi-Fi 是后续图形桌面、包管理、远程调试和日用测试的基础能力。
-* 当前问题更可能集中在 kernel config、ath12k/MHI/PCIe 模块、firmware、board 文件和 rootfs 模块打包，不应先改 NetworkManager 配置。
+* 当前 PCIe endpoint、ath12k、MHI 模块已出现，主要阻塞是 rootfs 缺 `ath12k/WCN7850/hw2.0/amss.bin` 等 firmware，不应先改 NetworkManager 配置。
 
 建议检查顺序：
 
 1. `ip link` / `iw dev` / `rfkill list`
-2. `/lib/modules` 中 ath12k、mhi、qrtr、qmi、pci 相关模块是否存在
-3. `/lib/firmware/ath12k`、WCN7851/WCN7850 firmware、board-2 文件是否进入 rootfs
-4. PCIe endpoint / MHI 是否枚举
-5. dmesg 中 ath12k、MHI、PCIe、firmware 错误
-
-### 建议 P1：Touchscreen
-
-理由：
-
-* 没有触摸会严重影响本机交互。
-* 当前大概率是 NT36532E SPI 驱动、DTS、firmware 或模块进入 rootfs 的问题。
-* 触摸修复通常只影响 boot/rootfs 中明确的 driver/firmware，不应和桌面环境一起改。
+2. `/lib/firmware/ath12k/WCN7850/hw2.0/amss.bin` 是否存在
+3. WCN7850/WCN7851 firmware、board-2 文件是否进入 rootfs
+4. MHI 是否能从 firmware load failure 进入正常状态
+5. 修复后 NetworkManager 是否能扫描与连接
 
 ### 建议 P1：Audio / Bluetooth
 
