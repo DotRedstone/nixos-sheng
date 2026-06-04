@@ -38,6 +38,8 @@ in
     "z /var/lib/qcom 0755 root root - -"
     "d /usr/share 0755 root root -"
     "L+ /usr/share/qcom - - - - /var/lib/qcom"
+    "d /usr/lib 0755 root root -"
+    "L+ /usr/lib/firmware - - - - /lib/firmware"
   ];
 
   # 3. Define the root adsprpcd service
