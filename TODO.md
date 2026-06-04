@@ -123,10 +123,11 @@ dmesg | grep -Ei 'drm|dpu|panel|dsi|display|mode|refresh' | tail -300
 postmarketOS 状态：Y
 型号：Novatek NT36532E
 
-* [ ] 当前检查输出中未看到 touchscreen input 设备
-* [ ] 需要确认 `CONFIG_TOUCHSCREEN_NT36532E_SPI=m` 对应模块是否进入 rootfs
-* [ ] 需要检查 Novatek/NT36532E 驱动是否 probe
-* [~] 如果实际触摸可用，需要补充 input 节点与人工触摸事件记录
+* [x] `NVTCapacitiveTouchScreen` input 设备存在
+* [x] `libinput list-devices` 识别为 touch 设备
+* [x] `CONFIG_TOUCHSCREEN_NT36532E_SPI=m` 对应模块可加载
+* [x] 已补入 `novatek/novatek_nt36532e_fw.bin`
+* [~] 需要人工触摸屏幕验证坐标、方向和多点触控行为
 
 验证命令：
 
@@ -708,6 +709,7 @@ postmarketOS 状态：N
 
 * [x] USB-C / OTG：Hub、键盘、鼠标已验证；待验证 U 盘、ADB device 模式
 * [x] Sensors：加速度计、距离传感器、光感、指南针已通过 SSC + `iio-sensor-proxy` 验证
+* [x] Touchscreen：input/libinput 已识别；待人工验证触摸坐标与多点触控
 * [ ] Display：分辨率、刷新率、背光调节
 * [ ] Power / volume buttons：实际按键事件
 * [ ] Battery / charger：不同充电器下电压、电流、PD 状态
@@ -717,7 +719,6 @@ postmarketOS 状态：N
 * [ ] Wi-Fi：优先检查 ath12k / MHI / PCIe / `/lib/modules`
 * [ ] Bluetooth：检查 HCI、QCA firmware、serdev/UART、bluetooth service
 * [ ] Audio：检查 WCD9380、CS35L43、QDSP6、SoundWire、ALSA/PipeWire
-* [ ] Touchscreen：检查 NT36532E SPI 模块是否进入 rootfs
 * [ ] Camera：检查 CAMSS、S5KJN1、OV32D40、media graph
 * [ ] Keyboard / Touchpad：连接官方键盘后检查 Nanosic/HID
 
