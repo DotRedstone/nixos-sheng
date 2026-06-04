@@ -119,6 +119,25 @@ in
     };
   };
 
-  # 6. Ensure iio-sensor-proxy is enabled
+  # 6. Expose SSC-backed sensors to iio-sensor-proxy.
+  services.udev.extraRules = ''
+    SUBSYSTEM=="misc", KERNEL=="fastrpc-adsp*", ENV{IIO_SENSOR_PROXY_TYPE}+="ssc-accel ssc-proximity ssc-light ssc-compass", ENV{ACCEL_MOUNT_MATRIX}+="-1, 0, 0; 0, -1, 0; 0, 0, -1", TAG+="systemd", ENV{SYSTEMD_WANTS}+="iio-sensor-proxy.service"
+  '';
+
+  # 7. Ensure iio-sensor-proxy is enabled and starts after SSC is queryable.
   hardware.sensor.iio.enable = lib.mkDefault true;
+  systemd.services.iio-sensor-proxy = {
+    after = [ "adsprpcd-sensorspd.service" "systemd-udev-settle.service" ];
+    wants = [ "adsprpcd-sensorspd.service" ];
+    serviceConfig.ExecStartPre = pkgs.writeShellScript "wait-for-sheng-ssc" ''
+      for _ in $(seq 1 30); do
+        if ${libssc}/bin/ssccli --sensor light --timeout 1 >/dev/null 2>&1; then
+          exit 0
+        fi
+        sleep 1
+      done
+
+      exit 0
+    '';
+  };
 }
