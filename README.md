@@ -22,6 +22,7 @@ This is an early bring-up project.
 | RootFS | Mobile NixOS generated rootfs | ext4 image labeled `linux` |
 | Display/console | Bring-up | Stage-1 currently runs headless until display works |
 | Debug access | Bring-up | Stage-1/stage-2 ADB is enabled through Mobile NixOS |
+| Sensors | User-space working | accelerometer, proximity, ambient light, and compass work through SSC + iio-sensor-proxy D-Bus |
 
 ## Upstream Projects
 
@@ -167,6 +168,11 @@ update `/lib/firmware`.
 
 USB-C host mode and various sensors on sheng heavily depend on the complete Qualcomm remoteproc firmware (including ADSP and CDSP).
 Since NixOS is stateless, we introduced [sheng-firmware-full](https://github.com/DotRedstone/sheng-firmware-full) to manage all proprietary files, and configured the system to mount the native Android `persist` partition to provide the registry required by the DSP sensors.
+
+Sensors currently use the Qualcomm SSC user-space path. `iio-sensor-proxy`
+exposes accelerometer, proximity, ambient light, and compass data over D-Bus.
+This does not create kernel IIO sysfs nodes, so an empty
+`/sys/bus/iio/devices` directory is expected for the current implementation.
 
 For the full dependency chain, offline rootfs checks, runtime verification commands, and common failure signatures, see:
 - [docs/sheng-firmware-and-usbc.md](docs/sheng-firmware-and-usbc.md)

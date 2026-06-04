@@ -440,20 +440,19 @@ dmesg | grep -Ei 'bluetooth|bt|hci|qca|btqca|uart|serdev|firmware|rfkill' | tail
 postmarketOS 状态：Y
 型号：InvenSense ICM42607P
 
-* [ ] 当前 `/sys/bus/iio/devices` 下无 `iio:device*`
-* [ ] 当前未看到 IMU/IIO 设备
-* [ ] 检查 ICM42607P 驱动与 DTS 节点
-* [ ] 验证加速度计/陀螺仪
+* [x] 加速度计已通过 SSC + `iio-sensor-proxy` 用户态路径验证可用
+* [x] `monitor-sensor --accel` 可看到 accelerometer/orientation/tilt
+* [x] `ssccli --sensor accelerometer` 可读取实时三轴数据
+* [ ] 陀螺仪尚未作为单独上层能力暴露，后续需要确认 `libssc` / `iio-sensor-proxy` 是否支持
+* [~] `/sys/bus/iio/devices` 下仍无 `iio:device*`；当前方案不走 kernel IIO sysfs
+* [-] 暂不编造 ICM42607P DTS 节点，除非后续确认存在 AP 侧直连路径
 
 验证命令：
 
 ```sh
-find /sys/bus/iio/devices -maxdepth 3 -type f -o -type d 2>/dev/null | sort
-for d in /sys/bus/iio/devices/iio:device*; do
-  echo "--- $d ---"
-  cat "$d/name" 2>/dev/null
-done
-dmesg | grep -Ei 'icm42607|invensense|imu|accel|gyro|iio|sensor' | tail -300
+monitor-sensor --accel
+ssccli --sensor accelerometer --timeout 5
+journalctl -b -u adsprpcd-sensorspd -u iio-sensor-proxy --no-pager -o short-monotonic | tail -200
 ```
 
 ### Hall sensor
@@ -476,15 +475,18 @@ dmesg | grep -Ei 'hall|lid|SW_LID|gpio-keys|input' | tail -200
 postmarketOS 状态：Y
 型号：QST QMC6308
 
-* [ ] 当前无 IIO 设备
-* [ ] 当前未看到 QMC6308
-* [ ] 检查 QMC6308 驱动与 DTS 节点
+* [x] 指南针已通过 SSC + `iio-sensor-proxy` 用户态路径验证可用
+* [x] `monitor-sensor --compass` 可看到 heading 变化
+* [x] `ssccli --sensor magnetometer` 可读取磁力计数据
+* [~] `/sys/bus/iio/devices` 下仍无 `iio:device*`；当前方案不走 kernel IIO sysfs
+* [-] 暂不编造 QMC6308 DTS 节点，除非后续确认存在 AP 侧直连路径
 
 验证命令：
 
 ```sh
-find /sys/bus/iio/devices -maxdepth 3 -type f -o -type d 2>/dev/null | sort
-dmesg | grep -Ei 'qmc6308|magnet|compass|iio|sensor' | tail -300
+monitor-sensor --compass
+ssccli --sensor magnetometer --timeout 5
+journalctl -b -u adsprpcd-sensorspd -u iio-sensor-proxy --no-pager -o short-monotonic | tail -200
 ```
 
 ### RGB Light & IR Proximity
@@ -493,16 +495,24 @@ postmarketOS 状态：Y
 型号：Sensortek STK36C61-A
 备注：作为 light sensor 暴露，而不是 AMS TSL2522。
 
-* [ ] 当前无 IIO 设备
-* [ ] 当前未看到 STK36C61-A
-* [ ] 检查 STK36C61-A 驱动与 DTS 节点
-* [ ] 注意不要误判为 TSL2522
+* [x] 光感已通过 SSC + `iio-sensor-proxy` 用户态路径验证可用
+* [x] 距离传感器已通过 SSC + `iio-sensor-proxy` 用户态路径验证可用
+* [x] `monitor-sensor --light` 可看到 ambient light
+* [x] `monitor-sensor --proximity` 可看到 proximity 状态
+* [x] `ssccli --sensor light` 可读取 lux
+* [x] `ssccli --sensor proximity` 可读取 FAR/near 状态
+* [~] proximity 当前会出现 `Failed to unpack Xiaomi Davinci proximity measurement message` 日志，但不影响基本 FAR/near 状态
+* [~] `/sys/bus/iio/devices` 下仍无 `iio:device*`；当前方案不走 kernel IIO sysfs
+* [-] 不按 AMS TSL2522 处理；当前有效路线是 Sensortek/SSC
 
 验证命令：
 
 ```sh
-find /sys/bus/iio/devices -maxdepth 3 -type f -o -type d 2>/dev/null | sort
-dmesg | grep -Ei 'stk36|sensortek|light|proximity|als|iio|sensor' | tail -300
+monitor-sensor --light
+monitor-sensor --proximity
+ssccli --sensor light --timeout 5
+ssccli --sensor proximity --timeout 5
+journalctl -b -u adsprpcd-sensorspd -u iio-sensor-proxy --no-pager -o short-monotonic | tail -200
 ```
 
 ### Battery
@@ -696,6 +706,7 @@ postmarketOS 状态：N
 ### P0：已修通后补实测记录
 
 * [x] USB-C / OTG：Hub、键盘、鼠标已验证；待验证 U 盘、ADB device 模式
+* [x] Sensors：加速度计、距离传感器、光感、指南针已通过 SSC + `iio-sensor-proxy` 验证
 * [ ] Display：分辨率、刷新率、背光调节
 * [ ] Power / volume buttons：实际按键事件
 * [ ] Battery / charger：不同充电器下电压、电流、PD 状态
@@ -706,7 +717,6 @@ postmarketOS 状态：N
 * [ ] Bluetooth：检查 HCI、QCA firmware、serdev/UART、bluetooth service
 * [ ] Audio：检查 WCD9380、CS35L43、QDSP6、SoundWire、ALSA/PipeWire
 * [ ] Touchscreen：检查 NT36532E SPI 模块是否进入 rootfs
-* [ ] Sensors：检查 IIO 设备，包括 ICM42607P、QMC6308、STK36C61-A
 * [ ] Camera：检查 CAMSS、S5KJN1、OV32D40、media graph
 * [ ] Keyboard / Touchpad：连接官方键盘后检查 Nanosic/HID
 
@@ -717,6 +727,7 @@ postmarketOS 状态：N
 * [ ] RGB LED
 * [ ] Microphones
 * [ ] Hall sensor
+* [~] Sensors 后续增强：kernel IIO sysfs bridge、单独 gyroscope 暴露、proximity Davinci payload 解包
 
 ### 暂不处理
 
@@ -726,3 +737,44 @@ postmarketOS 状态：N
 * [-] NFC
 * [-] SAR
 * [-] Pen wireless charger
+
+## 下一步建议
+
+### 建议 P0：Wi-Fi
+
+理由：
+
+* postmarketOS 标记为可用，说明硬件链路理论上已有参考实现。
+* Wi-Fi 是后续图形桌面、包管理、远程调试和日用测试的基础能力。
+* 当前问题更可能集中在 kernel config、ath12k/MHI/PCIe 模块、firmware、board 文件和 rootfs 模块打包，不应先改 NetworkManager 配置。
+
+建议检查顺序：
+
+1. `ip link` / `iw dev` / `rfkill list`
+2. `/lib/modules` 中 ath12k、mhi、qrtr、qmi、pci 相关模块是否存在
+3. `/lib/firmware/ath12k`、WCN7851/WCN7850 firmware、board-2 文件是否进入 rootfs
+4. PCIe endpoint / MHI 是否枚举
+5. dmesg 中 ath12k、MHI、PCIe、firmware 错误
+
+### 建议 P1：Touchscreen
+
+理由：
+
+* 没有触摸会严重影响本机交互。
+* 当前大概率是 NT36532E SPI 驱动、DTS、firmware 或模块进入 rootfs 的问题。
+* 触摸修复通常只影响 boot/rootfs 中明确的 driver/firmware，不应和桌面环境一起改。
+
+### 建议 P1：Audio / Bluetooth
+
+理由：
+
+* Audio 链路涉及 WCD9380、CS35L43、QDSP6、SoundWire、ALSA UCM、PipeWire，范围比 Wi-Fi 和触摸更大，建议等基础交互更稳后推进。
+* Bluetooth 可能与 WCN7851、UART/serdev、QCA firmware、Wi-Fi 组合模块有关，建议在 Wi-Fi 诊断后继续。
+
+### Sensors 后续增强
+
+当前传感器已经可用，不建议继续把它作为阻塞项。后续增强只在需要时单独开任务：
+
+* kernel IIO sysfs bridge
+* gyroscope 单独暴露
+* proximity Xiaomi Davinci payload 解包

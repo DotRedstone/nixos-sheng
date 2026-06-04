@@ -18,6 +18,7 @@ Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的实验性 Mobile NixOS 移�
 | RootFS | Mobile NixOS 生成的 rootfs | 面向 `linux` 分区的 ext4 镜像 |
 | 显示/终端 | Bring-up | 在显示正常工作前，Stage-1 暂为无头 (headless) 运行 |
 | 调试访问 | Bring-up | Stage-1/stage-2 的 ADB 已通过 Mobile NixOS 启用 |
+| 传感器 | 用户态可用 | 加速度计、距离传感器、光感、指南针已通过 SSC + iio-sensor-proxy D-Bus 路径验证 |
 
 ## 上游项目
 
@@ -151,6 +152,8 @@ fastboot flash linux out/mobile-rootfs/rootfs.img
 
 sheng 上的 USB-C 主机模式和各类传感器均强依赖于完整的 Qualcomm remoteproc 固件（包含 ADSP 与 CDSP）。
 由于 NixOS 是无状态的，我们在系统中引入了 [sheng-firmware-full](https://github.com/DotRedstone/sheng-firmware-full) 来管理所有闭源文件，并配置了系统去挂载原生的 Android `persist` 分区以提供 DSP 传感器所需的注册表。
+
+当前传感器走 Qualcomm SSC 用户态路径。`iio-sensor-proxy` 已能通过 D-Bus 暴露加速度计、距离传感器、光感和指南针数据。该方案不会创建 kernel IIO sysfs 节点，因此当前 `/sys/bus/iio/devices` 为空属于预期现象。
 
 有关完整的依赖链、离线 rootfs 检查、运行时验证命令以及常见的故障特征，请参阅：
 - [docs/sheng-firmware-and-usbc.md](docs/sheng-firmware-and-usbc.md)
