@@ -6,7 +6,7 @@ let
   sheng-sensors-file = pkgs.callPackage ./sheng-sensors-file.nix { };
   qrtr = pkgs.callPackage ./qrtr.nix { };
   pd-mapper = pkgs.callPackage ./pd-mapper.nix { inherit qrtr; };
-  sheng-devauth = pkgs.callPackage ./devauth.nix { };
+  sheng-devauth = pkgs.callPackage ./devauth.nix { inherit (pkgs) sheng-firmware; };
 
 in
 {
