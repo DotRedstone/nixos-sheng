@@ -1,7 +1,7 @@
 { stdenv
 , lib
 , fetchurl
-, autoPatchelfHook
+, patchelf
 }:
 
 # xiaomi_devauth is a precompiled aarch64 binary for Xiaomi sensor/keyboard authentication.
@@ -16,11 +16,7 @@ stdenv.mkDerivation {
   };
 
   nativeBuildInputs = [
-    autoPatchelfHook
-  ];
-
-  buildInputs = [
-    stdenv.cc.cc.lib
+    patchelf
   ];
 
   # No build required — this is a precompiled binary
@@ -32,7 +28,13 @@ stdenv.mkDerivation {
     runHook preInstall
     mkdir -p $out/bin
     cp $src $out/bin/xiaomi_devauth
-    chmod +x $out/bin/xiaomi_devauth
+    chmod +wx $out/bin/xiaomi_devauth
+    
+    patchelf \
+      --set-interpreter "$(cat $NIX_CC/nix-support/dynamic-linker)" \
+      --set-rpath "${lib.makeLibraryPath [ stdenv.cc.libc stdenv.cc.cc.lib ]}" \
+      $out/bin/xiaomi_devauth
+      
     runHook postInstall
   '';
 
