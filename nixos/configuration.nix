@@ -4,6 +4,7 @@
   imports = [
     ./hardware-sheng.nix
     ./services/sheng-devauth.nix
+    ./services/xiaomi-mipps-auth.nix
   ];
 
   nixpkgs.hostPlatform = "aarch64-linux";
@@ -53,6 +54,8 @@
       Useful checks: dmesg -w, journalctl -b, ip addr, lsmod
     '';
   };
+
+  services.xiaomi-mipps-auth.enable = true;
 
   console = {
     earlySetup = true;
