@@ -12,7 +12,7 @@
       flake = false;
     };
     shengFirmware = {
-      url = "github:DotRedstone/sheng-firmware-full";
+      url = "github:DotRedstone/sheng-firmware-full?ref=fix/firmware-package-layout";
       # Note: This is now a true flake, so we remove `flake = false;`
     };
   };

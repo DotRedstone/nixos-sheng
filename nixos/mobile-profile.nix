@@ -35,10 +35,6 @@ let
       exit 0
     fi
   '';
-  novatekTouchFirmware = pkgs.fetchurl {
-    url = "https://raw.githubusercontent.com/DotRedstone/sheng-firmware-full/master/novatek/novatek_nt36532e_fw.bin";
-    hash = "sha256-NY1xFei+J5JtV6r/vy0DE+24EMxrUyhp0XFI+wD5GM0=";
-  };
 in
 {
   mobile.enable = true;
@@ -83,7 +79,7 @@ in
       echo "Injecting sheng-firmware into /lib/firmware..."
       mkdir -p ./lib/firmware
       cp -r ${pkgs.sheng-firmware}/lib/firmware/* ./lib/firmware/
-      install -Dm0644 ${novatekTouchFirmware} ./lib/firmware/novatek/novatek_nt36532e_fw.bin
+      cp -r ${pkgs.wireless-regdb}/lib/firmware/* ./lib/firmware/
 
       echo "Injecting kernel modules into /lib/modules..."
       if [ -d ${kernelModulesTree}/lib/modules ]; then
