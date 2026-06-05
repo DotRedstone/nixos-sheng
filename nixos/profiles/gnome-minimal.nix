@@ -11,21 +11,21 @@
   hardware.graphics.enable = true;
 
   services.gnome = {
-    core-apps.enable = false;
-    core-developer-tools.enable = false;
-    games.enable = false;
-    evolution-data-server.enable = false;
-    gnome-browser-connector.enable = false;
-    gnome-initial-setup.enable = false;
-    gnome-online-accounts.enable = false;
-    gnome-remote-desktop.enable = false;
-    gnome-user-share.enable = false;
-    localsearch.enable = false;
-    rygel.enable = false;
-    tinysparql.enable = false;
+    core-apps.enable = lib.mkForce false;
+    core-developer-tools.enable = lib.mkForce false;
+    games.enable = lib.mkForce false;
+    evolution-data-server.enable = lib.mkForce false;
+    gnome-browser-connector.enable = lib.mkForce false;
+    gnome-initial-setup.enable = lib.mkForce false;
+    gnome-online-accounts.enable = lib.mkForce false;
+    gnome-remote-desktop.enable = lib.mkForce false;
+    gnome-user-share.enable = lib.mkForce false;
+    localsearch.enable = lib.mkForce false;
+    rygel.enable = lib.mkForce false;
+    tinysparql.enable = lib.mkForce false;
   };
 
-  services.dleyna.enable = false;
+  services.dleyna.enable = lib.mkForce false;
 
   environment.systemPackages = with pkgs; [
     gnome-console
