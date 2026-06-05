@@ -18,6 +18,10 @@ mobile-nixos.kernel-builder-clang {
     ./0002-ucsi-glink-debug-retry.patch
     ./0003-pdr-pd-mapper-debug.patch
     ./0004-pdr-add-sheng-sensor-pd-lookup.patch
+    (pkgs.fetchurl {
+      url = "https://github.com/ianchb/sm8550-mainline/commit/b6c3859efdec4e7f51a77e7ae835c1425eb104c5.patch";
+      hash = "sha256-GYYDCSYybKU4d8ohZHMh0vEgdT+anUeU5fnskAeT2pI=";
+    })
   ];
 
   isModular = true;
@@ -71,6 +75,9 @@ mobile-nixos.kernel-builder-clang {
 
     echo "--- pmic glink power supply config ---"
     grep -nE '^CONFIG_POWER_SUPPLY=|^CONFIG_BATTERY_QCOM_BATTMGR=|^CONFIG_QCOM_PMIC_GLINK=|^CONFIG_UCSI_PMIC_GLINK=|^CONFIG_TYPEC_UCSI=|^CONFIG_TYPEC=|^CONFIG_QRTR=|^CONFIG_QCOM_PD_MAPPER=' build/.config || true
+
+    echo "--- Xiaomi MiPPS hooks ---"
+    grep -nE 'BATTMGR_XM_PROPERTY_GET|request_vdm_cmd|qcom_battmgr_xiaomi_attr_group' drivers/power/supply/qcom_battmgr.c || true
 
     echo "--- compiler identity ---"
     command -v clang || true
