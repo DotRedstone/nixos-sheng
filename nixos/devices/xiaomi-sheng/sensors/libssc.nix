@@ -1,14 +1,10 @@
-{ lib, stdenv, fetchgit, meson, ninja, pkg-config, glib, protobufc, protobuf, libqmi, libmbim }:
+{ lib, stdenv, meson, ninja, pkg-config, glib, protobufc, protobuf, libqmi, libmbim }:
 
 stdenv.mkDerivation {
   pname = "libssc";
   version = "0.3.0";
 
-  src = fetchgit {
-    url = "https://codeberg.org/DylanVanAssche/libssc.git";
-    rev = "refs/tags/v0.3.0";
-    hash = "sha256-RmgjZbNUpF1u2vhX63VUxK9FV98MBcx5d9TExEDup0g=";
-  };
+  src = ../../../vendor/libssc;
 
   patches = [
     ./wait_for_qmi_service.patch
