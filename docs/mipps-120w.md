@@ -14,6 +14,29 @@ The authentication service only attempts the Xiaomi private flow when the
 charger reports Xiaomi SVID `0x2717`. Other chargers continue using standard
 PD/PPS negotiation.
 
+## Verified result
+
+The integration was verified on sheng with a compatible Xiaomi 120 W charger
+and cable. A successful authentication run reported:
+
+```text
+adapter_svid=0x2717
+authentic_verified=1
+slave_authentic_verified=1
+pd_auth=1
+authentic=1
+slave_authentic=1
+apdo_max=120
+power_max=120
+fastchg_mode=1
+pd_verifed=1
+```
+
+This proves that the kernel interface and userspace authentication flow can
+unlock the charger's 120 W MiPPS profile. It does not prove that the tablet
+continuously draws 120 W; actual input power remains dependent on battery
+state, temperature, and the charger control loop.
+
 ## Build and flash
 
 Both the boot image and GNOME rootfs are required:

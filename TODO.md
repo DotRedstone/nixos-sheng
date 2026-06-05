@@ -563,15 +563,16 @@ postmarketOS 状态：Y
 
 postmarketOS 状态：Y
 型号：Qualcomm PM8550B and Southchip SC8581
-备注：快充仅 PD 3.0；MIPPS/PPS 暂不可用，会回退到普通 PD 3.0 PDO；原装充电器 mainline 最大约 13.5W（9V 1.5A）。
+备注：MiPPS 认证已实机成功，原装 120W 充电器可报告 `apdo_max=120`、`power_max=120`，并进入 `fastchg_mode=1`；持续实际输入功率仍需外置功率计和温度测试验证。
 
 * [x] charger_pd 主链路已修复
 * [x] USB-C / Type-C 主链路已修复
 * [x] `qcom-battmgr-usb` 节点存在
 * [x] UCSI source power_supply 节点存在
 * [x] 当前可读取 USB online、电压、电流、usb_type
+* [x] MiPPS 用户态认证成功，`authentic=1`、`slave_authentic=1`、`pd_verifed=1`
 * [~] 需要验证不同充电器下 PD 3.0 协商、电压、电流
-* [-] 不把 MIPPS/PPS 作为当前阶段目标
+* [~] 需要使用外置功率计验证实际输入功率，并长期观察电池与接口温度
 
 验证命令：
 
