@@ -7,6 +7,10 @@
       flake = false;
     };
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    home-manager = {
+      url = "github:nix-community/home-manager";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     shengKernelSrc = {
       url = "github:map220v/sm8550-mainline/sheng-7.0";
       flake = false;
@@ -17,7 +21,7 @@
     };
   };
 
-  outputs = { self, mobile-nixos, nixpkgs, shengKernelSrc, shengFirmware }:
+  outputs = { self, mobile-nixos, nixpkgs, home-manager, shengKernelSrc, shengFirmware }:
     let
       system = "aarch64-linux";
       shengOverlay = final: prev: {
@@ -58,6 +62,11 @@
       pkgs = import nixpkgs {
         inherit system;
       };
+      homeManagerModule = {
+        environment.systemPackages = [
+          home-manager.packages.${system}.default
+        ];
+      };
       mobileEvalFor = extraModules: import "${mobile-nixos}/lib/eval-with-configuration.nix" {
         inherit pkgs;
         device = ./devices/xiaomi-sheng;
@@ -66,6 +75,7 @@
             nixpkgs.overlays = lib.mkAfter [ shengOverlay ];
           })
           ./configuration.nix
+          homeManagerModule
         ] ++ extraModules ++ [
           ./mobile-profile.nix
         ];
@@ -83,6 +93,14 @@
             nixpkgs.overlays = lib.mkAfter [ shengOverlay ];
           })
           ./configuration.nix
+          homeManagerModule
+        ];
+      };
+
+      homeConfigurations."luser@sheng" = home-manager.lib.homeManagerConfiguration {
+        inherit pkgs;
+        modules = [
+          ./home/luser.nix
         ];
       };
 

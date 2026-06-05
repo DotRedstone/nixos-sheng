@@ -10,6 +10,11 @@
 
   system.stateVersion = "25.11";
 
+  nix.settings.experimental-features = [
+    "nix-command"
+    "flakes"
+  ];
+
   networking.hostName = "nixos-sheng";
   networking.networkmanager.enable = true;
   networking.useDHCP = lib.mkDefault true;
