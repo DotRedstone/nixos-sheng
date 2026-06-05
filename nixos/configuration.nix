@@ -126,6 +126,9 @@
 
   boot.loader.grub.enable = false;
   boot.loader.generic-extlinux-compatible.enable = false;
+  boot.extraModprobeConfig = ''
+    options cfg80211 ieee80211_regdom=CN
+  '';
 
   boot.kernelParams = [
     "console=tty0"
