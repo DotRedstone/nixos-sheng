@@ -15,6 +15,14 @@
   networking.useDHCP = lib.mkDefault true;
 
   time.timeZone = "Asia/Shanghai";
+  services.timesyncd = {
+    enable = true;
+    servers = [
+      "ntp.aliyun.com"
+      "cn.pool.ntp.org"
+      "time.cloudflare.com"
+    ];
+  };
   i18n.defaultLocale = "en_US.UTF-8";
 
   # Bring-up only: replace or remove this once stage-2 access is stable.
