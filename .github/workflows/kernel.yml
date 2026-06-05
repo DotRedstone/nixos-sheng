@@ -68,6 +68,15 @@ jobs:
           mkdir -p out/kernel
           cp out/mobile-bootimg out/kernel/boot_sheng_nixos.img
 
+          image_size="$(stat -c '%s' out/kernel/boot_sheng_nixos.img)"
+          boot_b_size=$((0xC000000))
+          echo "boot image size: $image_size bytes"
+          echo "boot_b size: $boot_b_size bytes"
+          if [ "$image_size" -gt "$boot_b_size" ]; then
+            echo "ERROR: boot image exceeds sheng boot_b partition"
+            exit 1
+          fi
+
       - name: Upload kernel artifact
         uses: actions/upload-artifact@v4
         with:
