@@ -230,7 +230,8 @@ postmarketOS 状态：Y
 * [x] `qcom-camss` media graph 已出现
 * [x] `s5kjn1 7-0010` 已注册并连接到 `msm_csiphy3`
 * [x] `CONFIG_VIDEO_S5KJN1_SHENG=m` 与 QCOM CAMSS 模块已进入 rootfs 并加载
-* [~] 尚未使用 libcamera 或相机应用验证实际画面
+* [x] 已通过 CAMSS/V4L2 管线抓取 `4080x3060` packed RAW10 实际画面
+* [~] 尚无 libcamera 相机应用、自动曝光、白平衡、降噪与 JPEG 输出
 * [-] 仅对齐 postmarketOS 已有状态，不开发画质增强或 8K 支持
 
 验证命令：
@@ -254,7 +255,8 @@ postmarketOS 状态：Y
 
 * [x] `ov32d40 9-0010` 已注册并连接到 `msm_csiphy4`
 * [x] `CONFIG_VIDEO_OV32D40=m` 模块已进入 rootfs 并加载
-* [~] 尚未使用 libcamera 或相机应用验证实际画面
+* [x] 已通过 CAMSS/V4L2 管线抓取 `3264x2448` packed RAW10 实际画面
+* [~] 尚无 libcamera 相机应用、自动曝光、白平衡、降噪与 JPEG 输出
 * [-] 仅对齐 postmarketOS 已有状态，不开发画质增强
 
 验证命令：
@@ -728,7 +730,7 @@ postmarketOS 状态：N
 * [~] GNOME：桌面、悬浮软键盘和旋转配置已集成；待长期验证自动弹出、四向旋转与触摸坐标
 * [~] Bluetooth：控制器与服务正常；待验证扫描、配对、重连、BLE 和蓝牙音频
 * [~] Audio：声卡与 playback/capture PCM 已枚举；待验证扬声器、麦克风和 Type-C 音频
-* [~] Camera：前后摄与 CAMSS media graph 已枚举；待验证实际画面
+* [~] Camera：前后摄 RAW10 实际画面已抓取；待完善 libcamera 与桌面相机应用
 * [~] Display：3048x2032 已确认；待验证刷新率、144Hz、Night Light、背光调节
 * [ ] Power / volume buttons：实际按键事件
 * [ ] Battery / charger：不同充电器下电压、电流、PD 状态
@@ -794,13 +796,13 @@ postmarketOS 状态：N
 
 * Audio 已有 ALSA 声卡与 playback/capture PCM，优先验证实际播放、录音、PipeWire 路由和 Type-C 音频。
 * Bluetooth 控制器和服务已正常运行，下一步直接验证扫描、配对、重连、BLE 和蓝牙音频。
-* 前后摄传感器与 CAMSS media graph 已枚举，下一步使用 libcamera 或相机应用验证实际画面。
+* 前后摄 RAW10 实际画面已抓取，下一步完善 libcamera pipeline、自动曝光和桌面相机应用。
 
 ### 仍未完成的主要项目
 
 1. 官方键盘与触摸板实机验证
 2. 扬声器、麦克风、Type-C 音频与蓝牙音频实测
-3. 前后摄实际画面、camera flash 与 RGB LED 实测
+3. 相机 libcamera/桌面应用、camera flash 与 RGB LED 实测
 4. 显示刷新率、144Hz、Night Light 与背光调节实测
 5. 电源键、音量键、Hall sensor、U 盘与 ADB device 模式实测
 6. 充电功率长期测试、不同充电器兼容性与温度观察

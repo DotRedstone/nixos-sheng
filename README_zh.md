@@ -21,7 +21,7 @@ Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的实验性 Mobile NixOS 移�
 | Wi-Fi | 可用 | 2.4GHz 与 5GHz 扫描、连接和联网已验证；6GHz 未验证 |
 | 蓝牙 | 部分可用 | hci0 与 bluetooth.service 正常；扫描、配对、重连和音频待验证 |
 | 音频 | 部分可用 | ALSA 声卡与播放/录音 PCM 已枚举；实际播放和录音待验证 |
-| 相机 | 部分可用 | 前后摄与 CAMSS media graph 已枚举；实际画面待验证 |
+| 相机 | 部分可用 | 前后摄 RAW10 实际画面已抓取；libcamera、自动曝光与桌面相机应用待完善 |
 | 传感器 | 用户态可用 | 加速度计、距离传感器、光感、指南针已通过 SSC + iio-sensor-proxy D-Bus 路径验证 |
 
 ## 上游项目

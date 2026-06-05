@@ -25,7 +25,7 @@ This is an early bring-up project.
 | Wi-Fi | Working | 2.4 GHz and 5 GHz scanning, connection, and networking verified; 6 GHz untested |
 | Bluetooth | Partially working | hci0 and bluetooth.service work; discovery, pairing, reconnect, and audio need validation |
 | Audio | Partially working | ALSA card and playback/capture PCM devices enumerate; playback and recording need validation |
-| Cameras | Partially working | front/rear sensors and CAMSS media graph enumerate; actual capture needs validation |
+| Cameras | Partially working | front/rear RAW10 frames captured; libcamera, auto exposure, and desktop camera app need integration |
 | Sensors | User-space working | accelerometer, proximity, ambient light, and compass work through SSC + iio-sensor-proxy D-Bus |
 
 ## Upstream Projects
