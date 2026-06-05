@@ -378,16 +378,15 @@ postmarketOS 状态：Y
 
 当前 NixOS 状态：
 
-* [ ] 当前无 `wlan0`
-* [ ] 当前 `iw dev` 为空
-* [ ] `nmcli device` 只有 loopback
+* [x] `wlp1s0` 与 P2P interface 已出现
+* [x] NetworkManager 可扫描并连接 Wi-Fi
 * [x] PCIe Root Port 与 WCN7850 endpoint 可枚举：`0000:01:00.0 [17cb:1107]`
 * [x] `ath12k_wifi7` / `ath12k` / `mhi` / `cfg80211` / `mac80211` 模块已加载
-* [ ] 当前 rootfs 未找到 `ath12k/WCN7850/hw2.0/amss.bin`
-* [ ] dmesg 显示 `Direct firmware load for ath12k/WCN7850/hw2.0/amss.bin failed with error -2`
-* [ ] `ath12k_wifi7_pci` 因 MHI firmware 加载失败，probe 返回 `-110`
-* [ ] 优先补齐 WCN7850/WCN7851 ath12k firmware 与 board 文件进入 rootfs
-* [ ] 修复后验证 NetworkManager 扫描与连接
+* [x] WCN7850 firmware 已进入 rootfs，`ath12k_wifi7_pci` probe 成功
+* [x] 中国监管域已生效，5GHz 信道 36–64 与 149–165 可用
+* [x] 更新 WCN7850 `board-2.bin` 后，5GHz 定向扫描与 NetworkManager 连接已实机验证
+* [x] 已连接 `5200 MHz` / 信道 40 / `80 MHz` AP，链路速率为 `1200.9 MBit/s`
+* [~] 当前 6GHz 信道仍被禁用，尚未验证 6GHz
 
 验证命令：
 
@@ -722,7 +721,7 @@ postmarketOS 状态：N
 
 ### P1：postmarketOS 已工作但当前 NixOS 未工作的项目
 
-* [ ] Wi-Fi：优先检查 ath12k / MHI / PCIe / `/lib/modules`
+* [x] Wi-Fi：2.4GHz 与 5GHz 扫描、连接和联网已验证
 * [ ] Bluetooth：检查 HCI、QCA firmware、serdev/UART、bluetooth service
 * [ ] Audio：检查 WCD9380、CS35L43、QDSP6、SoundWire、ALSA/PipeWire
 * [ ] Camera：检查 CAMSS、S5KJN1、OV32D40、media graph
@@ -762,13 +761,15 @@ postmarketOS 状态：N
 1. 多点触控
 2. 屏幕旋转后的坐标方向
 
-### 建议 P1：Wi-Fi
+### 已完成 P1：Wi-Fi
 
 理由：
 
 * postmarketOS 标记为可用，说明硬件链路理论上已有参考实现。
 * Wi-Fi 是后续图形桌面、包管理、远程调试和日用测试的基础能力。
-* 当前 PCIe endpoint、ath12k、MHI 模块已出现，主要阻塞是 rootfs 缺 `ath12k/WCN7850/hw2.0/amss.bin` 等 firmware，不应先改 NetworkManager 配置。
+* PCIe endpoint、ath12k、MHI 与 firmware 均正常。
+* 5GHz 阻塞来自旧 `board-2.bin` 不包含 sheng 请求的 `subsystem-device=1107,qmi-board-id=255` 匹配项。
+* 更新板级数据库后，5GHz 定向扫描不再触发 `received scan start failure event`，并已完成连接与联网验证。
 
 建议检查顺序：
 

@@ -39,7 +39,7 @@ ADSP / sensor_pd
 - 启动 `adsprpcd-sensorspd.service`
 - 给 `fastrpc-adsp` udev 设备标记：
   `ssc-accel ssc-proximity ssc-light ssc-compass`
-- 为 `ACCEL_MOUNT_MATRIX` 设置 sheng 当前验证可用的方向矩阵
+- 为 `ACCEL_MOUNT_MATRIX` 设置 sheng 横屏原生面板对应的方向矩阵，避免 GNOME 自动旋转结果偏移 90°
 - 在启动 `iio-sensor-proxy` 前等待 SSC 可查询，避免开机太早导致代理退出
 
 上游 `iio-sensor-proxy` 默认只给 `fastrpc-adsp` 启用 `ssc-light ssc-compass`，不会默认启用 `ssc-accel` 和 `ssc-proximity`。sheng 需要显式补充 udev 规则，否则加速度计和距离传感器不会被 `monitor-sensor` 看到。

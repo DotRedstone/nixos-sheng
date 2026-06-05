@@ -1,5 +1,8 @@
 { lib, pkgs, ... }:
 
+let
+  gjs-osk = pkgs.callPackage ../packages/gjs-osk.nix { };
+in
 {
   services.xserver.enable = true;
   services.displayManager.gdm.enable = true;
@@ -15,8 +18,22 @@
 
   programs.dconf.profiles.user.databases = [
     {
+      settings."org/gnome/shell" = {
+        enabled-extensions = [ "gjsosk@vishram1123.com" ];
+      };
+
       settings."org/gnome/desktop/a11y/applications" = {
         screen-keyboard-enabled = true;
+      };
+
+      settings."org/gnome/shell/extensions/gjsosk" = {
+        enable-drag = true;
+        enable-tap-gesture = lib.gvariant.mkInt32 1;
+        indicator-enabled = true;
+        landscape-width-percent = lib.gvariant.mkInt32 70;
+        landscape-height-percent = lib.gvariant.mkInt32 30;
+        portrait-width-percent = lib.gvariant.mkInt32 100;
+        portrait-height-percent = lib.gvariant.mkInt32 30;
       };
     }
   ];
@@ -39,6 +56,7 @@
   services.dleyna.enable = lib.mkForce false;
 
   environment.systemPackages = with pkgs; [
+    gjs-osk
     gnome-console
     nautilus
   ];
