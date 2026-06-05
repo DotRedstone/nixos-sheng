@@ -23,7 +23,18 @@
 * [x] `nix` 可用
 * [x] `nixos-rebuild` 可用
 * [x] `systemctl` 可用
+* [x] flake 与 Home Manager 基础配置已集成
+* [x] `systemd-timesyncd` 已启用并实机确认时间同步
 * [~] rootfs 当前较小，适合作为最小发布镜像；扩展桌面环境前需要扩容 linux 分区
+* [~] `nixos-rebuild` 可更新 rootfs 内系统世代；涉及 kernel、DTS、initrd 或 boot cmdline 时仍需另外生成并刷写 `boot_b`
+
+### GNOME desktop
+
+* [x] 精简 GNOME profile 可启动，GDM 与 GNOME Shell 正常运行
+* [x] 已集成 GJS OSK，并启用拖动与触摸输入自动弹出配置
+* [x] 加速度计 mount matrix 已按横屏原生方向修正
+* [~] 悬浮软键盘在不同应用中的自动弹出行为仍需长期使用验证
+* [~] 自动旋转方向已修正配置，仍需验证四个方向和旋转后的触摸坐标
 
 ### Firmware / remoteproc
 
@@ -108,7 +119,8 @@ postmarketOS 状态：Y
 * [x] Render 节点存在：`/dev/dri/renderD128`
 * [x] DSI connector 存在：`card0-DSI-1`
 * [x] DPU / DSI / panel 基础链路可用
-* [~] 需要补充实际分辨率、刷新率、144Hz、Night Light 状态记录
+* [x] DRM connector 报告 `3048x2032` 显示模式
+* [~] 仍需补充实际刷新率、144Hz、Night Light 与亮度调节实测记录
 
 验证命令：
 
@@ -214,12 +226,12 @@ postmarketOS 状态：Y
 型号：Samsung S5KJN1
 备注：相较 Android 画质降低；8K 模式使用 Quad Bayer，目前 libcamera 支持情况未知。
 
-* [ ] 当前无 `/dev/video*`
-* [ ] 当前无 `/dev/media*`
-* [ ] 当前未看到可用 media graph
-* [~] DTS 中有 camera 节点依赖信息，但用户态设备未出现
-* [ ] 检查 `CONFIG_VIDEO_S5KJN1_SHENG=m`、`CONFIG_VIDEO_QCOM_CAMSS=m` 模块是否进入 rootfs
-* [ ] 仅对齐 postmarketOS 已有状态，不开发画质增强或 8K 支持
+* [x] `/dev/media0` 与 `/dev/video0` 至 `/dev/video16` 已出现
+* [x] `qcom-camss` media graph 已出现
+* [x] `s5kjn1 7-0010` 已注册并连接到 `msm_csiphy3`
+* [x] `CONFIG_VIDEO_S5KJN1_SHENG=m` 与 QCOM CAMSS 模块已进入 rootfs 并加载
+* [~] 尚未使用 libcamera 或相机应用验证实际画面
+* [-] 仅对齐 postmarketOS 已有状态，不开发画质增强或 8K 支持
 
 验证命令：
 
@@ -240,10 +252,10 @@ postmarketOS 状态：Y
 型号：OmniVision OV32D40
 备注：相较 Android 画质降低。
 
-* [ ] 当前无 `/dev/video*`
-* [ ] 当前无 `/dev/media*`
-* [ ] 检查 `CONFIG_VIDEO_OV32D40=m` 模块是否进入 rootfs
-* [ ] 仅对齐 postmarketOS 已有状态，不开发画质增强
+* [x] `ov32d40 9-0010` 已注册并连接到 `msm_csiphy4`
+* [x] `CONFIG_VIDEO_OV32D40=m` 模块已进入 rootfs 并加载
+* [~] 尚未使用 libcamera 或相机应用验证实际画面
+* [-] 仅对齐 postmarketOS 已有状态，不开发画质增强
 
 验证命令：
 
@@ -263,9 +275,9 @@ dmesg | grep -Ei 'ov32d40|camera|camss|cci|csi|csiphy|media|video' | tail -350
 postmarketOS 状态：Y
 型号：Qualcomm PM8550B supply
 
-* [ ] 当前 `/sys/class/leds` 为空
-* [ ] 当前未验证 camera flash 节点
-* [ ] 暂不做相机补光实测主线
+* [x] `/sys/class/leds/white:flash-0` 节点已出现
+* [~] 当前未验证 camera flash 实际点亮
+* [-] 暂不做相机补光实测主线
 
 验证命令：
 
@@ -279,8 +291,8 @@ dmesg | grep -Ei 'flash|led|pm8550|camera' | tail -200
 postmarketOS 状态：Y
 型号：Qualcomm PM8550B PWM
 
-* [ ] 当前 `/sys/class/leds` 为空
-* [ ] 需要检查 LED/PWM 驱动或 DTS 节点
+* [x] `/sys/class/leds/rgb:status` 节点已出现
+* [~] 需要人工验证颜色、亮度和触发器行为
 
 验证命令：
 
@@ -295,11 +307,10 @@ postmarketOS 状态：Y
 型号：Qualcomm WCD9380
 备注：用于麦克风和 Type-C 模拟音频输出。
 
-* [ ] 当前未看到 ALSA 声卡
-* [ ] `aplay` / `arecord` 工具当前不可用或无输出
-* [ ] `/proc/asound` 当前未确认存在
-* [ ] 需要检查 QDSP6 / WCD9380 / SoundWire / audio topology 是否进入 rootfs 与 probe
-* [~] ADSP audio_pd 已出现，说明 DSP 侧音频域有基础信号，但用户态声卡未出现
+* [x] ALSA 声卡 `Xiaomi-Pad6SPro` 已注册
+* [x] `aplay -l` 可看到两个 playback PCM，`arecord -l` 可看到一个 capture PCM
+* [x] QDSP6 / WCD9380 / SoundWire 模块已进入 rootfs 并加载
+* [~] PipeWire 输出、Type-C 模拟音频和实际播放/录音仍需验证
 
 验证命令：
 
@@ -323,9 +334,9 @@ postmarketOS 状态：Y
 型号：Cirrus CS35L43
 备注：6 个扬声器各一个。
 
-* [ ] 当前未看到可用声卡
-* [ ] 检查 `CONFIG_SND_SOC_CS35L43=m` 模块是否进入 rootfs
-* [ ] 检查 CS35L43 是否 probe
+* [x] `CONFIG_SND_SOC_CS35L43=m` 与 I2C 模块已进入 rootfs
+* [x] `snd_soc_cs35l43_i2c` 已加载并绑定 6 个放大器
+* [~] 仍需实际播放验证 6 个扬声器与音量控制
 
 验证命令：
 
@@ -342,9 +353,8 @@ dmesg | grep -Ei 'cs35l43|speaker|amp|sound|audio|asoc|snd' | tail -350
 postmarketOS 状态：Y
 备注：PulseAudio 下可能有轻微 crackling；PipeWire 下应更正常。
 
-* [ ] 当前未验证扬声器播放
-* [ ] 当前未看到可用 ALSA/PipeWire 输出
-* [ ] 需要先修 audio 设备枚举
+* [x] ALSA playback PCM 已枚举
+* [~] 当前未验证扬声器实际播放、音量控制和 crackling 情况
 
 验证命令：
 
@@ -359,9 +369,8 @@ dmesg | grep -Ei 'speaker|pipewire|pulse|sound|audio|cs35' | tail -250
 postmarketOS 状态：Y
 备注：4 个麦克风，mainline 可用 stereo configuration。
 
-* [ ] 当前未验证麦克风输入
-* [ ] 当前未看到可用 ALSA/PipeWire 输入
-* [ ] 需要先修 audio 设备枚举
+* [x] ALSA capture PCM 已枚举
+* [~] 当前未验证麦克风实际录音与声道映射
 
 验证命令：
 
@@ -419,12 +428,12 @@ postmarketOS 状态：Y
 
 当前 NixOS 状态：
 
-* [ ] 当前未看到 HCI 设备
-* [ ] `rfkill list` 为空
-* [ ] `bluetoothctl list` 无控制器输出
+* [x] `hci0` 已出现，rfkill 未阻止蓝牙
+* [x] `bluetooth.service` 正常运行
+* [x] `bluetoothctl show` 可看到已上电控制器 `nixos-sheng`
 * [x] qca bluetooth firmware 存在
-* [ ] 需要检查 BT UART/serdev/QCA 驱动与服务
-* [ ] 可能与 WCN7851 / Wi-Fi PCIe 或模块问题相关
+* [x] `hci_uart` / `btqca` / Bluetooth 核心模块已加载
+* [~] 尚未实测扫描、配对、重连、BLE 与蓝牙音频
 
 验证命令：
 
@@ -613,7 +622,7 @@ postmarketOS 状态：Y
 * [ ] 当前未看到外接键盘 input 设备
 * [ ] 当前未看到 Nanosic/HID accessory 设备
 * [ ] 需要连接官方键盘后重新验证
-* [ ] 需要确认 `CONFIG_HID_NANOSIC_WN8030=m` 模块是否进入 rootfs
+* [x] `CONFIG_HID_NANOSIC_WN8030=m` 已启用，`hid_nanosic_wn8030` 模块已进入 rootfs 并加载
 
 验证命令：
 
@@ -635,7 +644,7 @@ postmarketOS 状态：Y
 
 * [ ] 当前未看到触摸板 input 设备
 * [ ] 需要连接官方键盘后重新验证
-* [ ] 需要确认 Nanosic/HID 模块是否进入 rootfs
+* [x] Nanosic/HID 模块已进入 rootfs 并加载
 
 验证命令：
 
@@ -653,7 +662,8 @@ postmarketOS 状态：?
 型号：OmniVision OV02B1B
 备注：libcamera 不支持 10-bit Grayscale。
 
-* [~] 当前阶段仅检查设备节点和 dmesg
+* [x] `ov02b1b 8-003c` 已注册并连接到 `msm_csiphy1`
+* [~] 尚未验证 depth camera 实际画面与 10-bit Grayscale 用户态支持
 * [-] 暂不开发 libcamera 10-bit Grayscale 支持
 
 ### NFC
@@ -710,29 +720,28 @@ postmarketOS 状态：N
 
 ## 当前优先级
 
-### P0：已修通后补实测记录
+### P0：已枚举但需要实机功能验证
 
-* [x] USB-C / OTG：Hub、键盘、鼠标已验证；待验证 U 盘、ADB device 模式
+* [~] USB-C / OTG：Hub、键盘、鼠标已验证；待验证 U 盘、ADB device 模式
 * [x] Sensors：加速度计、距离传感器、光感、指南针已通过 SSC + `iio-sensor-proxy` 验证
 * [x] Touchscreen：固件加载、input/libinput、点击、滑动和坐标事件已实机验证
-* [ ] Display：分辨率、刷新率、背光调节
+* [~] GNOME：桌面、悬浮软键盘和旋转配置已集成；待长期验证自动弹出、四向旋转与触摸坐标
+* [~] Bluetooth：控制器与服务正常；待验证扫描、配对、重连、BLE 和蓝牙音频
+* [~] Audio：声卡与 playback/capture PCM 已枚举；待验证扬声器、麦克风和 Type-C 音频
+* [~] Camera：前后摄与 CAMSS media graph 已枚举；待验证实际画面
+* [~] Display：3048x2032 已确认；待验证刷新率、144Hz、Night Light、背光调节
 * [ ] Power / volume buttons：实际按键事件
 * [ ] Battery / charger：不同充电器下电压、电流、PD 状态
 
-### P1：postmarketOS 已工作但当前 NixOS 未工作的项目
+### P1：尚未完成的硬件功能
 
 * [x] Wi-Fi：2.4GHz 与 5GHz 扫描、连接和联网已验证
-* [ ] Bluetooth：检查 HCI、QCA firmware、serdev/UART、bluetooth service
-* [ ] Audio：检查 WCD9380、CS35L43、QDSP6、SoundWire、ALSA/PipeWire
-* [ ] Camera：检查 CAMSS、S5KJN1、OV32D40、media graph
 * [ ] Keyboard / Touchpad：连接官方键盘后检查 Nanosic/HID
+* [~] RGB LED：节点已出现，待验证颜色与触发器
+* [~] Camera flash：节点已出现，待验证实际点亮
 
 ### P2：postmarketOS 已工作但需要更多用户态验证的项目
 
-* [ ] Cameras 实际画面
-* [ ] Camera flash
-* [ ] RGB LED
-* [ ] Microphones
 * [ ] Hall sensor
 * [~] Sensors 后续增强：kernel IIO sysfs bridge、单独 gyroscope 暴露、proximity Davinci payload 解包
 
@@ -779,12 +788,23 @@ postmarketOS 状态：N
 4. MHI 是否能从 firmware load failure 进入正常状态
 5. 修复后 NetworkManager 是否能扫描与连接
 
-### 建议 P1：Audio / Bluetooth
+### 建议下一步：Audio / Bluetooth / Camera 实测
 
 理由：
 
-* Audio 链路涉及 WCD9380、CS35L43、QDSP6、SoundWire、ALSA UCM、PipeWire，范围比 Wi-Fi 和触摸更大，建议等基础交互更稳后推进。
-* Bluetooth 可能与 WCN7851、UART/serdev、QCA firmware、Wi-Fi 组合模块有关，建议在 Wi-Fi 诊断后继续。
+* Audio 已有 ALSA 声卡与 playback/capture PCM，优先验证实际播放、录音、PipeWire 路由和 Type-C 音频。
+* Bluetooth 控制器和服务已正常运行，下一步直接验证扫描、配对、重连、BLE 和蓝牙音频。
+* 前后摄传感器与 CAMSS media graph 已枚举，下一步使用 libcamera 或相机应用验证实际画面。
+
+### 仍未完成的主要项目
+
+1. 官方键盘与触摸板实机验证
+2. 扬声器、麦克风、Type-C 音频与蓝牙音频实测
+3. 前后摄实际画面、camera flash 与 RGB LED 实测
+4. 显示刷新率、144Hz、Night Light 与背光调节实测
+5. 电源键、音量键、Hall sensor、U 盘与 ADB device 模式实测
+6. 充电功率长期测试、不同充电器兼容性与温度观察
+7. 6GHz Wi-Fi、独立 gyroscope、kernel IIO sysfs bridge 等非阻塞增强
 
 ### Sensors 后续增强
 

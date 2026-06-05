@@ -20,8 +20,12 @@ This is an early bring-up project.
 | Kernel | Sheng mainline kernel | Built from `map220v/sm8550-mainline` through Nix |
 | Boot image | Bring-up | Mobile NixOS Android boot image for `boot_b` |
 | RootFS | Mobile NixOS generated rootfs | ext4 image labeled `linux` |
-| Display/console | Bring-up | Stage-1 currently runs headless until display works |
+| Display/desktop | Partially working | 3048x2032 panel and minimal GNOME work; refresh rate, Night Light, and four-way rotation need validation |
 | Debug access | Bring-up | Stage-1/stage-2 ADB is enabled through Mobile NixOS |
+| Wi-Fi | Working | 2.4 GHz and 5 GHz scanning, connection, and networking verified; 6 GHz untested |
+| Bluetooth | Partially working | hci0 and bluetooth.service work; discovery, pairing, reconnect, and audio need validation |
+| Audio | Partially working | ALSA card and playback/capture PCM devices enumerate; playback and recording need validation |
+| Cameras | Partially working | front/rear sensors and CAMSS media graph enumerate; actual capture needs validation |
 | Sensors | User-space working | accelerometer, proximity, ambient light, and compass work through SSC + iio-sensor-proxy D-Bus |
 
 ## Upstream Projects

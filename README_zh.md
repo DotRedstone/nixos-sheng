@@ -16,8 +16,12 @@ Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的实验性 Mobile NixOS 移�
 | 内核 | Sheng mainline kernel | 通过 Nix 从 `map220v/sm8550-mainline` 构建 |
 | 启动镜像 | Bring-up | 面向 `boot_b` 的 Mobile NixOS Android boot image |
 | RootFS | Mobile NixOS 生成的 rootfs | 面向 `linux` 分区的 ext4 镜像 |
-| 显示/终端 | Bring-up | 在显示正常工作前，Stage-1 暂为无头 (headless) 运行 |
+| 显示/桌面 | 部分可用 | 3048x2032 面板与精简 GNOME 可用；刷新率、Night Light、四向旋转仍待验证 |
 | 调试访问 | Bring-up | Stage-1/stage-2 的 ADB 已通过 Mobile NixOS 启用 |
+| Wi-Fi | 可用 | 2.4GHz 与 5GHz 扫描、连接和联网已验证；6GHz 未验证 |
+| 蓝牙 | 部分可用 | hci0 与 bluetooth.service 正常；扫描、配对、重连和音频待验证 |
+| 音频 | 部分可用 | ALSA 声卡与播放/录音 PCM 已枚举；实际播放和录音待验证 |
+| 相机 | 部分可用 | 前后摄与 CAMSS media graph 已枚举；实际画面待验证 |
 | 传感器 | 用户态可用 | 加速度计、距离传感器、光感、指南针已通过 SSC + iio-sensor-proxy D-Bus 路径验证 |
 
 ## 上游项目

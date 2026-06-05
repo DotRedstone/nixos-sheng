@@ -1,7 +1,8 @@
 # Xiaomi MiPPS fast charging
 
-The `exp/mipps-120w` branch adds experimental Xiaomi MiPPS charger
-authentication support for sheng.
+The `sheng` branch includes Xiaomi MiPPS charger authentication support for
+sheng. The integration is verified, while sustained input power and thermal
+behavior still require long-term testing.
 
 This support has two required parts:
 
