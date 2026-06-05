@@ -378,16 +378,14 @@ postmarketOS 状态：Y
 
 当前 NixOS 状态：
 
-* [ ] 当前无 `wlan0`
-* [ ] 当前 `iw dev` 为空
-* [ ] `nmcli device` 只有 loopback
+* [x] `wlp1s0` 与 P2P interface 已出现
+* [x] NetworkManager 可扫描并连接 Wi-Fi
 * [x] PCIe Root Port 与 WCN7850 endpoint 可枚举：`0000:01:00.0 [17cb:1107]`
 * [x] `ath12k_wifi7` / `ath12k` / `mhi` / `cfg80211` / `mac80211` 模块已加载
-* [ ] 当前 rootfs 未找到 `ath12k/WCN7850/hw2.0/amss.bin`
-* [ ] dmesg 显示 `Direct firmware load for ath12k/WCN7850/hw2.0/amss.bin failed with error -2`
-* [ ] `ath12k_wifi7_pci` 因 MHI firmware 加载失败，probe 返回 `-110`
-* [ ] 优先补齐 WCN7850/WCN7851 ath12k firmware 与 board 文件进入 rootfs
-* [ ] 修复后验证 NetworkManager 扫描与连接
+* [x] WCN7850 firmware 已进入 rootfs，`ath12k_wifi7_pci` probe 成功
+* [x] 中国监管域已生效，5GHz 信道 36–64 与 149–165 可用
+* [~] 当前环境扫描结果只有 2.4GHz AP；需要使用明确开启兼容 5GHz 信道和 80MHz 模式的路由器实测连接
+* [-] 当前 6GHz 信道被禁用，5GHz 不支持 160MHz/320MHz
 
 验证命令：
 
