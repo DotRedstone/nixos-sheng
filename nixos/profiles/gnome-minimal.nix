@@ -4,6 +4,9 @@
   services.xserver.enable = true;
   services.displayManager.gdm.enable = true;
   services.desktopManager.gnome.enable = true;
+  services.desktopManager.gnome.sessionPath = [
+    pkgs.gnome-settings-daemon
+  ];
 
   # GDM owns the display VT in this image.
   services.kmscon.enable = lib.mkForce false;
