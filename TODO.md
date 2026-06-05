@@ -385,7 +385,7 @@ postmarketOS 状态：Y
 * [x] WCN7850 firmware 已进入 rootfs，`ath12k_wifi7_pci` probe 成功
 * [x] 中国监管域已生效，5GHz 信道 36–64 与 149–165 可用
 * [~] 当前环境扫描结果只有 2.4GHz AP；需要使用明确开启兼容 5GHz 信道和 80MHz 模式的路由器实测连接
-* [-] 当前 6GHz 信道被禁用，5GHz 不支持 160MHz/320MHz
+* [ ] 当前 6GHz 信道被禁用；5GHz 底层指定频率扫描未正常返回，需要检查 WCN7850 板级数据与校准加载
 
 验证命令：
 
