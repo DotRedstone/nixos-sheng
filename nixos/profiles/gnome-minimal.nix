@@ -1,11 +1,5 @@
 { lib, pkgs, ... }:
 
-let
-  optionalPackages = names:
-    builtins.filter (package: package != null) (
-      map (name: lib.attrByPath [ name ] null pkgs) names
-    );
-in
 {
   services.xserver.enable = true;
   services.displayManager.gdm.enable = true;
@@ -16,32 +10,22 @@ in
 
   hardware.graphics.enable = true;
 
-  environment.gnome.excludePackages = optionalPackages [
-    "baobab"
-    "cheese"
-    "decibels"
-    "epiphany"
-    "evince"
-    "geary"
-    "gnome-calendar"
-    "gnome-characters"
-    "gnome-clocks"
-    "gnome-connections"
-    "gnome-contacts"
-    "gnome-font-viewer"
-    "gnome-logs"
-    "gnome-maps"
-    "gnome-music"
-    "gnome-system-monitor"
-    "gnome-text-editor"
-    "gnome-tour"
-    "gnome-weather"
-    "loupe"
-    "simple-scan"
-    "snapshot"
-    "totem"
-    "yelp"
-  ];
+  services.gnome = {
+    core-apps.enable = false;
+    core-developer-tools.enable = false;
+    games.enable = false;
+    evolution-data-server.enable = false;
+    gnome-browser-connector.enable = false;
+    gnome-initial-setup.enable = false;
+    gnome-online-accounts.enable = false;
+    gnome-remote-desktop.enable = false;
+    gnome-user-share.enable = false;
+    localsearch.enable = false;
+    rygel.enable = false;
+    tinysparql.enable = false;
+  };
+
+  services.dleyna.enable = false;
 
   environment.systemPackages = with pkgs; [
     gnome-console
