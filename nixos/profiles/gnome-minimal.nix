@@ -13,6 +13,14 @@
 
   hardware.graphics.enable = true;
 
+  programs.dconf.profiles.user.databases = [
+    {
+      settings."org/gnome/desktop/a11y/applications" = {
+        screen-keyboard-enabled = true;
+      };
+    }
+  ];
+
   services.gnome = {
     core-apps.enable = lib.mkForce false;
     core-developer-tools.enable = lib.mkForce false;
