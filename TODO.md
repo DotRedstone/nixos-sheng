@@ -127,7 +127,11 @@ postmarketOS 状态：Y
 * [x] `libinput list-devices` 识别为 touch 设备
 * [x] `CONFIG_TOUCHSCREEN_NT36532E_SPI=m` 对应模块可加载
 * [x] 已补入 `novatek/novatek_nt36532e_fw.bin`
-* [~] 需要人工触摸屏幕验证坐标、方向和多点触控行为
+* [x] 实机 `evtest` 已验证点击、滑动、坐标、压力和触摸面积事件
+* [~] 仍需验证多点触控和旋转后的坐标方向
+
+备注：触摸驱动跟随 DRM panel suspend/resume。minimal 环境中面板休眠后
+`evtest` 不会收到事件；唤醒或重启 `kmsconvt@tty1.service` 后可继续验证。
 
 验证命令：
 
@@ -140,6 +144,7 @@ find /lib/modules -type f 2>/dev/null \
   | sort
 
 dmesg | grep -Ei 'touch|novatek|nt36532|input|i2c|spi|tddi' | tail -300
+evtest /dev/input/event3
 ```
 
 ### Backlight
@@ -709,7 +714,7 @@ postmarketOS 状态：N
 
 * [x] USB-C / OTG：Hub、键盘、鼠标已验证；待验证 U 盘、ADB device 模式
 * [x] Sensors：加速度计、距离传感器、光感、指南针已通过 SSC + `iio-sensor-proxy` 验证
-* [x] Touchscreen：input/libinput 已识别；待人工验证触摸坐标与多点触控
+* [x] Touchscreen：固件加载、input/libinput、点击、滑动和坐标事件已实机验证
 * [ ] Display：分辨率、刷新率、背光调节
 * [ ] Power / volume buttons：实际按键事件
 * [ ] Battery / charger：不同充电器下电压、电流、PD 状态
@@ -742,20 +747,19 @@ postmarketOS 状态：N
 
 ## 下一步建议
 
-### 建议 P0：Touchscreen
+### 已完成 P0：Touchscreen
 
-理由：
+验证结果：
 
-* 当前 dmesg 明确显示 `NVT-ts-spi` 缺 `novatek/novatek_nt36532e_fw.bin`。
-* 没有触摸会严重影响本机交互。
-* 该问题边界清晰，优先检查 firmware 是否进入 rootfs，以及 NT36532E SPI 驱动加载后的 input 设备。
+* rootfs 已包含 `/lib/firmware/novatek/novatek_nt36532e_fw.bin`。
+* `NVT-ts-spi` 可完成固件更新并注册 `NVTCapacitiveTouchScreen`。
+* 面板唤醒后，`evtest` 已捕获连续 X/Y、压力和触摸面积事件。
+* minimal 环境中触摸会跟随 DRM panel 正常 suspend；这不是驱动故障。
 
-建议检查顺序：
+剩余验证：
 
-1. `/lib/firmware/novatek/novatek_nt36532e_fw.bin` 是否存在
-2. `NVT-ts-spi` dmesg 是否仍报 firmware `-2`
-3. `/proc/bus/input/devices` 是否出现触摸屏
-4. `libinput list-devices` 是否识别触摸设备
+1. 多点触控
+2. 屏幕旋转后的坐标方向
 
 ### 建议 P1：Wi-Fi
 
