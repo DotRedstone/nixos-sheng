@@ -28,12 +28,12 @@ in
 
       settings."org/gnome/shell/extensions/gjsosk" = {
         enable-drag = true;
-        enable-tap-gesture = 1;
+        enable-tap-gesture = lib.gvariant.mkInt32 1;
         indicator-enabled = true;
-        landscape-width-percent = 70;
-        landscape-height-percent = 30;
-        portrait-width-percent = 100;
-        portrait-height-percent = 30;
+        landscape-width-percent = lib.gvariant.mkInt32 70;
+        landscape-height-percent = lib.gvariant.mkInt32 30;
+        portrait-width-percent = lib.gvariant.mkInt32 100;
+        portrait-height-percent = lib.gvariant.mkInt32 30;
       };
     }
   ];
