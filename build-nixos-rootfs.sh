@@ -2,11 +2,11 @@
 set -euo pipefail
 
 IMAGE_SIZE="${IMAGE_SIZE:-auto}"
+ROOTFS_FLAKE_ATTR="${ROOTFS_FLAKE_ATTR:-mobileRootfsImage}"
 FILESYSTEM_UUID="${FILESYSTEM_UUID:-ee8d3593-59b1-480e-a3b6-4fefb17ee7d8}"
 TIMESTAMP="$(date +"%Y%m%d_%H%M%S")"
-ROOTFS_IMG="nixos-sheng-${TIMESTAMP}.img"
 OUT_DIR="${OUT_DIR:-out}"
-OUT_LINK="${OUT_DIR}/nixos-sheng-mobile-rootfs"
+OUT_LINK="${OUT_DIR}/nixos-sheng-${ROOTFS_FLAKE_ATTR}"
 
 if [ -n "${ROOTFS_BACKEND:-}" ] && [ "${ROOTFS_BACKEND}" != "mobile" ]; then
     echo "ROOTFS_BACKEND=${ROOTFS_BACKEND} is no longer supported."
@@ -21,9 +21,25 @@ fi
 
 mkdir -p "${OUT_DIR}"
 
-echo "==> Building Mobile NixOS generated rootfs image"
+case "${ROOTFS_FLAKE_ATTR}" in
+    mobileRootfsImage)
+        ROOTFS_VARIANT="minimal"
+        ;;
+    mobileRootfsImageGnome)
+        ROOTFS_VARIANT="gnome"
+        ;;
+    *)
+        echo "Unsupported ROOTFS_FLAKE_ATTR=${ROOTFS_FLAKE_ATTR}"
+        echo "Supported values: mobileRootfsImage, mobileRootfsImageGnome"
+        exit 1
+        ;;
+esac
+
+ROOTFS_IMG="nixos-sheng-${ROOTFS_VARIANT}-${TIMESTAMP}.img"
+
+echo "==> Building Mobile NixOS generated rootfs image: ${ROOTFS_FLAKE_ATTR}"
 nix --extra-experimental-features "nix-command flakes" \
-    build ./nixos#mobileRootfsImage \
+    build "./nixos#${ROOTFS_FLAKE_ATTR}" \
     --out-link "${OUT_LINK}"
 
 ROOTFS_DIR="$(readlink -f "${OUT_LINK}")"

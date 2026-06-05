@@ -58,7 +58,7 @@
       pkgs = import nixpkgs {
         inherit system;
       };
-      mobileEval = import "${mobile-nixos}/lib/eval-with-configuration.nix" {
+      mobileEvalFor = extraModules: import "${mobile-nixos}/lib/eval-with-configuration.nix" {
         inherit pkgs;
         device = ./devices/xiaomi-sheng;
         configuration = [
@@ -66,9 +66,14 @@
             nixpkgs.overlays = lib.mkAfter [ shengOverlay ];
           })
           ./configuration.nix
+        ] ++ extraModules ++ [
           ./mobile-profile.nix
         ];
       };
+      mobileEval = mobileEvalFor [ ];
+      mobileGnomeEval = mobileEvalFor [
+        ./profiles/gnome-minimal.nix
+      ];
     in
     {
       nixosConfigurations.sheng = nixpkgs.lib.nixosSystem {
@@ -85,6 +90,7 @@
         mobileAndroidBootimg = mobileEval.outputs.android.android-bootimg;
         mobileFastbootImages = mobileEval.outputs.android.android-fastboot-images;
         mobileRootfsImage = mobileEval.outputs.generatedFilesystems.rootfs;
+        mobileRootfsImageGnome = mobileGnomeEval.outputs.generatedFilesystems.rootfs;
         # Compatibility alias for older workflow names. This is the Mobile NixOS
         # generated rootfs, not a separate hand-built filesystem.
         fullRootfsImage = mobileEval.outputs.generatedFilesystems.rootfs;
