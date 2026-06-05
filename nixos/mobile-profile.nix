@@ -7,6 +7,10 @@ let
   udevTolerantTask = pkgs.writeTextDir "zz-sheng-udev-tolerant.rb" (
     builtins.readFile ./patches/stage-1-udev-trigger-tolerant.rb
   );
+  stage1Firmware = pkgs.runCommand "sheng-stage1-firmware" { } ''
+    mkdir -p $out/lib/firmware
+    cp -r ${pkgs.sheng-firmware}/lib/firmware/qcom $out/lib/firmware/
+  '';
   closureInfo = pkgs.buildPackages.closureInfo {
     rootPaths = config.system.build.toplevel;
   };
@@ -131,7 +135,9 @@ in
 
     kernel.modules = [ ];
     kernel.additionalModules = [ ];
-    firmware = [ pkgs.sheng-firmware ];
+    # Keep large device firmware in rootfs. Stage-1 only needs Qualcomm boot
+    # firmware; including the full package makes boot.img exceed boot_b.
+    firmware = [ stage1Firmware ];
   };
 
   mobile.boot.stage-1.fail.reboot = false;
