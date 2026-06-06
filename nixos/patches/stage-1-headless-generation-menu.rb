@@ -4,6 +4,7 @@ module ShengHeadlessGenerationMenu
   VOLUME_UP = [:KEY_VOLUMEUP]
   VOLUME_DOWN = [:KEY_VOLUMEDOWN]
   CONFIRM = [:KEY_POWER, :KEY_ENTER]
+  REQUEST_PATH = "/mnt/var/lib/sheng-boot-menu/requested"
 
   def config()
     Configuration["sheng_generation_menu"] || {}
@@ -19,6 +20,14 @@ module ShengHeadlessGenerationMenu
 
   def pressed?(keys)
     Evdev.keys_held(keys)
+  end
+
+  def requested?()
+    File.exist?(REQUEST_PATH)
+  end
+
+  def consume_request()
+    File.delete(REQUEST_PATH) if requested?()
   end
 
   def wait_for_release(keys)
@@ -89,15 +98,18 @@ class Tasks::SwitchRoot
   def selected_generation()
     return @selected_generation if @selected_generation
 
-    if Hal::Recovery.wants_recovery? &&
+    wants_menu = Hal::Recovery.wants_recovery? || ShengHeadlessGenerationMenu.requested?()
+
+    if wants_menu &&
        ShengHeadlessStage1.enabled? &&
        ShengHeadlessGenerationMenu.enabled?
+      ShengHeadlessGenerationMenu.consume_request()
       @selected_generation = ShengHeadlessGenerationMenu.choose(self)
-    elsif Hal::Recovery.wants_recovery? && !ShengHeadlessStage1.enabled?
+    elsif wants_menu && !ShengHeadlessStage1.enabled?
       Tasks::Splash.instance.quit("Continuing to recovery menu")
       @selected_generation = choose_generation()
     else
-      if Hal::Recovery.wants_recovery?
+      if wants_menu
         $logger.info("Headless stage-1: skipping recovery generation menu.")
       end
 

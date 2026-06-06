@@ -3,8 +3,15 @@
 Sheng uses a fixed Android `boot_b` image and selectable NixOS stage-2
 generations from the writable `linux` partition.
 
-The normal boot path remains headless. Hold either volume key while the device
-starts to open the text generation menu:
+The normal boot path remains headless. Open the text generation menu from the
+running system:
+
+```sh
+sudo sheng-reboot-generation-menu
+```
+
+The command writes a one-time request to the writable `linux` partition and
+reboots. Stage-1 consumes the request before displaying the menu:
 
 ```text
 NixOS Sheng - Select stage-2 generation
@@ -22,6 +29,9 @@ Volume +/-: select    Power: boot
 - The menu always keeps using the kernel, DTB, stage-1 initrd, and command line
   from the flashed `boot_b`.
 
+Do not hold volume down while powering on the tablet. The Xiaomi bootloader
+intercepts it before Linux starts and enters Fastboot mode.
+
 The menu is implemented without the Mobile NixOS LVGL splash because enabling
 the graphical stage-1 path previously blocked sheng from reaching stage-2.
 
@@ -37,8 +47,8 @@ Before testing the menu, confirm at least two generations exist:
 PAGER=cat nix-env --profile /nix/var/nix/profiles/system --list-generations
 ```
 
-Reboot, hold either volume key, choose an older generation, and confirm with the
-power key. After boot:
+Run `sudo sheng-reboot-generation-menu`, choose an older generation, and
+confirm with the power key. After boot:
 
 ```sh
 readlink /nix/var/nix/profiles/system
@@ -46,5 +56,5 @@ readlink -f /run/current-system
 systemctl --failed --no-pager
 ```
 
-If the menu does not appear, boot continues normally after the key is released.
-The previous known-good `boot_b` image is the rollback path for menu failures.
+If the menu does not appear, the previous known-good `boot_b` image is the
+rollback path for menu failures.

@@ -73,6 +73,19 @@
 
   environment.systemPackages = let
     sheng-check = pkgs.writeShellScriptBin "sheng-check" (builtins.readFile ./scripts/sheng-check.sh);
+    sheng-reboot-generation-menu = pkgs.writeShellScriptBin "sheng-reboot-generation-menu" ''
+      set -eu
+
+      if [ "$(id -u)" -ne 0 ]; then
+        echo "Run this command with sudo." >&2
+        exit 1
+      fi
+
+      install -d -m 0755 /var/lib/sheng-boot-menu
+      : > /var/lib/sheng-boot-menu/requested
+      sync
+      systemctl reboot
+    '';
     sheng-alsa-ucm = pkgs.runCommand "sheng-alsa-ucm" { } ''
       install -Dm0644 ${./audio/ucm2/conf.d/sm8550/Xiaomi-Pad6SPro.conf} \
         $out/share/alsa/ucm2/conf.d/sm8550/Xiaomi-Pad6SPro.conf
@@ -81,6 +94,7 @@
     '';
   in with pkgs; [
     sheng-check
+    sheng-reboot-generation-menu
     sheng-alsa-ucm
     alsa-ucm-conf
     alsa-utils

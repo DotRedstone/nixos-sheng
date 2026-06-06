@@ -28,7 +28,7 @@
 * [~] rootfs 当前较小，适合作为最小发布镜像；扩展桌面环境前需要扩容 linux 分区
 * [x] `nixosConfigurations.sheng` 已与 GNOME Mobile NixOS rootfs 共用同一求值，并通过 Actions 构建验证
 * [x] 纯 flake stage-2 profile rollback 与 `switch-to-configuration switch` 已实机验证
-* [~] 物理键开机世代菜单已构建并刷入；待确认音量键触发、选择和电源键确认界面
+* [~] 开机世代菜单已改为一次性重启标记触发，避免音量减被 bootloader 截获进入 Fastboot；待实机验证菜单内音量选择和电源确认
 * [~] `nixos-rebuild --flake` 仅更新 stage-2 系统世代；涉及 kernel、DTS、stage-1 initrd 或 boot cmdline 时仍需另外生成并刷写 `boot_b`
 
 ### GNOME desktop
