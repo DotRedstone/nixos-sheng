@@ -2,7 +2,9 @@
 
 let
   headlessStage1Task = pkgs.writeTextDir "zz-sheng-headless-stage1.rb" (
-    builtins.readFile ./patches/stage-1-headless-no-gui.rb
+    (builtins.readFile ./patches/stage-1-headless-no-gui.rb)
+    + "\n"
+    + (builtins.readFile ./patches/stage-1-headless-generation-menu.rb)
   );
   udevTolerantTask = pkgs.writeTextDir "zz-sheng-udev-tolerant.rb" (
     builtins.readFile ./patches/stage-1-udev-trigger-tolerant.rb
@@ -122,6 +124,10 @@ in
       boot.fail.shell = true;
       gui.enable = false;
       splash.disabled = true;
+      sheng_generation_menu = {
+        enable = true;
+        timeout = 30;
+      };
     };
 
     gui.enable = false;
