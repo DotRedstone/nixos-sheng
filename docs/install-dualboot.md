@@ -119,7 +119,3 @@ kernel、DTS、stage-1 initrd 和 boot cmdline 更新仍需重新刷写 `boot_b`
 
 保留上一版本的 boot 和 rootfs 镜像。无法启动时可进入 Fastboot/TWRP，重新刷入
 上一版本的 `boot_b`；恢复旧 rootfs 会覆盖 `linux` 分区中的本地系统世代和数据。
-
-分区步骤参考了
-[Xiaomi-pad-6s-pro-Linux 双系统安装指南](https://github.com/code002-2/Xiaomi-pad-6s-pro-Linux/wiki/%E5%AE%89%E8%A3%85%E6%8C%87%E5%8D%97)，
-并按本项目的分区名称、镜像名称和实机扩容结果调整。
