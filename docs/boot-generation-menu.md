@@ -26,8 +26,8 @@ Volume +/-: select    Power: boot
 - Volume up/down changes the highlighted stage-2 generation.
 - Power confirms the selection.
 - The highlighted entry boots automatically after 30 seconds.
-- The menu uses a 16x32 console font and only redraws when the selection or
-  countdown changes, avoiding continuous screen flicker.
+- The menu uses a 16x32 console font and only redraws when the selection
+  changes, avoiding periodic screen flicker.
 - The menu always keeps using the kernel, DTB, stage-1 initrd, and command line
   from the flashed `boot_b`.
 

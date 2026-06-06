@@ -49,7 +49,7 @@ module ShengHeadlessGenerationMenu
     $logger.warn("Could not load sheng generation menu font: #{error}")
   end
 
-  def render(generations, selected, seconds_left)
+  def render(generations, selected)
     labels = ["NixOS - Default"] + generations.map { |generation| generation.label() }
 
     console.write("\e[H")
@@ -59,7 +59,7 @@ module ShengHeadlessGenerationMenu
       console.write("#{marker} #{label}\n")
     end
     console.write("\nVolume +/-: select    Power: boot\n")
-    console.write("Booting selection in #{seconds_left}s\n")
+    console.write("The selected generation boots automatically after the timeout.\n")
     console.write("\e[J")
     console.flush
   end
@@ -73,15 +73,11 @@ module ShengHeadlessGenerationMenu
     console.write("\e[?25l\e[2J\e[H")
     console.flush
     last_selected = nil
-    last_seconds_left = nil
 
     loop do
-      seconds_left = deadline - Time.now.to_i
-      seconds_left = 0 if seconds_left < 0
-      if selected != last_selected || seconds_left != last_seconds_left
-        render(generations, selected, seconds_left)
+      if selected != last_selected
+        render(generations, selected)
         last_selected = selected
-        last_seconds_left = seconds_left
       end
 
       if pressed?(VOLUME_UP)
