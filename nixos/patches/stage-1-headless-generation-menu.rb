@@ -5,6 +5,7 @@ module ShengHeadlessGenerationMenu
   VOLUME_DOWN = [:KEY_VOLUMEDOWN]
   CONFIRM = [:KEY_POWER, :KEY_ENTER]
   REQUEST_PATH = "/mnt/var/lib/sheng-boot-menu/requested"
+  FONT_PATH = "/etc/sheng-generation-menu-font.psf.gz"
 
   def config()
     Configuration["sheng_generation_menu"] || {}
@@ -42,10 +43,16 @@ module ShengHeadlessGenerationMenu
     end
   end
 
+  def load_font()
+    System.run("setfont", "-C", "/dev/tty0", FONT_PATH)
+  rescue System::CommandError => error
+    $logger.warn("Could not load sheng generation menu font: #{error}")
+  end
+
   def render(generations, selected, seconds_left)
     labels = ["NixOS - Default"] + generations.map { |generation| generation.label() }
 
-    console.write("\e[2J\e[H")
+    console.write("\e[H")
     console.write("NixOS Sheng - Select stage-2 generation\n\n")
     labels.each_with_index do |label, index|
       marker = index == selected ? ">" : " "
@@ -53,6 +60,7 @@ module ShengHeadlessGenerationMenu
     end
     console.write("\nVolume +/-: select    Power: boot\n")
     console.write("Booting selection in #{seconds_left}s\n")
+    console.write("\e[J")
     console.flush
   end
 
@@ -61,11 +69,20 @@ module ShengHeadlessGenerationMenu
     selected = 0
     deadline = Time.now.to_i + timeout()
     wait_for_release(VOLUME_UP + VOLUME_DOWN + CONFIRM)
+    load_font()
+    console.write("\e[?25l\e[2J\e[H")
+    console.flush
+    last_selected = nil
+    last_seconds_left = nil
 
     loop do
       seconds_left = deadline - Time.now.to_i
       seconds_left = 0 if seconds_left < 0
-      render(generations, selected, seconds_left)
+      if selected != last_selected || seconds_left != last_seconds_left
+        render(generations, selected, seconds_left)
+        last_selected = selected
+        last_seconds_left = seconds_left
+      end
 
       if pressed?(VOLUME_UP)
         selected = (selected - 1) % (generations.length + 1)
@@ -83,7 +100,7 @@ module ShengHeadlessGenerationMenu
       sleep(0.1)
     end
 
-    console.write("\nBooting selected generation...\n")
+    console.write("\e[?25h\nBooting selected generation...\n")
     console.flush
 
     if selected == 0
