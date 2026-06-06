@@ -48,6 +48,25 @@ jobs:
       - name: Enable Nix cache
         uses: DeterminateSystems/magic-nix-cache-action@v13
 
+      - name: Validate installed stage-2 configuration
+        run: |
+          case "${{ github.event.inputs.rootfs_flake_attr }}" in
+            mobileRootfsImageGnome)
+              configuration="sheng"
+              ;;
+            mobileRootfsImage)
+              configuration="sheng-minimal"
+              ;;
+            *)
+              echo "Unsupported rootfs output: ${{ github.event.inputs.rootfs_flake_attr }}"
+              exit 1
+              ;;
+          esac
+
+          nix --extra-experimental-features "nix-command flakes" \
+            build "./nixos#nixosConfigurations.${configuration}.config.system.build.toplevel" \
+            --no-link
+
       - name: Build image
         run: |
           chmod +x build-nixos-rootfs.sh
