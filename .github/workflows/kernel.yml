@@ -9,7 +9,7 @@ on:
       skip_release:
         description: "Skip GitHub release"
         type: boolean
-        default: false
+        default: true
 
 jobs:
   build:
