@@ -24,6 +24,8 @@ Volume +/-: select    Power: boot
 ```
 
 - Volume up/down changes the highlighted stage-2 generation.
+- Volume key handling is edge-triggered, so selection redraw does not wait for
+  a delayed key-release event.
 - Power confirms the selection.
 - The highlighted entry boots automatically after 30 seconds.
 - The menu uses a 16x32 console font and only redraws when the selection

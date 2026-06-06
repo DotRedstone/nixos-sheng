@@ -73,6 +73,8 @@ module ShengHeadlessGenerationMenu
     console.write("\e[?25l\e[2J\e[H")
     console.flush
     last_selected = nil
+    volume_up_was_pressed = false
+    volume_down_was_pressed = false
 
     loop do
       if selected != last_selected
@@ -80,12 +82,13 @@ module ShengHeadlessGenerationMenu
         last_selected = selected
       end
 
-      if pressed?(VOLUME_UP)
+      volume_up_pressed = pressed?(VOLUME_UP)
+      volume_down_pressed = pressed?(VOLUME_DOWN)
+
+      if volume_up_pressed && !volume_up_was_pressed
         selected = (selected - 1) % (generations.length + 1)
-        wait_for_release(VOLUME_UP)
-      elsif pressed?(VOLUME_DOWN)
+      elsif volume_down_pressed && !volume_down_was_pressed
         selected = (selected + 1) % (generations.length + 1)
-        wait_for_release(VOLUME_DOWN)
       elsif pressed?(CONFIRM)
         wait_for_release(CONFIRM)
         break
@@ -93,6 +96,8 @@ module ShengHeadlessGenerationMenu
         break
       end
 
+      volume_up_was_pressed = volume_up_pressed
+      volume_down_was_pressed = volume_down_pressed
       sleep(0.1)
     end
 
