@@ -22,7 +22,7 @@ This is an early bring-up project.
 | RootFS | Mobile NixOS generated rootfs | ext4 image labeled `linux` |
 | Display/desktop | Partially working | 3048x2032 panel and minimal GNOME work; refresh rate, Night Light, and four-way rotation need validation |
 | Debug access | Bring-up | Stage-1/stage-2 ADB is enabled through Mobile NixOS |
-| Wi-Fi | Working | 2.4 GHz and 5 GHz scanning, connection, and networking verified; 6 GHz untested |
+| Wi-Fi | Working | 2.4 GHz and 5 GHz scanning, connection, and networking verified; refresh the full NetworkManager scan before first 5 GHz activation; 6 GHz untested |
 | Bluetooth | Partially working | hci0 and bluetooth.service work; discovery, pairing, reconnect, and audio need validation |
 | Audio | Partially working | ALSA card and playback/capture PCM devices enumerate; playback and recording need validation |
 | Cameras | Partially working | front/rear RAW10 frames captured; libcamera, auto exposure, and desktop camera app need integration |
@@ -180,6 +180,10 @@ tested, switched, and rolled back directly on the tablet with
 still require a separately built and flashed `boot_b` image. See
 [`docs/nixos-rebuild.md`](docs/nixos-rebuild.md) for the safe workflow.
 
+The generated rootfs filesystem can be smaller than the dedicated `linux`
+partition. Expand it offline before creating multiple generations. See
+[`docs/linux-partition-resize.md`](docs/linux-partition-resize.md).
+
 ## Firmware, Sensors, and USB-C
 
 USB-C host mode and various sensors on sheng heavily depend on the complete Qualcomm remoteproc firmware (including ADSP and CDSP).
@@ -193,6 +197,13 @@ This does not create kernel IIO sysfs nodes, so an empty
 For the full dependency chain, offline rootfs checks, runtime verification commands, and common failure signatures, see:
 - [docs/sheng-firmware-and-usbc.md](docs/sheng-firmware-and-usbc.md)
 - [docs/sensors-ssc-userland.md](docs/sensors-ssc-userland.md)
+- [docs/nixos-rebuild.md](docs/nixos-rebuild.md)
+- [docs/linux-partition-resize.md](docs/linux-partition-resize.md)
+- [docs/boot-generation-menu.md](docs/boot-generation-menu.md)
+- [docs/camera-raw-capture.md](docs/camera-raw-capture.md)
+- [docs/mipps-120w.md](docs/mipps-120w.md)
+- [docs/release-readiness.md](docs/release-readiness.md)
+- [docs/release-notes.md](docs/release-notes.md)
 
 ## Debugging
 

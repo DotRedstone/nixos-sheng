@@ -4,6 +4,18 @@ The flashed Android `boot_b` image is the fixed boot foundation for sheng. It
 contains the kernel, DTB, Mobile NixOS stage-1 initrd, and boot command line.
 Normal NixOS generations only update stage-2 on the writable `linux` partition.
 
+Before creating multiple generations, make sure the ext4 filesystem uses the
+full `linux` partition:
+
+```sh
+df -h /
+lsblk -o NAME,SIZE,FSTYPE,LABEL,PARTLABEL,MOUNTPOINTS
+```
+
+Online resizing is not supported by the current sheng kernel/filesystem
+combination. Follow [`linux-partition-resize.md`](linux-partition-resize.md)
+from TWRP or another rescue environment while the filesystem is unmounted.
+
 The flake exposes the same Mobile NixOS evaluations used to build the flashable
 rootfs images:
 
@@ -25,6 +37,12 @@ cd nixos-xiaomi-sheng
 
 sudo nixos-rebuild build --flake ./nixos#sheng
 ```
+
+The repository flake lives in the `nixos/` subdirectory. Remote flake URIs must
+therefore use `dir=nixos`; cloning the repository first is recommended.
+
+Release branches should contain `nixos/flake.lock` so evaluation does not
+re-resolve and download large inputs on the tablet.
 
 Inspect the result before switching:
 
