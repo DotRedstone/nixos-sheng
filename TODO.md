@@ -26,8 +26,10 @@
 * [x] flake 与 Home Manager 基础配置已集成
 * [x] `systemd-timesyncd` 已启用并实机确认时间同步
 * [~] rootfs 当前较小，适合作为最小发布镜像；扩展桌面环境前需要扩容 linux 分区
-* [~] `nixosConfigurations.sheng` 已与 GNOME Mobile NixOS rootfs 共用同一求值；待实机完成 `build`、`test`、`switch` 与 rollback 验证
-* [~] `nixos-rebuild` 仅更新 stage-2 系统世代；涉及 kernel、DTS、stage-1 initrd 或 boot cmdline 时仍需另外生成并刷写 `boot_b`
+* [x] `nixosConfigurations.sheng` 已与 GNOME Mobile NixOS rootfs 共用同一求值，并通过 Actions 构建验证
+* [x] 纯 flake stage-2 profile rollback 与 `switch-to-configuration switch` 已实机验证
+* [~] 物理键开机世代菜单已构建并刷入；待确认音量键触发、选择和电源键确认界面
+* [~] `nixos-rebuild --flake` 仅更新 stage-2 系统世代；涉及 kernel、DTS、stage-1 initrd 或 boot cmdline 时仍需另外生成并刷写 `boot_b`
 
 ### GNOME desktop
 

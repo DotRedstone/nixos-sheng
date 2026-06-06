@@ -56,14 +56,24 @@ List installed system generations:
 sudo nix-env --profile /nix/var/nix/profiles/system --list-generations
 ```
 
-Roll back the running stage-2 system:
+Roll back the default profile and activate the selected stage-2 generation:
 
 ```sh
-sudo nixos-rebuild switch --rollback
+sudo nix profile rollback --profile /nix/var/nix/profiles/system
+sudo /nix/var/nix/profiles/system/bin/switch-to-configuration switch
 ```
 
-The Mobile NixOS recovery menu can also select a stage-2 generation during
-boot. It cannot select a different kernel or stage-1 generation.
+This pure-flake workflow does not depend on legacy NixOS channels or
+`<nixpkgs/nixos>`. The sheng boot generation menu can also select a stage-2
+generation during boot. It cannot select a different kernel or stage-1
+generation.
+
+When checking generations through a non-interactive ADB shell, disable the
+pager:
+
+```sh
+PAGER=cat nix-env --profile /nix/var/nix/profiles/system --list-generations
+```
 
 ## Fixed boot boundary
 
