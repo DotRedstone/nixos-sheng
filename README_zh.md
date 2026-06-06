@@ -177,6 +177,7 @@ sheng 上的 USB-C 主机模式和各类传感器均强依赖于完整的 Qualco
 - [docs/sheng-firmware-and-usbc.md](docs/sheng-firmware-and-usbc.md)
 - [docs/sensors-ssc-userland.md](docs/sensors-ssc-userland.md)
 - [docs/nixos-rebuild.md](docs/nixos-rebuild.md)
+- [docs/install-dualboot.md](docs/install-dualboot.md)
 - [docs/linux-partition-resize.md](docs/linux-partition-resize.md)
 - [docs/boot-generation-menu.md](docs/boot-generation-menu.md)
 - [docs/camera-raw-capture.md](docs/camera-raw-capture.md)

@@ -26,26 +26,31 @@ replace `TODO.md`; it lists only release blockers and high-signal results.
   audio remain unverified.
 - The one-time boot generation menu appears and physical volume-key navigation
   works.
+- A second synthetic stage-2 generation was created and activated, then the
+  system profile was rolled back and activated successfully. The synthetic
+  generation was removed after validation.
 
-## Release blockers
+## Alpha release blockers
 
-- Add and validate `nixos/flake.lock`. Without it, device-side flake evaluation
-  re-resolves large inputs and can exhaust a small rootfs.
-- Expand the ext4 filesystem offline to the full `linux` partition before
-  validating multiple NixOS generations.
-- Create at least two real stage-2 generations and verify selection plus
-  rollback through the boot generation menu.
-- Build and activate the repository Home Manager configuration once. The
-  current flashed image contains the CLI but no Home Manager generation.
 - Rebuild and verify the rootfs after removing the invalid
   `serial-getty@ttyMSM0` service.
 - Re-verify the final boot image after the latest menu log/highlight cleanup.
-- Decide whether the first public release may ship the SSC user-space sensor
-  path without kernel `iio:device*` nodes. Strict kernel IIO acceptance remains
-  unmet.
 - Replace or explicitly document the bring-up default passwords before a
   public image is published.
 - Verify the release workflow with explicit kernel and rootfs Action run IDs.
+
+## Stable release blockers
+
+- Add and validate `nixos/flake.lock`. Without it, device-side flake evaluation
+  re-resolves large inputs and can exhaust a small rootfs.
+- Expand the ext4 filesystem offline to the full `linux` partition, then
+  validate a full device-side `nixos-rebuild --flake`.
+- Build and activate the repository Home Manager configuration once. The
+  current flashed image contains the CLI but no Home Manager generation.
+- Verify selection and rollback between real stage-2 generations through the
+  boot generation menu.
+- Implement kernel `iio:device*` nodes if strict kernel IIO acceptance is
+  required. The current working sensors use SSC user space plus D-Bus.
 
 ## Known issues
 

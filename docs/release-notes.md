@@ -32,6 +32,9 @@ Read the known issues before flashing.
 The release contains a boot image, a compressed rootfs image, and
 `sha256sums.txt`. Verify the checksums before flashing.
 
+For first-time dual-boot partitioning and installation, follow
+[`install-dualboot.md`](install-dualboot.md).
+
 ```sh
 sha256sum -c sha256sums.txt
 zstd -d sheng-*-rootfs-*.img.zst
