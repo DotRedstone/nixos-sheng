@@ -30,6 +30,8 @@ Volume +/-: select    Power: boot
 - The highlighted entry boots automatically after 30 seconds.
 - The menu uses a 16x32 console font and only redraws when the selection
   changes, avoiding periodic screen flicker.
+- Console input echo is disabled while the menu is active, preventing physical
+  volume keys from printing terminal characters over the menu.
 - The menu always keeps using the kernel, DTB, stage-1 initrd, and command line
   from the flashed `boot_b`.
 

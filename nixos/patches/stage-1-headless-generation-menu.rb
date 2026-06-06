@@ -49,6 +49,12 @@ module ShengHeadlessGenerationMenu
     $logger.warn("Could not load sheng generation menu font: #{error}")
   end
 
+  def set_console_echo(enabled)
+    System.run("stty", "-F", "/dev/tty0", enabled ? "echo" : "-echo")
+  rescue System::CommandError => error
+    $logger.warn("Could not update sheng generation menu console echo: #{error}")
+  end
+
   def render(generations, selected)
     labels = ["NixOS - Default"] + generations.map { |generation| generation.label() }
 
@@ -70,6 +76,7 @@ module ShengHeadlessGenerationMenu
     deadline = Time.now.to_i + timeout()
     wait_for_release(VOLUME_UP + VOLUME_DOWN + CONFIRM)
     load_font()
+    set_console_echo(false)
     console.write("\e[?25l\e[2J\e[H")
     console.flush
     last_selected = nil
@@ -101,6 +108,7 @@ module ShengHeadlessGenerationMenu
       sleep(0.1)
     end
 
+    set_console_echo(true)
     console.write("\e[?25h\nBooting selected generation...\n")
     console.flush
 
