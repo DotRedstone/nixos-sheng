@@ -55,17 +55,28 @@ module ShengHeadlessGenerationMenu
     $logger.warn("Could not update sheng generation menu console echo: #{error}")
   end
 
+  def set_console_keyboard(enabled)
+    mode = enabled ? "-u" : "-d"
+    System.run("kbd_mode", "-f", mode, "-C", "/dev/tty0")
+  rescue System::CommandError => error
+    $logger.warn("Could not update sheng generation menu keyboard mode: #{error}")
+  end
+
   def render(generations, selected)
     labels = ["NixOS - Default"] + generations.map { |generation| generation.label() }
 
     console.write("\e[H")
     console.write("NixOS Sheng - Select stage-2 generation\n\n")
     labels.each_with_index do |label, index|
-      marker = index == selected ? ">" : " "
-      console.write("#{marker} #{label}\n")
+      if index == selected
+        console.write("\e[7m  #{label}  \e[0m\n")
+      else
+        console.write("  #{label}\n")
+      end
     end
-    console.write("\nVolume +/-: select    Power: boot\n")
-    console.write("The selected generation boots automatically after the timeout.\n")
+    console.write("\nVolume +/-  Select generation\n")
+    console.write("Power       Boot selection\n")
+    console.write("\nThe selected generation boots automatically after the timeout.\n")
     console.write("\e[J")
     console.flush
   end
@@ -74,9 +85,10 @@ module ShengHeadlessGenerationMenu
     generations = Tasks::SwitchRoot::NixOSGeneration.generations()
     selected = 0
     deadline = Time.now.to_i + timeout()
-    wait_for_release(VOLUME_UP + VOLUME_DOWN + CONFIRM)
     load_font()
     set_console_echo(false)
+    set_console_keyboard(false)
+    wait_for_release(VOLUME_UP + VOLUME_DOWN + CONFIRM)
     console.write("\e[?25l\e[2J\e[H")
     console.flush
     last_selected = nil
@@ -109,6 +121,7 @@ module ShengHeadlessGenerationMenu
     end
 
     set_console_echo(true)
+    set_console_keyboard(true)
     console.write("\e[?25h\nBooting selected generation...\n")
     console.flush
 
