@@ -62,12 +62,27 @@ module ShengHeadlessGenerationMenu
     $logger.warn("Could not update sheng generation menu keyboard mode: #{error}")
   end
 
+  def suppress_console_logs()
+    @previous_printk = File.read("/proc/sys/kernel/printk")
+    File.write("/proc/sys/kernel/printk", "1\n")
+  rescue => error
+    $logger.warn("Could not suppress kernel logs during sheng generation menu: #{error}")
+  end
+
+  def restore_console_logs()
+    File.write("/proc/sys/kernel/printk", @previous_printk) if @previous_printk
+  rescue => error
+    $logger.warn("Could not restore kernel console log level: #{error}")
+  end
+
   def render(generations, selected)
     labels = ["NixOS - Default"] + generations.map { |generation| generation.label() }
 
     console.write("\e[H")
+    console.write("\e[2K")
     console.write("NixOS Sheng - Select stage-2 generation\n\n")
     labels.each_with_index do |label, index|
+      console.write("\e[2K\r")
       if index == selected
         console.write("\e[7m  #{label}  \e[0m\n")
       else
@@ -88,6 +103,7 @@ module ShengHeadlessGenerationMenu
     load_font()
     set_console_echo(false)
     set_console_keyboard(false)
+    suppress_console_logs()
     wait_for_release(VOLUME_UP + VOLUME_DOWN + CONFIRM)
     console.write("\e[?25l\e[2J\e[H")
     console.flush
@@ -122,6 +138,7 @@ module ShengHeadlessGenerationMenu
 
     set_console_echo(true)
     set_console_keyboard(true)
+    restore_console_logs()
     console.write("\e[?25h\nBooting selected generation...\n")
     console.flush
 

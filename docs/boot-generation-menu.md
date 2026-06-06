@@ -33,6 +33,10 @@ Volume +/-: select    Power: boot
 - Console input echo and VT keyboard translation are disabled while the menu is
   active, preventing physical volume keys from printing escape sequences over
   the menu.
+- Kernel console logging is temporarily suppressed while the menu is active,
+  preventing asynchronous driver logs from overwriting it.
+- Each generation row is cleared before redraw to avoid inverse-video remnants
+  after moving the selection.
 - The menu always keeps using the kernel, DTB, stage-1 initrd, and command line
   from the flashed `boot_b`.
 
