@@ -125,6 +125,12 @@ Build the flashable Mobile NixOS rootfs image:
 nix build ./nixos#mobileRootfsImage -o out/mobile-rootfs
 ```
 
+Build the installed GNOME stage-2 system used by `nixos-rebuild`:
+
+```bash
+nix build ./nixos#nixosConfigurations.sheng.config.system.build.toplevel
+```
+
 Build all Mobile NixOS fastboot-facing images in one output:
 
 ```bash
@@ -167,6 +173,12 @@ If stage-1 code or the Android boot configuration changed, rebuild and flash
 Do not flash `userdata`. Firmware, packages, systemd units, users, and other
 rootfs content live in the `linux` partition; flashing only `boot_b` does not
 update `/lib/firmware`.
+
+After the initial flash, normal stage-2 configuration changes can be built,
+tested, switched, and rolled back directly on the tablet with
+`nixos-rebuild`. Kernel, DTS, stage-1 initrd, and boot command-line changes
+still require a separately built and flashed `boot_b` image. See
+[`docs/nixos-rebuild.md`](docs/nixos-rebuild.md) for the safe workflow.
 
 ## Firmware, Sensors, and USB-C
 

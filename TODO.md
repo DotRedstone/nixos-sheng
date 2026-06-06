@@ -26,7 +26,8 @@
 * [x] flake 与 Home Manager 基础配置已集成
 * [x] `systemd-timesyncd` 已启用并实机确认时间同步
 * [~] rootfs 当前较小，适合作为最小发布镜像；扩展桌面环境前需要扩容 linux 分区
-* [~] `nixos-rebuild` 可更新 rootfs 内系统世代；涉及 kernel、DTS、initrd 或 boot cmdline 时仍需另外生成并刷写 `boot_b`
+* [~] `nixosConfigurations.sheng` 已与 GNOME Mobile NixOS rootfs 共用同一求值；待实机完成 `build`、`test`、`switch` 与 rollback 验证
+* [~] `nixos-rebuild` 仅更新 stage-2 系统世代；涉及 kernel、DTS、stage-1 initrd 或 boot cmdline 时仍需另外生成并刷写 `boot_b`
 
 ### GNOME desktop
 

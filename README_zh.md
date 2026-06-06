@@ -116,6 +116,12 @@ nix build ./nixos#mobileAndroidBootimg -o out/mobile-bootimg
 nix build ./nixos#mobileRootfsImage -o out/mobile-rootfs
 ```
 
+构建设备内 `nixos-rebuild` 使用的 GNOME stage-2 系统：
+
+```bash
+nix build ./nixos#nixosConfigurations.sheng.config.system.build.toplevel
+```
+
 将所有面向 fastboot 的 Mobile NixOS 镜像输出到一个目录中：
 
 ```bash
@@ -151,6 +157,11 @@ fastboot flash linux out/mobile-rootfs/rootfs.img
 如果 stage-1 代码或 Android 启动配置发生了变化，请重新构建并刷入 `boot_b`。如果只有 NixOS userspace/rootfs 发生了变化，请重新构建并刷入 `linux`。
 
 不要刷入 `userdata`。固件、软件包、systemd 单元、用户和其他 rootfs 内容都位于 `linux` 分区；仅刷入 `boot_b` 并不会更新 `/lib/firmware`。
+
+完成首次刷机后，普通 stage-2 配置可以直接在平板上通过
+`nixos-rebuild` 构建、测试、切换和回滚。kernel、DTS、stage-1 initrd
+和 boot cmdline 仍需要单独构建并刷入 `boot_b`。安全操作流程见
+[`docs/nixos-rebuild.md`](docs/nixos-rebuild.md)。
 
 ## 固件、传感器与 USB-C
 
