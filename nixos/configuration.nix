@@ -55,6 +55,10 @@
     '';
   };
 
+  # Suspend currently times out in the sheng kernel. Ignoring short power-key
+  # presses prevents GDM/logind from disconnecting the device for about 40s.
+  services.logind.settings.Login.HandlePowerKey = "ignore";
+
   services.xiaomi-mipps-auth.enable = true;
 
   console = {
