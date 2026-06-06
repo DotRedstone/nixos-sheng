@@ -134,11 +134,6 @@
 
   systemd.services.iio-sensor-proxy.wantedBy = [ "multi-user.target" ];
 
-  systemd.services."serial-getty@ttyMSM0" = {
-    enable = true;
-    wantedBy = [ "getty.target" ];
-  };
-
   services.udev.extraRules = ''
     ENV{ID_INPUT_TOUCHSCREEN}=="1", ENV{LIBINPUT_CALIBRATION_MATRIX}="1 0 0 0 1 0 0 0 1"
   '';
