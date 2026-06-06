@@ -24,9 +24,17 @@
 * [x] `nixos-rebuild` 可用
 * [x] `systemctl` 可用
 * [x] flake 与 Home Manager 基础配置已集成
+* [~] Home Manager CLI 已安装，但当前实机尚无 Home Manager generation；待扩容并补
+  `flake.lock` 后完成一次 `home-manager switch --flake ./nixos#luser@sheng`
 * [x] `systemd-timesyncd` 已启用并实机确认时间同步
-* [~] rootfs 当前较小，适合作为最小发布镜像；扩展桌面环境前需要扩容 linux 分区
-* [~] `nixos-rebuild` 可更新 rootfs 内系统世代；涉及 kernel、DTS、initrd 或 boot cmdline 时仍需另外生成并刷写 `boot_b`
+* [~] `linux` 分区约 77.7GiB，但当前 ext4 文件系统约 10GiB；在线扩容失败，
+  需要在 TWRP/救援环境中离线执行 `e2fsck` 与 `resize2fs`
+* [x] `nixosConfigurations.sheng` 已与 GNOME Mobile NixOS rootfs 共用同一求值，并通过 Actions 构建验证
+* [x] 纯 flake stage-2 profile rollback 与 `switch-to-configuration switch` 已实机验证
+* [~] 开机世代菜单、音量选择和电源确认已实机验证；当前仅有一个真实 system
+  generation，仍待扩容后验证跨世代选择与回滚
+* [~] `nixos-rebuild --flake` 仅更新 stage-2 系统世代；涉及 kernel、DTS、stage-1 initrd 或 boot cmdline 时仍需另外生成并刷写 `boot_b`
+* [ ] 发布前补充并验证 `nixos/flake.lock`，避免设备端求值重复下载大型 inputs
 
 ### GNOME desktop
 
@@ -397,6 +405,10 @@ postmarketOS 状态：Y
 * [x] 中国监管域已生效，5GHz 信道 36–64 与 149–165 可用
 * [x] 更新 WCN7850 `board-2.bin` 后，5GHz 定向扫描与 NetworkManager 连接已实机验证
 * [x] 已连接 `5200 MHz` / 信道 40 / `80 MHz` AP，链路速率为 `1200.9 MBit/s`
+* [x] 当前候选版本重新连接 `5180 MHz` / 信道 36 / `80 MHz` AP，收发链路约
+  `960.7/1080.6 MBit/s`，联网正常
+* [~] 首次切换到已保存的 5GHz 连接可能报告找不到网络；刷新 NetworkManager
+  完整扫描后可连接。当前 ath12k 下定向 `iw scan freq` 不应作为唯一健康判据
 * [~] 当前 6GHz 信道仍被禁用，尚未验证 6GHz
 
 验证命令：
@@ -728,11 +740,11 @@ postmarketOS 状态：N
 * [x] Sensors：加速度计、距离传感器、光感、指南针已通过 SSC + `iio-sensor-proxy` 验证
 * [x] Touchscreen：固件加载、input/libinput、点击、滑动和坐标事件已实机验证
 * [~] GNOME：桌面、悬浮软键盘和旋转配置已集成；待长期验证自动弹出、四向旋转与触摸坐标
-* [~] Bluetooth：控制器与服务正常；待验证扫描、配对、重连、BLE 和蓝牙音频
+* [~] Bluetooth：控制器、服务和扫描发现已验证；待验证配对、重连、BLE 和蓝牙音频
 * [~] Audio：声卡与 playback/capture PCM 已枚举；待验证扬声器、麦克风和 Type-C 音频
-* [~] Camera：前后摄 RAW10 实际画面已抓取；待完善 libcamera 与桌面相机应用
+* [~] Camera：当前候选版本已重新验证前后摄 RAW10 实际抓帧；待完善 libcamera 与桌面相机应用
 * [~] Display：3048x2032 已确认；待验证刷新率、144Hz、Night Light、背光调节
-* [ ] Power / volume buttons：实际按键事件
+* [x] Power / volume buttons：实体键事件与开机世代菜单选择已验证
 * [ ] Battery / charger：不同充电器下电压、电流、PD 状态
 
 ### P1：尚未完成的硬件功能
@@ -745,7 +757,8 @@ postmarketOS 状态：N
 ### P2：postmarketOS 已工作但需要更多用户态验证的项目
 
 * [ ] Hall sensor
-* [~] Sensors 后续增强：kernel IIO sysfs bridge、单独 gyroscope 暴露、proximity Davinci payload 解包
+* [~] Sensors：SSC 用户态链路可用；严格 kernel IIO 验收仍未通过，需实现
+  `iio:device*`、单独 gyroscope 暴露，并完善 proximity Davinci payload 解包
 
 ### 暂不处理
 
@@ -766,6 +779,9 @@ postmarketOS 状态：N
 * `NVT-ts-spi` 可完成固件更新并注册 `NVTCapacitiveTouchScreen`。
 * 面板唤醒后，`evtest` 已捕获连续 X/Y、压力和触摸面积事件。
 * minimal 环境中触摸会跟随 DRM panel 正常 suspend；这不是驱动故障。
+* 系统 suspend 当前仍会在冻结任务时超时；已让 logind 忽略短按电源键，
+  避免 GDM 登录界面触发约 40 秒的假死。真正的 suspend/resume 仍待修复。
+* GNOME 会话中短按电源键仅切换 Mutter 显示电源，不再 suspend 或锁定会话。
 
 剩余验证：
 
@@ -806,12 +822,13 @@ postmarketOS 状态：N
 4. 显示刷新率、144Hz、Night Light 与背光调节实测
 5. 电源键、音量键、Hall sensor、U 盘与 ADB device 模式实测
 6. 充电功率长期测试、不同充电器兼容性与温度观察
-7. 6GHz Wi-Fi、独立 gyroscope、kernel IIO sysfs bridge 等非阻塞增强
+7. 6GHz Wi-Fi、独立 gyroscope 等增强；kernel IIO sysfs bridge 仍是严格 IIO 验收项
 
 ### Sensors 后续增强
 
-当前传感器已经可用，不建议继续把它作为阻塞项。后续增强只在需要时单独开任务：
+当前传感器已通过 SSC 用户态链路供桌面使用，但严格 kernel IIO 验收尚未通过。
+后续工作应单独开任务，避免与已工作的 SSC 链路混改：
 
-* kernel IIO sysfs bridge
+* kernel IIO sysfs bridge（严格 IIO 验收与稳定发布前仍需解决）
 * gyroscope 单独暴露
 * proximity Xiaomi Davinci payload 解包

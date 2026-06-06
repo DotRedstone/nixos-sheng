@@ -1,0 +1,181 @@
+module ShengHeadlessGenerationMenu
+  extend self
+
+  VOLUME_UP = [:KEY_VOLUMEUP]
+  VOLUME_DOWN = [:KEY_VOLUMEDOWN]
+  CONFIRM = [:KEY_POWER, :KEY_ENTER]
+  REQUEST_PATH = "/mnt/var/lib/sheng-boot-menu/requested"
+  FONT_PATH = "/etc/sheng-generation-menu-font.psf.gz"
+
+  def config()
+    Configuration["sheng_generation_menu"] || {}
+  end
+
+  def enabled?()
+    config()["enable"] == true
+  end
+
+  def timeout()
+    (config()["timeout"] || 30).to_i
+  end
+
+  def pressed?(keys)
+    Evdev.keys_held(keys)
+  end
+
+  def requested?()
+    File.exist?(REQUEST_PATH)
+  end
+
+  def consume_request()
+    File.delete(REQUEST_PATH) if requested?()
+  end
+
+  def wait_for_release(keys)
+    sleep(0.1) while pressed?(keys)
+  end
+
+  def console()
+    @console ||= begin
+      File.open("/dev/tty0", "w")
+    rescue
+      $stderr
+    end
+  end
+
+  def load_font()
+    System.run("setfont", "-C", "/dev/tty0", FONT_PATH)
+  rescue System::CommandError => error
+    $logger.warn("Could not load sheng generation menu font: #{error}")
+  end
+
+  def set_console_echo(enabled)
+    System.run("stty", "-F", "/dev/tty0", enabled ? "echo" : "-echo")
+  rescue System::CommandError => error
+    $logger.warn("Could not update sheng generation menu console echo: #{error}")
+  end
+
+  def set_console_keyboard(enabled)
+    mode = enabled ? "-u" : "-d"
+    System.run("kbd_mode", "-f", mode, "-C", "/dev/tty0")
+  rescue System::CommandError => error
+    $logger.warn("Could not update sheng generation menu keyboard mode: #{error}")
+  end
+
+  def suppress_console_logs()
+    @previous_printk = File.read("/proc/sys/kernel/printk")
+    File.write("/proc/sys/kernel/printk", "1\n")
+  rescue => error
+    $logger.warn("Could not suppress kernel logs during sheng generation menu: #{error}")
+  end
+
+  def restore_console_logs()
+    File.write("/proc/sys/kernel/printk", @previous_printk) if @previous_printk
+  rescue => error
+    $logger.warn("Could not restore kernel console log level: #{error}")
+  end
+
+  def render(generations, selected)
+    labels = ["NixOS - Default"] + generations.map { |generation| generation.label() }
+
+    console.write("\e[H")
+    console.write("\e[2K")
+    console.write("NixOS Sheng - Select stage-2 generation\n\n")
+    labels.each_with_index do |label, index|
+      console.write("\e[2K\r")
+      if index == selected
+        console.write("\e[7m  #{label}  \e[0m\n")
+      else
+        console.write("  #{label}\n")
+      end
+    end
+    console.write("\nVolume +/-  Select generation\n")
+    console.write("Power       Boot selection\n")
+    console.write("\nThe selected generation boots automatically after the timeout.\n")
+    console.write("\e[J")
+    console.flush
+  end
+
+  def choose(switch_root)
+    generations = Tasks::SwitchRoot::NixOSGeneration.generations()
+    selected = 0
+    deadline = Time.now.to_i + timeout()
+    load_font()
+    set_console_echo(false)
+    set_console_keyboard(false)
+    suppress_console_logs()
+    wait_for_release(VOLUME_UP + VOLUME_DOWN + CONFIRM)
+    console.write("\e[?25l\e[2J\e[H")
+    console.flush
+    last_selected = nil
+    volume_up_was_pressed = false
+    volume_down_was_pressed = false
+
+    loop do
+      if selected != last_selected
+        render(generations, selected)
+        last_selected = selected
+      end
+
+      volume_up_pressed = pressed?(VOLUME_UP)
+      volume_down_pressed = pressed?(VOLUME_DOWN)
+
+      if volume_up_pressed && !volume_up_was_pressed
+        selected = (selected - 1) % (generations.length + 1)
+      elsif volume_down_pressed && !volume_down_was_pressed
+        selected = (selected + 1) % (generations.length + 1)
+      elsif pressed?(CONFIRM)
+        wait_for_release(CONFIRM)
+        break
+      elsif Time.now.to_i >= deadline
+        break
+      end
+
+      volume_up_was_pressed = volume_up_pressed
+      volume_down_was_pressed = volume_down_pressed
+      sleep(0.1)
+    end
+
+    set_console_echo(true)
+    set_console_keyboard(true)
+    restore_console_logs()
+    console.write("\e[?25h\nBooting selected generation...\n")
+    console.flush
+
+    if selected == 0
+      Tasks::SwitchRoot::NixOSGeneration.new(switch_root.default_selection_path())
+    else
+      generations[selected - 1]
+    end
+  end
+end
+
+class Tasks::SwitchRoot
+  def selected_generation()
+    return @selected_generation if @selected_generation
+
+    wants_menu = Hal::Recovery.wants_recovery? || ShengHeadlessGenerationMenu.requested?()
+
+    if wants_menu &&
+       ShengHeadlessStage1.enabled? &&
+       ShengHeadlessGenerationMenu.enabled?
+      ShengHeadlessGenerationMenu.consume_request()
+      @selected_generation = ShengHeadlessGenerationMenu.choose(self)
+    elsif wants_menu && !ShengHeadlessStage1.enabled?
+      Tasks::Splash.instance.quit("Continuing to recovery menu")
+      @selected_generation = choose_generation()
+    else
+      if wants_menu
+        $logger.info("Headless stage-1: skipping recovery generation menu.")
+      end
+
+      @selected_generation = NixOSGeneration.new(default_selection_path())
+      if will_kexec?()
+        Tasks::Splash.instance.quit("Rebooting in generation kernel", sticky: true)
+      else
+        Tasks::Splash.instance.quit("Continuing to stage-2")
+      end
+    end
+    @selected_generation
+  end
+end

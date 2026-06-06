@@ -86,15 +86,12 @@
       ];
     in
     {
-      nixosConfigurations.sheng = nixpkgs.lib.nixosSystem {
-        inherit system;
-        modules = [
-          ({ lib, ... }: {
-            nixpkgs.overlays = lib.mkAfter [ shengOverlay ];
-          })
-          ./configuration.nix
-          homeManagerModule
-        ];
+      # Reuse the exact Mobile NixOS evaluations used by the flashable images.
+      # This keeps nixos-rebuild generations aligned with the fixed boot image,
+      # sheng kernel modules, firmware, hardware services, and desktop profile.
+      nixosConfigurations = {
+        sheng = mobileGnomeEval;
+        sheng-minimal = mobileEval;
       };
 
       homeConfigurations."luser@sheng" = home-manager.lib.homeManagerConfiguration {

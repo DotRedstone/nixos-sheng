@@ -2,7 +2,9 @@
 
 let
   headlessStage1Task = pkgs.writeTextDir "zz-sheng-headless-stage1.rb" (
-    builtins.readFile ./patches/stage-1-headless-no-gui.rb
+    (builtins.readFile ./patches/stage-1-headless-no-gui.rb)
+    + "\n"
+    + (builtins.readFile ./patches/stage-1-headless-generation-menu.rb)
   );
   udevTolerantTask = pkgs.writeTextDir "zz-sheng-udev-tolerant.rb" (
     builtins.readFile ./patches/stage-1-udev-trigger-tolerant.rb
@@ -10,6 +12,11 @@ let
   stage1Firmware = pkgs.runCommand "sheng-stage1-firmware" { } ''
     mkdir -p $out/lib/firmware
     cp -r ${pkgs.sheng-firmware}/lib/firmware/qcom $out/lib/firmware/
+  '';
+  generationMenuFont = pkgs.runCommand "sheng-generation-menu-font.psf.gz" { } ''
+    font="$(find ${pkgs.terminus_font}/share/consolefonts -name 'ter-v32n.psf.gz' -print -quit)"
+    test -n "$font"
+    cp "$font" "$out"
   '';
   closureInfo = pkgs.buildPackages.closureInfo {
     rootPaths = config.system.build.toplevel;
@@ -122,6 +129,10 @@ in
       boot.fail.shell = true;
       gui.enable = false;
       splash.disabled = true;
+      sheng_generation_menu = {
+        enable = true;
+        timeout = 30;
+      };
     };
 
     gui.enable = false;
@@ -129,6 +140,17 @@ in
     tasks = [
       headlessStage1Task
       udevTolerantTask
+    ];
+
+    extraUtils = [
+      pkgs.kbd
+    ];
+
+    contents = [
+      {
+        object = generationMenuFont;
+        symlink = "/etc/sheng-generation-menu-font.psf.gz";
+      }
     ];
 
     shell.shellOnFail = true;

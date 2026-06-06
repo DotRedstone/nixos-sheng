@@ -18,7 +18,7 @@ Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的实验性 Mobile NixOS 移�
 | RootFS | Mobile NixOS 生成的 rootfs | 面向 `linux` 分区的 ext4 镜像 |
 | 显示/桌面 | 部分可用 | 3048x2032 面板与精简 GNOME 可用；刷新率、Night Light、四向旋转仍待验证 |
 | 调试访问 | Bring-up | Stage-1/stage-2 的 ADB 已通过 Mobile NixOS 启用 |
-| Wi-Fi | 可用 | 2.4GHz 与 5GHz 扫描、连接和联网已验证；6GHz 未验证 |
+| Wi-Fi | 可用 | 2.4GHz 与 5GHz 扫描、连接和联网已验证；首次连接 5GHz 前可能需要刷新 NetworkManager 完整扫描；6GHz 未验证 |
 | 蓝牙 | 部分可用 | hci0 与 bluetooth.service 正常；扫描、配对、重连和音频待验证 |
 | 音频 | 部分可用 | ALSA 声卡与播放/录音 PCM 已枚举；实际播放和录音待验证 |
 | 相机 | 部分可用 | 前后摄 RAW10 实际画面已抓取；libcamera、自动曝光与桌面相机应用待完善 |
@@ -116,6 +116,12 @@ nix build ./nixos#mobileAndroidBootimg -o out/mobile-bootimg
 nix build ./nixos#mobileRootfsImage -o out/mobile-rootfs
 ```
 
+构建设备内 `nixos-rebuild` 使用的 GNOME stage-2 系统：
+
+```bash
+nix build ./nixos#nixosConfigurations.sheng.config.system.build.toplevel
+```
+
 将所有面向 fastboot 的 Mobile NixOS 镜像输出到一个目录中：
 
 ```bash
@@ -152,6 +158,14 @@ fastboot flash linux out/mobile-rootfs/rootfs.img
 
 不要刷入 `userdata`。固件、软件包、systemd 单元、用户和其他 rootfs 内容都位于 `linux` 分区；仅刷入 `boot_b` 并不会更新 `/lib/firmware`。
 
+完成首次刷机后，普通 stage-2 配置可以直接在平板上通过
+`nixos-rebuild` 构建、测试、切换和回滚。kernel、DTS、stage-1 initrd
+和 boot cmdline 仍需要单独构建并刷入 `boot_b`。安全操作流程见
+[`docs/nixos-rebuild.md`](docs/nixos-rebuild.md)。
+
+生成的 rootfs 文件系统可能小于专用 `linux` 分区。创建多个世代前应先离线扩容，
+具体步骤见 [`docs/linux-partition-resize.md`](docs/linux-partition-resize.md)。
+
 ## 固件、传感器与 USB-C
 
 sheng 上的 USB-C 主机模式和各类传感器均强依赖于完整的 Qualcomm remoteproc 固件（包含 ADSP 与 CDSP）。
@@ -162,6 +176,14 @@ sheng 上的 USB-C 主机模式和各类传感器均强依赖于完整的 Qualco
 有关完整的依赖链、离线 rootfs 检查、运行时验证命令以及常见的故障特征，请参阅：
 - [docs/sheng-firmware-and-usbc.md](docs/sheng-firmware-and-usbc.md)
 - [docs/sensors-ssc-userland.md](docs/sensors-ssc-userland.md)
+- [docs/nixos-rebuild.md](docs/nixos-rebuild.md)
+- [docs/install-dualboot.md](docs/install-dualboot.md)
+- [docs/linux-partition-resize.md](docs/linux-partition-resize.md)
+- [docs/boot-generation-menu.md](docs/boot-generation-menu.md)
+- [docs/camera-raw-capture.md](docs/camera-raw-capture.md)
+- [docs/mipps-120w.md](docs/mipps-120w.md)
+- [docs/release-readiness.md](docs/release-readiness.md)
+- [docs/release-notes.md](docs/release-notes.md)
 
 ## 调试
 
