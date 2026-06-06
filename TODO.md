@@ -771,6 +771,7 @@ postmarketOS 状态：N
 * minimal 环境中触摸会跟随 DRM panel 正常 suspend；这不是驱动故障。
 * 系统 suspend 当前仍会在冻结任务时超时；已让 logind 忽略短按电源键，
   避免 GDM 登录界面触发约 40 秒的假死。真正的 suspend/resume 仍待修复。
+* GNOME 会话中短按电源键仅切换 Mutter 显示电源，不再 suspend 或锁定会话。
 
 剩余验证：
 

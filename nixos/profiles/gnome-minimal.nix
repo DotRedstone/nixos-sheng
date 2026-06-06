@@ -2,6 +2,45 @@
 
 let
   gjs-osk = pkgs.callPackage ../packages/gjs-osk.nix { };
+  powerKeyDisplayToggle = pkgs.writeShellScript "sheng-power-key-display-toggle" ''
+    set -u
+
+    device=/dev/input/by-path/platform-c400000.spmi-platform-c400000.spmi:pmic@0:pon@1300:pwrkey-event
+    pressed=0
+
+    while true; do
+      ${pkgs.evtest}/bin/evtest --query "$device" EV_KEY KEY_POWER >/dev/null 2>&1
+      key_state=$?
+
+      if [ "$key_state" -eq 10 ]; then
+        if [ "$pressed" -eq 0 ]; then
+          set -- $(${pkgs.systemd}/bin/busctl --user get-property \
+            org.gnome.Mutter.DisplayConfig \
+            /org/gnome/Mutter/DisplayConfig \
+            org.gnome.Mutter.DisplayConfig \
+            PowerSaveMode)
+          mode="$2"
+
+          if [ "$mode" -eq 0 ]; then
+            target=3
+          else
+            target=0
+          fi
+
+          ${pkgs.systemd}/bin/busctl --user set-property \
+            org.gnome.Mutter.DisplayConfig \
+            /org/gnome/Mutter/DisplayConfig \
+            org.gnome.Mutter.DisplayConfig \
+            PowerSaveMode i "$target" || true
+          pressed=1
+        fi
+      else
+        pressed=0
+      fi
+
+      ${pkgs.coreutils}/bin/sleep 0.05
+    done
+  '';
 in
 {
   services.xserver.enable = true;
@@ -24,6 +63,10 @@ in
 
       settings."org/gnome/desktop/a11y/applications" = {
         screen-keyboard-enabled = true;
+      };
+
+      settings."org/gnome/settings-daemon/plugins/power" = {
+        power-button-action = "nothing";
       };
 
       settings."org/gnome/shell/extensions/gjsosk" = {
@@ -54,6 +97,18 @@ in
   };
 
   services.dleyna.enable = lib.mkForce false;
+
+  systemd.user.services.sheng-power-key-display-toggle = {
+    description = "Toggle the sheng display with the power key";
+    wantedBy = [ "graphical-session.target" ];
+    partOf = [ "graphical-session.target" ];
+    after = [ "graphical-session.target" ];
+    serviceConfig = {
+      ExecStart = powerKeyDisplayToggle;
+      Restart = "always";
+      RestartSec = 1;
+    };
+  };
 
   environment.systemPackages = with pkgs; [
     gjs-osk
