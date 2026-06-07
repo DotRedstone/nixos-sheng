@@ -96,6 +96,12 @@ in
 
       settings."org/gnome/settings-daemon/plugins/power" = {
         power-button-action = "nothing";
+        sleep-inactive-ac-type = "nothing";
+        sleep-inactive-battery-type = "nothing";
+      };
+
+      settings."org/gnome/desktop/session" = {
+        idle-delay = lib.gvariant.mkUint32 300;
       };
 
       settings."org/gnome/shell" = {
@@ -126,6 +132,9 @@ in
     wantedBy = [ "graphical-session.target" ];
     partOf = [ "graphical-session.target" ];
     after = [ "graphical-session.target" ];
+    unitConfig = {
+      ConditionUser = "!gdm";
+    };
     serviceConfig = {
       ExecStart = powerKeyDisplayToggle;
       Restart = "always";
