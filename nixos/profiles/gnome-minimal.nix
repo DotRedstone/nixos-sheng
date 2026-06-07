@@ -58,7 +58,7 @@ in
   programs.dconf.profiles.user.databases = [
     {
       settings."org/gnome/shell" = {
-        enabled-extensions = [ "gjsosk@vishram1123.com" ];
+        enabled-extensions = lib.gvariant.mkEmptyArray lib.gvariant.type.string;
       };
 
       settings."org/gnome/desktop/a11y/applications" = {
