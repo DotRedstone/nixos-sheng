@@ -95,7 +95,7 @@ in
       };
 
       settings."org/gnome/shell" = {
-        enabled-extensions = [ ];
+        enabled-extensions = lib.gvariant.mkEmptyArray lib.gvariant.type.string;
       };
     }
   ];
