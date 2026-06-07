@@ -409,8 +409,10 @@ postmarketOS 状态：Y
 * [x] 已连接 `5200 MHz` / 信道 40 / `80 MHz` AP，链路速率为 `1200.9 MBit/s`
 * [x] 当前候选版本重新连接 `5180 MHz` / 信道 36 / `80 MHz` AP，收发链路约
   `960.7/1080.6 MBit/s`，联网正常
-* [~] 首次切换到已保存的 5GHz 连接可能报告找不到网络；刷新 NetworkManager
-  完整扫描后可连接。当前 ath12k 下定向 `iw scan freq` 不应作为唯一健康判据
+* [x] 将 `p2p-dev-wlp1s0` 排除出 NetworkManager 管理后，Wi-Fi off/on 不再导致
+  5GHz 扫描结果全部消失
+* [~] 当前为保持普通 Wi-Fi 扫描稳定，暂不支持 Wi-Fi Direct / P2P
+* [~] 当前 ath12k 下定向 `iw scan freq` 不应作为唯一健康判据
 * [~] 当前 6GHz 信道仍被禁用，尚未验证 6GHz
 
 验证命令：
