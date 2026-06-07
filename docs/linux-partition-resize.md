@@ -12,8 +12,23 @@ lsblk -o NAME,SIZE,FSTYPE,LABEL,PARTLABEL,MOUNTPOINTS
 ```
 
 On the tested device, the `linux` partition was about 77.7 GiB while the ext4
-filesystem was about 10 GiB. Online `resize2fs` failed, so expansion must be
-performed while the filesystem is unmounted.
+filesystem was about 10 GiB. Online `resize2fs` failed because the filesystem
+was mounted.
+
+Current boot images enable Mobile NixOS stage-1 automatic resizing. Before
+mounting the root filesystem, stage-1 compares the ext4 filesystem size with
+the `linux` partition, runs `e2fsck`, and expands the filesystem when needed.
+After flashing a matching boot image and rootfs, the first boot may take
+longer while this completes.
+
+Verify after the first boot:
+
+```sh
+df -h /
+lsblk -o NAME,SIZE,FSTYPE,LABEL,PARTLABEL,MOUNTPOINTS
+```
+
+Use the following rescue procedure only if automatic resizing did not complete.
 
 ## TWRP or rescue procedure
 
