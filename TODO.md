@@ -38,6 +38,8 @@
 
 ### GNOME desktop
 
+* [~] GDM 登录界面：为 greeter 单独启用原生屏幕键盘和密码登录，待新 rootfs 实机验证
+
 * [x] 精简 GNOME profile 可启动，GDM 与 GNOME Shell 正常运行
 * [x] 已集成 GJS OSK，并启用拖动与触摸输入自动弹出配置
 * [x] 加速度计 mount matrix 已按横屏原生方向修正

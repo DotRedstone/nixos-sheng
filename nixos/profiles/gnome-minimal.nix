@@ -81,6 +81,25 @@ in
     }
   ];
 
+  # GDM uses a separate dconf profile. Keep the greeter on GNOME's native OSK
+  # so the third-party movable keyboard cannot interfere with password entry.
+  programs.dconf.profiles.gdm.databases = [
+    {
+      settings."org/gnome/login-screen" = {
+        enable-password-authentication = true;
+        disable-user-list = false;
+      };
+
+      settings."org/gnome/desktop/a11y/applications" = {
+        screen-keyboard-enabled = true;
+      };
+
+      settings."org/gnome/shell" = {
+        enabled-extensions = [ ];
+      };
+    }
+  ];
+
   services.gnome = {
     core-apps.enable = lib.mkForce false;
     core-developer-tools.enable = lib.mkForce false;
