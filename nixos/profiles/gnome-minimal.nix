@@ -94,6 +94,10 @@ in
         screen-keyboard-enabled = true;
       };
 
+      settings."org/gnome/settings-daemon/plugins/power" = {
+        power-button-action = "nothing";
+      };
+
       settings."org/gnome/shell" = {
         enabled-extensions = lib.gvariant.mkEmptyArray lib.gvariant.type.string;
       };
