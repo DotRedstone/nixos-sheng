@@ -17,7 +17,12 @@
   ];
 
   networking.hostName = "nixos-sheng";
-  networking.networkmanager.enable = true;
+  networking.networkmanager = {
+    enable = true;
+    # Managing the P2P device can leave WCN7850 scans stuck after Wi-Fi is
+    # toggled, making every 5 GHz BSS disappear until the driver is reloaded.
+    unmanaged = [ "interface-name:p2p-dev-wlp1s0" ];
+  };
   networking.useDHCP = lib.mkDefault true;
 
   time.timeZone = "Asia/Shanghai";
