@@ -6,58 +6,57 @@ let
     set -u
 
     device=/dev/input/by-path/platform-c400000.spmi-platform-c400000.spmi:pmic@0:pon@1300:pwrkey-event
-    pressed=0
-    last_mode=0
-    counter=0
-    active_uid=""
-    active_user=""
-    bus_address=""
 
-    while true; do
-      if [ "$counter" -eq 0 ]; then
-        current_uid=""
-        for session in $(${pkgs.systemd}/bin/loginctl list-sessions --no-legend | ${pkgs.gawk}/bin/awk '{print $1}'); do
-          state=$(${pkgs.systemd}/bin/loginctl show-session "$session" -p State --value)
-          if [ "$state" = "active" ]; then
-            current_uid=$(${pkgs.systemd}/bin/loginctl show-session "$session" -p UID --value)
-            break
-          fi
-        done
-
-        if [ -n "$current_uid" ]; then
-          active_uid="$current_uid"
-          active_user=$(id -un "$active_uid")
-          bus_address="unix:path=/run/user/$active_uid/bus"
-
-          mode_output=$(su -s /bin/sh "$active_user" -c "DBUS_SESSION_BUS_ADDRESS=$bus_address ${pkgs.systemd}/bin/busctl --user get-property org.gnome.Mutter.DisplayConfig /org/gnome/Mutter/DisplayConfig org.gnome.Mutter.DisplayConfig PowerSaveMode" 2>/dev/null || true)
-          if [ -n "$mode_output" ]; then
-            last_mode=$(echo "$mode_output" | ${pkgs.gawk}/bin/awk '{print $2}')
-          fi
+    get_active_session_info() {
+      for session in $(${pkgs.systemd}/bin/loginctl list-sessions --no-legend | ${pkgs.gawk}/bin/awk '{print $1}'); do
+        local state
+        state=$(${pkgs.systemd}/bin/loginctl show-session "$session" -p Active --value 2>/dev/null || true)
+        if [ "$state" = "yes" ]; then
+          ${pkgs.systemd}/bin/loginctl show-session "$session" -p UID --value 2>/dev/null || true
+          return
         fi
-      fi
+      done
+    }
 
-      counter=$(( (counter + 1) % 20 ))
-
-      ${pkgs.evtest}/bin/evtest --query "$device" EV_KEY KEY_POWER >/dev/null 2>&1
-      key_state=$?
-
-      if [ "$key_state" -eq 10 ]; then
-        if [ "$pressed" -eq 0 ]; then
-          if [ "$last_mode" -eq 0 ]; then
-            if [ -n "$active_uid" ]; then
-              su -s /bin/sh "$active_user" -c "DBUS_SESSION_BUS_ADDRESS=$bus_address ${pkgs.systemd}/bin/busctl --user set-property org.gnome.Mutter.DisplayConfig /org/gnome/Mutter/DisplayConfig org.gnome.Mutter.DisplayConfig PowerSaveMode i 3" >/dev/null 2>&1 || true
-            fi
-            last_mode=3
-          else
-            last_mode=0
-          fi
-          pressed=1
-        fi
+    get_power_save_mode() {
+      local uid="$1"
+      local user
+      user=$(id -un "$uid" 2>/dev/null || true)
+      [ -z "$user" ] && echo "unknown" && return
+      local bus="unix:path=/run/user/$uid/bus"
+      local out
+      out=$(su -s /bin/sh "$user" -c "DBUS_SESSION_BUS_ADDRESS=$bus ${pkgs.systemd}/bin/busctl --user get-property org.gnome.Mutter.DisplayConfig /org/gnome/Mutter/DisplayConfig org.gnome.Mutter.DisplayConfig PowerSaveMode" 2>/dev/null || true)
+      if [ -n "$out" ]; then
+        echo "$out" | ${pkgs.gawk}/bin/awk '{print $2}'
       else
-        pressed=0
+        echo "unknown"
       fi
+    }
 
-      ${pkgs.coreutils}/bin/sleep 0.05
+    set_power_save_mode() {
+      local uid="$1"
+      local target="$2"
+      local user
+      user=$(id -un "$uid" 2>/dev/null || true)
+      [ -z "$user" ] && return
+      local bus="unix:path=/run/user/$uid/bus"
+      su -s /bin/sh "$user" -c "DBUS_SESSION_BUS_ADDRESS=$bus ${pkgs.systemd}/bin/busctl --user set-property org.gnome.Mutter.DisplayConfig /org/gnome/Mutter/DisplayConfig org.gnome.Mutter.DisplayConfig PowerSaveMode i $target" >/dev/null 2>&1 || true
+    }
+
+    ${pkgs.coreutils}/bin/stdbuf -oL ${pkgs.evtest}/bin/evtest "$device" 2>/dev/null | while IFS= read -r line; do
+      case "$line" in
+        *"type 1 (EV_KEY), code 116 (KEY_POWER), value 1"*)
+          uid=$(get_active_session_info)
+          if [ -n "$uid" ]; then
+            mode=$(get_power_save_mode "$uid")
+            if [ "$mode" = "0" ]; then
+              set_power_save_mode "$uid" 3
+            else
+              set_power_save_mode "$uid" 0
+            fi
+          fi
+          ;;
+      esac
     done
   '';
 in
