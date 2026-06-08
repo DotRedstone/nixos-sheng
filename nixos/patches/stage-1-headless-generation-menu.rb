@@ -79,22 +79,21 @@ module ShengHeadlessGenerationMenu
     labels = ["NixOS - Default"] + generations.map { |generation| generation.label() }
 
     console.write("\e[H")
-    console.write("\e[2K")
-    console.write("NixOS Sheng - Select stage-2 generation\n\n")
+    console.write("\e[2K\n")
+    console.write("\e[2K  \e[1m\e[36m=== NixOS Boot Menu ===\e[0m\n\n")
     labels.each_with_index do |label, index|
       console.write("\e[2K\r")
       if index == selected
-        console.write("\e[7m  #{label}  \e[0m\n")
+        console.write("\e[1m\e[32m  > #{label}  \e[0m\n")
       else
-        console.write("  #{label}\n")
+        console.write("    #{label}\n")
       end
     end
-    console.write("\nVolume +/-  Select generation\n")
-    console.write("Power       Boot selection\n")
+    console.write("\e[2K\n\e[2K  [Vol +/-] Navigate   [Power] Select\n")
     if remaining
-      console.write("\nAutoboot in #{remaining}s. Press any key to cancel.\n")
+      console.write("\e[2K\n\e[2K  Autoboot in \e[1m#{remaining}\e[0m seconds. Press any key to stop.\n")
     else
-      console.write("\nAutoboot cancelled. Waiting for selection...\n")
+      console.write("\e[2K\n\e[2K  Autoboot stopped. Waiting for selection...\n")
     end
     console.write("\e[J")
     console.flush
@@ -145,7 +144,7 @@ module ShengHeadlessGenerationMenu
 
       volume_up_was_pressed = volume_up_pressed
       volume_down_was_pressed = volume_down_pressed
-      sleep(0.1)
+      sleep(0.01)
     end
 
     set_console_echo(true)
