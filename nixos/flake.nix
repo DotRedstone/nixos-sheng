@@ -16,7 +16,7 @@
       flake = false;
     };
     shengFirmware = {
-      url = "github:DotRedstone/sheng-firmware-full/3f1e57b264254fac289e189bf481a3855a41f052";
+      url = "github:DotRedstone/sheng-firmware-full/719086cc01c0c6607238a221f4bdc803ff2cd68b";
       # Note: This is now a true flake, so we remove `flake = false;`
     };
   };
