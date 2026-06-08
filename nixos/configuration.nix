@@ -81,7 +81,6 @@
   };
 
   environment.systemPackages = let
-    sheng-check = pkgs.writeShellScriptBin "sheng-check" (builtins.readFile ./scripts/sheng-check.sh);
     sheng-reboot-generation-menu = pkgs.writeShellScriptBin "sheng-reboot-generation-menu" ''
       set -eu
 
@@ -102,30 +101,17 @@
         $out/share/alsa/ucm2/Xiaomi/sheng/HiFi.conf
     '';
   in with pkgs; [
-    sheng-check
     sheng-reboot-generation-menu
     sheng-alsa-ucm
     alsa-ucm-conf
     alsa-utils
-    curl
     e2fsprogs
-    evtest
-    gitMinimal
     bluez
-    brightnessctl
     iio-sensor-proxy
-    iproute2
-    iw
     kmod
     libssc
     libinput
-    nano
-    pciutils
     util-linux
-    usbutils
-    v4l-utils
-    vim
-    wget
   ];
 
   environment.variables.ALSA_CONFIG_UCM2 = "/run/current-system/sw/share/alsa/ucm2";
