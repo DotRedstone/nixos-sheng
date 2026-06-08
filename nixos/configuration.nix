@@ -17,7 +17,12 @@
   ];
 
   networking.hostName = "nixos-sheng";
-  networking.networkmanager.enable = true;
+  networking.networkmanager = {
+    enable = true;
+    # Managing the P2P device can leave WCN7850 scans stuck after Wi-Fi is
+    # toggled, making every 5 GHz BSS disappear until the driver is reloaded.
+    unmanaged = [ "interface-name:p2p-dev-wlp1s0" ];
+  };
   networking.useDHCP = lib.mkDefault true;
 
   time.timeZone = "Asia/Shanghai";
@@ -76,7 +81,6 @@
   };
 
   environment.systemPackages = let
-    sheng-check = pkgs.writeShellScriptBin "sheng-check" (builtins.readFile ./scripts/sheng-check.sh);
     sheng-reboot-generation-menu = pkgs.writeShellScriptBin "sheng-reboot-generation-menu" ''
       set -eu
 
@@ -97,30 +101,17 @@
         $out/share/alsa/ucm2/Xiaomi/sheng/HiFi.conf
     '';
   in with pkgs; [
-    sheng-check
     sheng-reboot-generation-menu
     sheng-alsa-ucm
     alsa-ucm-conf
     alsa-utils
-    curl
     e2fsprogs
-    evtest
-    gitMinimal
     bluez
-    brightnessctl
     iio-sensor-proxy
-    iproute2
-    iw
     kmod
     libssc
     libinput
-    nano
-    pciutils
     util-linux
-    usbutils
-    v4l-utils
-    vim
-    wget
   ];
 
   environment.variables.ALSA_CONFIG_UCM2 = "/run/current-system/sw/share/alsa/ucm2";
@@ -136,6 +127,7 @@
 
   services.udev.extraRules = ''
     ENV{ID_INPUT_TOUCHSCREEN}=="1", ENV{LIBINPUT_CALIBRATION_MATRIX}="1 0 0 0 1 0 0 0 1"
+    SUBSYSTEM=="block", ENV{DEVTYPE}=="partition", ENV{ID_PATH}=="platform-1d84000.ufshc-scsi-*", ENV{UDISKS_IGNORE}="1"
   '';
 
   security.rtkit.enable = true;

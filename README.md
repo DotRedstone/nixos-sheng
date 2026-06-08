@@ -181,8 +181,10 @@ still require a separately built and flashed `boot_b` image. See
 [`docs/nixos-rebuild.md`](docs/nixos-rebuild.md) for the safe workflow.
 
 The generated rootfs filesystem can be smaller than the dedicated `linux`
-partition. Expand it offline before creating multiple generations. See
-[`docs/linux-partition-resize.md`](docs/linux-partition-resize.md).
+partition. A matching boot image expands it automatically in stage-1 before
+the first rootfs mount. See
+[`docs/linux-partition-resize.md`](docs/linux-partition-resize.md) for
+verification and the rescue fallback.
 
 ## Firmware, Sensors, and USB-C
 

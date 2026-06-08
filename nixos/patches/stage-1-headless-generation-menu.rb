@@ -75,23 +75,26 @@ module ShengHeadlessGenerationMenu
     $logger.warn("Could not restore kernel console log level: #{error}")
   end
 
-  def render(generations, selected)
+  def render(generations, selected, remaining: nil)
     labels = ["NixOS - Default"] + generations.map { |generation| generation.label() }
 
     console.write("\e[H")
-    console.write("\e[2K")
-    console.write("NixOS Sheng - Select stage-2 generation\n\n")
+    console.write("\e[2K\n")
+    console.write("\e[2K  \e[1m\e[36m=== NixOS Boot Menu ===\e[0m\n\n")
     labels.each_with_index do |label, index|
       console.write("\e[2K\r")
       if index == selected
-        console.write("\e[7m  #{label}  \e[0m\n")
+        console.write("\e[1m\e[32m  > #{label}  \e[0m\n")
       else
-        console.write("  #{label}\n")
+        console.write("    #{label}\n")
       end
     end
-    console.write("\nVolume +/-  Select generation\n")
-    console.write("Power       Boot selection\n")
-    console.write("\nThe selected generation boots automatically after the timeout.\n")
+    console.write("\e[2K\n\e[2K  [Vol +/-] Navigate   [Power] Select\n")
+    if remaining
+      console.write("\e[2K\n\e[2K  Autoboot in \e[1m#{remaining}\e[0m seconds. Press any key to stop.\n")
+    else
+      console.write("\e[2K\n\e[2K  Autoboot stopped. Waiting for selection...\n")
+    end
     console.write("\e[J")
     console.flush
   end
@@ -100,6 +103,7 @@ module ShengHeadlessGenerationMenu
     generations = Tasks::SwitchRoot::NixOSGeneration.generations()
     selected = 0
     deadline = Time.now.to_i + timeout()
+    countdown_active = true
     load_font()
     set_console_echo(false)
     set_console_keyboard(false)
@@ -108,32 +112,39 @@ module ShengHeadlessGenerationMenu
     console.write("\e[?25l\e[2J\e[H")
     console.flush
     last_selected = nil
+    last_remaining = nil
     volume_up_was_pressed = false
     volume_down_was_pressed = false
 
     loop do
-      if selected != last_selected
-        render(generations, selected)
+      remaining = countdown_active ? [deadline - Time.now.to_i, 0].max : nil
+      needs_redraw = (selected != last_selected) || (remaining != last_remaining)
+
+      if needs_redraw
+        render(generations, selected, remaining: remaining)
         last_selected = selected
+        last_remaining = remaining
       end
 
       volume_up_pressed = pressed?(VOLUME_UP)
       volume_down_pressed = pressed?(VOLUME_DOWN)
 
       if volume_up_pressed && !volume_up_was_pressed
+        countdown_active = false
         selected = (selected - 1) % (generations.length + 1)
       elsif volume_down_pressed && !volume_down_was_pressed
+        countdown_active = false
         selected = (selected + 1) % (generations.length + 1)
       elsif pressed?(CONFIRM)
         wait_for_release(CONFIRM)
         break
-      elsif Time.now.to_i >= deadline
+      elsif countdown_active && Time.now.to_i >= deadline
         break
       end
 
       volume_up_was_pressed = volume_up_pressed
       volume_down_was_pressed = volume_down_pressed
-      sleep(0.1)
+      sleep(0.01)
     end
 
     set_console_echo(true)
@@ -154,7 +165,9 @@ class Tasks::SwitchRoot
   def selected_generation()
     return @selected_generation if @selected_generation
 
-    wants_menu = Hal::Recovery.wants_recovery? || ShengHeadlessGenerationMenu.requested?()
+    explicit_request = Hal::Recovery.wants_recovery? || ShengHeadlessGenerationMenu.requested?()
+    multiple_generations = NixOSGeneration.generations().length > 0
+    wants_menu = explicit_request || multiple_generations
 
     if wants_menu &&
        ShengHeadlessStage1.enabled? &&
@@ -165,10 +178,6 @@ class Tasks::SwitchRoot
       Tasks::Splash.instance.quit("Continuing to recovery menu")
       @selected_generation = choose_generation()
     else
-      if wants_menu
-        $logger.info("Headless stage-1: skipping recovery generation menu.")
-      end
-
       @selected_generation = NixOSGeneration.new(default_selection_path())
       if will_kexec?()
         Tasks::Splash.instance.quit("Rebooting in generation kernel", sticky: true)

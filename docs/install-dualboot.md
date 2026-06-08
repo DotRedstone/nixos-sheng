@@ -77,28 +77,19 @@ fastboot reboot
 
 ## 扩展 rootfs 文件系统
 
-rootfs 镜像中的 ext4 文件系统小于 `linux` 分区。首次启动后先检查：
+rootfs 镜像中的 ext4 文件系统小于 `linux` 分区。匹配的 boot 镜像会在首次挂载
+rootfs 前通过 Mobile NixOS stage-1 自动扩展 ext4 文件系统，因此首次启动可能
+耗时更长。
+
+启动后检查：
 
 ```sh
 lsblk -o NAME,SIZE,FSTYPE,LABEL,PARTLABEL,MOUNTPOINTS
 df -h /
 ```
 
-可以先尝试在线扩容：
-
-```sh
-sudo resize2fs /dev/sda30
-```
-
-如果命令成功，再使用 `df -h /` 确认容量。如果出现下面的错误，不要反复执行：
-
-```text
-reserved block ... not at offset ...
-Invalid argument While trying to add group
-```
-
-当前候选镜像在实机上触发了该 ext4 在线扩容错误。此时进入 TWRP，在 `linux`
-未挂载时执行：
+如果文件系统仍明显小于 `linux` 分区，说明自动扩容未完成。不要在已挂载的根
+文件系统上反复运行 `resize2fs`；请进入 TWRP，在 `linux` 未挂载时执行：
 
 ```sh
 adb shell
