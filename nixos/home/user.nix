@@ -29,6 +29,7 @@
   in with pkgs; [
     sheng-check
     gjs-osk
+    gnome-console
     nautilus
     curl
     evtest
