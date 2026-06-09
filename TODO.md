@@ -24,8 +24,7 @@
 * [x] `nixos-rebuild` 可用
 * [x] `systemctl` 可用
 * [x] flake 与 Home Manager 基础配置已集成
-* [~] Home Manager CLI 已安装，但当前实机尚无 Home Manager generation；待扩容并补
-  `flake.lock` 后完成一次 `home-manager switch --flake ./nixos#luser@sheng`
+* [x] Home Manager 独立环境与 `hms` (standalone switch) 别名已集成，并在云端构建工作流中成功验证，彻底打通系统级与应用级的配置隔离。
 * [x] `systemd-timesyncd` 已启用并实机确认时间同步
 * [~] `linux` 分区约 77.7GiB，但当前 ext4 文件系统约 10GiB；在线扩容失败，
   需要在 TWRP/救援环境中离线执行 `e2fsck` 与 `resize2fs`

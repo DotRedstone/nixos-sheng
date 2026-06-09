@@ -16,8 +16,7 @@ reboots. Stage-1 consumes the request before displaying the menu:
 ```text
 NixOS Sheng - Select stage-2 generation
 
-> NixOS - Default
-  NixOS #2 (2026-06-06 - 26.11pre-git)
+> NixOS #2 (2026-06-06 - 26.11pre-git)
   NixOS #1 (2026-06-06 - 26.11pre-git)
 
 Volume +/-: select    Power: boot

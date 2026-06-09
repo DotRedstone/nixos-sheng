@@ -69,21 +69,33 @@ linux 分区
 |   |-- kernel.yml          # 构建 Mobile NixOS Android boot image
 |   `-- nixos-rootfs.yml    # 构建 Mobile NixOS rootfs image
 |-- nixos/
-|   |-- devices/xiaomi-sheng/
-|   |   |-- default.nix     # Mobile NixOS 设备定义
-|   |   `-- kernel/
-|   |       |-- default.nix # 用于 sheng 内核的 Nix kernel builder
-|   |       `-- config.aarch64
-|   |-- patches/            # 小型 stage-1 bring-up 补丁
-|   |-- flake.nix
-|   |-- configuration.nix
-|   |-- hardware-sheng.nix
-|   |-- mobile-profile.nix
-|   `-- services/
+|   |-- flake.nix           # Flake 入口
+|   |-- configuration.nix   # 系统核心与基础服务配置
+|   |-- hardware/           # 硬件抽象层：包含设备树、内核、ALSA调音、底层引导
+|   |   |-- xiaomi-sheng/   # Mobile NixOS 基础设备定义
+|   |   |-- audio/          # ALSA UCM2 硬件调音文件
+|   |   |-- hardware.nix    # NixOS 硬件特性模块
+|   |   `-- mobile.nix      # Mobile NixOS Stage-1 配置
+|   |-- modules/            # 自定义 NixOS 服务与特性 (MiPPS 认证等)
+|   |-- home/               # 用户级 Home Manager 配置
+|   |-- profiles/           # 上层桌面方案 (GNOME 等)
+|   |-- packages/           # 自定义构建软件包
+|   |-- patches/            # 启动流程 Ruby 补丁
+|   `-- scripts/            # 目标机执行脚本
 |-- scripts/
 |   `-- inspect-bootimg.sh  # 离线的 boot.img/initrd 检查辅助脚本
 `-- build-nixos-rootfs.sh
 ```
+
+## 双轨制包管理 (系统级 vs 应用级)
+
+本项目采用 Nix 社区推崇的“底层固化、上层敏捷”的拆分包管理策略：
+
+1. **底层固化 (`nixos/configuration.nix`)**：
+   系统核心硬件强依赖（音频驱动、传感器驱动、USB/充电服务）被“焊死”在 System Packages 里。更新这类配置需要使用 `nrs` (即 `sudo nixos-rebuild switch ...`)。由于其改动可能影响全局稳定，请保持极其克制。
+2. **应用敏捷 (`nixos/home/user.nix`)**：
+   面向用户的桌面软件（浏览器、终端、文件管理器、虚拟键盘等）完全从系统级抽离，由 Home Manager 独立管理。
+   **您可以在设备上直接拉取仓库并修改 `home/user.nix`，随后执行 `hms` 别名即可实现毫秒级应用刷新，完全无需编译或重构整个系统。**
 
 ## 使用 GitHub Actions 构建
 
@@ -197,15 +209,18 @@ scripts/inspect-bootimg.sh out/mobile-bootimg
 
 该辅助脚本会打印 `/etc/boot/config`、initrd applets 以及关键的启动标志（如 `boot_as_recovery`、`splash.disabled`、rootfs 挂载设置和 USB 特性）。
 
-## 默认登录
+## 动态凭据与默认登录
 
-当前的 bring-up 镜像保留了简单的凭据：
+为了避免将敏感密码硬编码进开源仓库中，我们的 `vars.nix` 会在系统构建期进行**参数动态注入**。
+
+- **云端构建**：在 GitHub Actions 手动触发 `Build NixOS RootFS` 工作流时，您可以**直接输入**自定义的用户名、用户密码和 Root 密码。Actions 运行时会生成携带您专属密码的专属镜像。
+- **本地开发**：您可以直接在本地创建或修改 `nixos/vars.nix`。
+
+如果在 Actions 中留空或未做修改，当前测试镜像将回落到预设体验凭据：
 
 - 用户名：`luser`
 - 密码：`luser`
 - root 密码：`123456`
-
-在发布供一般使用的镜像前请更改这些凭据。
 
 ## 警告
 

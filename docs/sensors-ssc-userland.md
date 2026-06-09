@@ -31,7 +31,7 @@ ADSP / sensor_pd
 
 ## 关键实现点
 
-本仓库通过 `nixos/devices/xiaomi-sheng/sensors/default.nix` 集成传感器用户态链路：
+本仓库通过 `nixos/hardware/xiaomi-sheng/sensors/default.nix` 集成传感器用户态链路：
 
 - 打包 `fastrpc`、`libssc`、`pd-mapper`、`qrtr`、`sheng-sensors-file`
 - 为 `iio-sensor-proxy` 启用 `-Dssc-support=enabled`

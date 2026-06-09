@@ -77,21 +77,33 @@ the NixOS system closure and then runs its `init`.
 |   |-- kernel.yml          # Builds the Mobile NixOS Android boot image
 |   `-- nixos-rootfs.yml    # Builds the Mobile NixOS rootfs image
 |-- nixos/
-|   |-- devices/xiaomi-sheng/
-|   |   |-- default.nix     # Mobile NixOS device definition
-|   |   `-- kernel/
-|   |       |-- default.nix # Nix kernel builder for the sheng kernel
-|   |       `-- config.aarch64
-|   |-- patches/            # Small stage-1 bring-up patches
-|   |-- flake.nix
-|   |-- configuration.nix
-|   |-- hardware-sheng.nix
-|   |-- mobile-profile.nix
-|   `-- services/
+|   |-- flake.nix           # Main Flake entrypoint
+|   |-- configuration.nix   # Core OS and system services configuration
+|   |-- hardware/           # Hardware Abstraction: DTB, kernel, ALSA, boot
+|   |   |-- xiaomi-sheng/   # Mobile NixOS base device definition
+|   |   |-- audio/          # ALSA UCM2 hardware audio tuning
+|   |   |-- hardware.nix    # NixOS hardware module configurations
+|   |   `-- mobile.nix      # Mobile NixOS Stage-1 configurations
+|   |-- modules/            # Custom NixOS modules & services (MiPPS auth etc.)
+|   |-- home/               # User-level Home Manager configurations
+|   |-- profiles/           # High-level desktop profiles (GNOME, etc.)
+|   |-- packages/           # Custom package derivations
+|   |-- patches/            # Boot-flow Ruby patches
+|   `-- scripts/            # Target-side execution scripts
 |-- scripts/
 |   `-- inspect-bootimg.sh  # Offline boot.img/initrd inspection helper
 `-- build-nixos-rootfs.sh
 ```
+
+## Dual-Track Package Management (System vs App Level)
+
+This project adopts the "solid base, agile top" package management strategy highly recommended by the Nix community:
+
+1. **Solid Base (`nixos/configuration.nix`)**:
+   Core hardware dependencies (audio drivers, sensor drivers, USB/charging services) are "hardcoded" into System Packages. Updating these requires using `nrs` (`sudo nixos-rebuild switch ...`). Since changes here can affect global stability, please modify them with extreme caution.
+2. **Agile Apps (`nixos/home/user.nix`)**:
+   User-facing desktop software (browsers, terminals, file managers, virtual keyboards) is completely decoupled from the system level and managed independently by Home Manager.
+   **You can directly modify `home/user.nix` on the device and run the `hms` alias to achieve millisecond-level app refreshes without needing to recompile or rebuild the entire OS.**
 
 ## Build With GitHub Actions
 
@@ -222,15 +234,18 @@ scripts/inspect-bootimg.sh out/mobile-bootimg
 The helper prints `/etc/boot/config`, initrd applets, and key boot flags such as
 `boot_as_recovery`, `splash.disabled`, rootfs mount settings, and USB features.
 
-## Default Login
+## Dynamic Credentials & Default Login
 
-The bring-up image currently keeps simple credentials:
+To avoid hardcoding sensitive passwords into the open-source repository, our `vars.nix` uses **dynamic parameter injection** during system build time.
+
+- **Cloud Build**: When manually triggering the `Build NixOS RootFS` workflow in GitHub Actions, you can **directly input** a custom username, user password, and Root password. The Actions runner will generate an exclusive image containing your specific credentials.
+- **Local Development**: You can directly create or modify `nixos/vars.nix` locally.
+
+If left blank or unmodified in Actions, the test image will fall back to the preset credentials:
 
 - user: `luser`
 - password: `luser`
 - root password: `123456`
-
-Change these before publishing images for general use.
 
 ## Warning
 
