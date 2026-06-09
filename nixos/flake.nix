@@ -76,6 +76,12 @@
           })
           ./configuration.nix
           homeManagerModule
+          home-manager.nixosModules.home-manager
+          ({ ... }: {
+            home-manager.useGlobalPkgs = true;
+            home-manager.useUserPackages = true;
+            home-manager.users.luser = import ./home/luser.nix;
+          })
         ] ++ extraModules ++ [
           ./mobile-profile.nix
         ];
@@ -92,13 +98,6 @@
       nixosConfigurations = {
         sheng = mobileGnomeEval;
         sheng-minimal = mobileEval;
-      };
-
-      homeConfigurations."luser@sheng" = home-manager.lib.homeManagerConfiguration {
-        inherit pkgs;
-        modules = [
-          ./home/luser.nix
-        ];
       };
 
       packages.${system} = {
