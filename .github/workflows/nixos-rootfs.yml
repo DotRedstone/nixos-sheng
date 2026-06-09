@@ -22,6 +22,18 @@ on:
         description: "Skip GitHub release"
         type: boolean
         default: true
+      username:
+        description: "Default non-root username"
+        required: false
+        default: "luser"
+      user_password:
+        description: "Password for the non-root user"
+        required: false
+        default: "1"
+      root_password:
+        description: "Password for the root user"
+        required: false
+        default: "123456"
 
 jobs:
   build:
@@ -44,6 +56,16 @@ jobs:
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
+
+      - name: Inject dynamic credentials
+        run: |
+          cat <<EOF > nixos/vars.nix
+          {
+            username = "${{ github.event.inputs.username || 'luser' }}";
+            userPassword = "${{ github.event.inputs.user_password || '1' }}";
+            rootPassword = "${{ github.event.inputs.root_password || '123456' }}";
+          }
+          EOF
 
       - name: Validate installed stage-2 configuration
         run: |

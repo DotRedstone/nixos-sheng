@@ -1,14 +1,14 @@
 # ---
-# Module: Luser Profile
-# Description: Home Manager configuration for the luser user
+# Module: User Profile
+# Description: Home Manager configuration for the dynamic user
 # Scope: Home Manager
 # ---
 
-{ pkgs, ... }:
+{ pkgs, vars, ... }:
 
 {
-  home.username = "luser";
-  home.homeDirectory = "/home/luser";
+  home.username = vars.username;
+  home.homeDirectory = "/home/${vars.username}";
   home.stateVersion = "25.11";
 
   programs.home-manager.enable = true;
@@ -16,7 +16,7 @@
   programs.bash = {
     enable = true;
     shellAliases = {
-      nrs = "sudo nixos-rebuild switch --flake /home/luser/nixos-xiaomi-sheng/nixos#sheng";
+      nrs = "sudo nixos-rebuild switch --flake /home/${vars.username}/nixos-xiaomi-sheng/nixos#sheng";
     };
   };
 

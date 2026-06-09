@@ -73,10 +73,13 @@
           home-manager.packages.${system}.default
         ];
       };
-      mobileEvalFor = extraModules: import "${mobile-nixos}/lib/eval-with-configuration.nix" {
+      mobileEvalFor = extraModules:
+        let vars = import ./vars.nix; in
+        import "${mobile-nixos}/lib/eval-with-configuration.nix" {
         inherit pkgs;
         device = ./devices/xiaomi-sheng;
         configuration = [
+          { _module.args.vars = vars; }
           ({ lib, ... }: {
             nixpkgs.overlays = lib.mkAfter [ shengOverlay ];
           })
@@ -86,7 +89,8 @@
           ({ ... }: {
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
-            home-manager.users.luser = import ./home/luser.nix;
+            home-manager.extraSpecialArgs = { inherit vars; };
+            home-manager.users.${vars.username} = import ./home/user.nix;
           })
         ] ++ extraModules ++ [
           ./mobile-profile.nix

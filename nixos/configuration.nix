@@ -4,7 +4,7 @@
 # Scope: System
 # ---
 
-{ config, lib, pkgs, modulesPath, ... }:
+{ config, pkgs, vars, ... }:
 
 {
   imports = [
@@ -43,10 +43,10 @@
   i18n.defaultLocale = "en_US.UTF-8";
 
   # Bring-up only: replace or remove this once stage-2 access is stable.
-  users.users.root.initialPassword = "123456";
-  users.users.luser = {
+  users.users.root.initialPassword = vars.rootPassword;
+  users.users.${vars.username} = {
     isNormalUser = true;
-    initialPassword = "luser";
+    initialPassword = vars.userPassword;
     extraGroups = [ "wheel" "networkmanager" "audio" "video" "input" "render" ];
   };
 
