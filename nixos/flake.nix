@@ -1,3 +1,9 @@
+# ---
+# Module: Flake Entry
+# Description: Main entry point for NixOS system and Home Manager
+# Scope: Flake
+# ---
+
 {
   description = "Mobile NixOS rootfs for Xiaomi Pad 6S Pro (sheng)";
 

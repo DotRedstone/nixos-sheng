@@ -92,6 +92,33 @@ cleanup(kernel): 降低 UCSI 调试日志噪音
 * 不要提交 secret、token、cookie、session、个人账号信息、API key、原始敏感日志。
 * 如果需要引用日志，只保留必要片段，并删除序列号、账号、密钥、网络凭据等敏感信息。
 
+## Nix Module Header Format
+
+All `.nix` modules should start with:
+
+```nix
+# ---
+# Module: <Human-readable module name>
+# Description: <one sentence responsibility>
+# Scope: <System | Home Manager | Host | Theme | Script | Flake>
+# ---
+```
+
+Optional:
+
+```nix
+# Notes:
+# - <maintenance warning>
+# - <do not modify X here>
+```
+
+Rules:
+
+* `Description` must describe a single responsibility.
+* Avoid vague descriptions like “configuration”.
+* `default.nix` files should use `Entry` or `Switchboard` in the `Module` field.
+* High-risk modules should include `Notes`.
+
 ## flake.lock 规则
 
 不要无理由更新 `flake.lock`。

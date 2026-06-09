@@ -1,3 +1,9 @@
+# ---
+# Module: QRTR Sensor
+# Description: QRTR routing configuration
+# Scope: Host
+# ---
+
 { lib, stdenv, fetchurl, meson, ninja, pkg-config }:
 
 stdenv.mkDerivation rec {

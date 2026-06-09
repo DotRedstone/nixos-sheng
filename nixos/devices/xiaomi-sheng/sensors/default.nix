@@ -1,3 +1,9 @@
+# ---
+# Module: Sensors Entry
+# Description: Entry point for sensor services and hacks
+# Scope: Host
+# ---
+
 { config, lib, pkgs, ... }:
 
 let

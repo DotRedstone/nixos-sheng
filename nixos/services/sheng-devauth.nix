@@ -1,3 +1,9 @@
+# ---
+# Module: Sheng DevAuth Service
+# Description: Systemd service for devauth
+# Scope: Service
+# ---
+
 { config, lib, pkgs, ... }:
 
 let

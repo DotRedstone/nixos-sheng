@@ -1,3 +1,9 @@
+# ---
+# Module: Mobile NixOS Base
+# Description: Mobile NixOS specific hacks and stage-1 settings
+# Scope: System
+# ---
+
 { config, lib, pkgs, ... }:
 
 let

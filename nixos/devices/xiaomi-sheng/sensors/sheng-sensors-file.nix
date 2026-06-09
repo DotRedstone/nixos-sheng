@@ -1,3 +1,9 @@
+# ---
+# Module: Sensors File
+# Description: Sensors file definition
+# Scope: Host
+# ---
+
 { lib, stdenv, fetchFromGitHub }:
 
 stdenv.mkDerivation rec {

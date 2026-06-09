@@ -1,3 +1,9 @@
+# ---
+# Module: Device Entry (Sheng)
+# Description: Device specific hardware configuration
+# Scope: Host
+# ---
+
 { config, lib, pkgs, ... }:
 
 let

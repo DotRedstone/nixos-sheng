@@ -1,3 +1,9 @@
+# ---
+# Module: GJS OSK Package
+# Description: GNOME JavaScript On-Screen Keyboard package
+# Scope: Package
+# ---
+
 { fetchurl
 , glib
 , lib

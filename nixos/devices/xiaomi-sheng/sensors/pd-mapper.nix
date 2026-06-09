@@ -1,3 +1,9 @@
+# ---
+# Module: PD Mapper Sensor
+# Description: Power Delivery mapper configuration
+# Scope: Host
+# ---
+
 { lib, stdenv, fetchurl, pkg-config, qrtr, xz }:
 
 stdenv.mkDerivation rec {

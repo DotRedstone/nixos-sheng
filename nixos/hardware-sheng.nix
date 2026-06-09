@@ -1,3 +1,9 @@
+# ---
+# Module: Hardware Profile (Sheng)
+# Description: Board-specific hardware details and firmware loading
+# Scope: Host
+# ---
+
 { config, lib, pkgs, ... }:
 
 {

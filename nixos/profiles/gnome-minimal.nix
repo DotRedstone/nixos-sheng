@@ -1,3 +1,9 @@
+# ---
+# Module: GNOME Minimal Profile
+# Description: Minimal GNOME desktop environment configuration
+# Scope: System
+# ---
+
 { lib, pkgs, ... }:
 
 let

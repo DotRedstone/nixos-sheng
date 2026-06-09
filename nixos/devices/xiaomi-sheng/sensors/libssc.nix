@@ -1,3 +1,9 @@
+# ---
+# Module: LibSSC Sensor
+# Description: LibSSC configuration
+# Scope: Host
+# ---
+
 { lib, stdenv, meson, ninja, pkg-config, glib, protobufc, protobuf, libqmi, libmbim }:
 
 stdenv.mkDerivation {

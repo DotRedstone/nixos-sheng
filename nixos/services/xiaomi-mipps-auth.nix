@@ -1,3 +1,9 @@
+# ---
+# Module: Xiaomi MIPPS Auth Service
+# Description: Systemd service for Xiaomi MIPPS authentication
+# Scope: Service
+# ---
+
 { config, lib, pkgs, ... }:
 
 let

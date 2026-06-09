@@ -1,3 +1,9 @@
+# ---
+# Module: FastRPC Sensor
+# Description: FastRPC configuration
+# Scope: Host
+# ---
+
 { lib, stdenv, fetchFromGitHub, autoreconfHook, pkg-config, libyaml, makeWrapper }:
 
 stdenv.mkDerivation rec {

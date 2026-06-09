@@ -1,3 +1,9 @@
+# ---
+# Module: DevAuth Sensor
+# Description: Devauth sensor configuration
+# Scope: Host
+# ---
+
 { stdenv
 , lib
 , fetchurl

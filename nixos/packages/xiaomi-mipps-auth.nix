@@ -1,3 +1,9 @@
+# ---
+# Module: Xiaomi MIPPS Auth Package
+# Description: Xiaomi specific authentication package
+# Scope: Package
+# ---
+
 {
   fetchurl,
   lib,

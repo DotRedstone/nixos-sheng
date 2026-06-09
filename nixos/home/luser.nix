@@ -1,3 +1,9 @@
+# ---
+# Module: Luser Profile
+# Description: Home Manager configuration for the luser user
+# Scope: Home Manager
+# ---
+
 { pkgs, ... }:
 
 {

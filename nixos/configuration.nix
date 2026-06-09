@@ -1,3 +1,9 @@
+# ---
+# Module: System Configuration
+# Description: Overall system configuration for the device
+# Scope: System
+# ---
+
 { config, lib, pkgs, modulesPath, ... }:
 
 {

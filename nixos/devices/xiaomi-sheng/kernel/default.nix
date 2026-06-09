@@ -1,3 +1,9 @@
+# ---
+# Module: Kernel Config (Sheng)
+# Description: Custom kernel and patches for xiaomi-sheng
+# Scope: Host
+# ---
+
 { mobile-nixos
 , shengKernelSrc
 , buildPackages
