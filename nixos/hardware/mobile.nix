@@ -8,12 +8,12 @@
 
 let
   headlessStage1Task = pkgs.writeTextDir "zz-sheng-headless-stage1.rb" (
-    (builtins.readFile ./patches/stage-1-headless-no-gui.rb)
+    (builtins.readFile ../patches/stage-1-headless-no-gui.rb)
     + "\n"
-    + (builtins.readFile ./patches/stage-1-headless-generation-menu.rb)
+    + (builtins.readFile ../patches/stage-1-headless-generation-menu.rb)
   );
   udevTolerantTask = pkgs.writeTextDir "zz-sheng-udev-tolerant.rb" (
-    builtins.readFile ./patches/stage-1-udev-trigger-tolerant.rb
+    builtins.readFile ../patches/stage-1-udev-trigger-tolerant.rb
   );
   stage1Firmware = pkgs.runCommand "sheng-stage1-firmware" { } ''
     mkdir -p $out/lib/firmware
