@@ -7,6 +7,14 @@
 
   programs.home-manager.enable = true;
 
+  programs.bash = {
+    enable = true;
+    shellAliases = {
+      nrs = "sudo nixos-rebuild switch --flake /home/luser/nixos-xiaomi-sheng/nixos#sheng";
+      hms = "home-manager switch --flake /home/luser/nixos-xiaomi-sheng/nixos#luser@sheng";
+    };
+  };
+
   home.packages = let
     sheng-check = pkgs.writeShellScriptBin "sheng-check" (builtins.readFile ../scripts/sheng-check.sh);
   in with pkgs; [
