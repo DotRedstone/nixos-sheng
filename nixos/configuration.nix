@@ -4,7 +4,7 @@
 # Scope: System
 # ---
 
-{ config, pkgs, vars, ... }:
+{ config, pkgs, lib, vars, ... }:
 
 {
   imports = [
