@@ -76,7 +76,7 @@ module ShengHeadlessGenerationMenu
   end
 
   def render(generations, selected, remaining: nil)
-    labels = ["NixOS - Default"] + generations.map { |generation| generation.label() }
+    labels = generations.empty? ? ["NixOS - Default"] : generations.map { |generation| generation.label() }
 
     console.write("\e[H")
     console.write("\e[2K\n")
@@ -131,10 +131,12 @@ module ShengHeadlessGenerationMenu
 
       if volume_up_pressed && !volume_up_was_pressed
         countdown_active = false
-        selected = (selected - 1) % (generations.length + 1)
+        menu_length = generations.empty? ? 1 : generations.length
+        selected = (selected - 1) % menu_length
       elsif volume_down_pressed && !volume_down_was_pressed
         countdown_active = false
-        selected = (selected + 1) % (generations.length + 1)
+        menu_length = generations.empty? ? 1 : generations.length
+        selected = (selected + 1) % menu_length
       elsif pressed?(CONFIRM)
         wait_for_release(CONFIRM)
         break
@@ -153,10 +155,10 @@ module ShengHeadlessGenerationMenu
     console.write("\e[?25h\nBooting selected generation...\n")
     console.flush
 
-    if selected == 0
+    if generations.empty?
       Tasks::SwitchRoot::NixOSGeneration.new(switch_root.default_selection_path())
     else
-      generations[selected - 1]
+      generations[selected]
     end
   end
 end
