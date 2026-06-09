@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+
+# ---
+# Module: Sheng Hardware Check
+# Description: Diagnostic script to check hardware status on sheng
+# Scope: Script
+# ---
 # sheng-check — Xiaomi Pad 6S Pro (sheng) hardware diagnostic script
 set -uo pipefail
 

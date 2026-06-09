@@ -1,3 +1,9 @@
+# ---
+# Module: Headless Generation Menu
+# Description: Mobile NixOS stage-1 headless boot menu implementation
+# Scope: Patch
+# ---
+
 module ShengHeadlessGenerationMenu
   extend self
 

@@ -1,3 +1,9 @@
+# ---
+# Module: Udev Trigger Tolerant
+# Description: Mobile NixOS stage-1 udev rules patch
+# Scope: Patch
+# ---
+
 # Relax udevadm trigger error handling for Qualcomm platforms.
 #
 # Qualcomm qcom_battmgr power_supply synthetic uevent can return -EAGAIN

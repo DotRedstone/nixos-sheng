@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+
+# ---
+# Module: Inspect Boot Image
+# Description: Diagnostic script to unpack and inspect Android boot images
+# Scope: Script
+# ---
 set -euo pipefail
 
 usage() {

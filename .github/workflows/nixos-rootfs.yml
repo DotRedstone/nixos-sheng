@@ -1,3 +1,9 @@
+# ---
+# Module: RootFS Build Workflow
+# Description: GitHub Actions workflow to build the NixOS root filesystem
+# Scope: CI
+# ---
+
 name: Build NixOS RootFS
 
 env:

@@ -1,3 +1,9 @@
+# ---
+# Module: Release Workflow
+# Description: GitHub Actions workflow to publish a GitHub release
+# Scope: CI
+# ---
+
 name: Publish Release
 
 on:

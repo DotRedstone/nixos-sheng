@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+
+# ---
+# Module: Build RootFS Script
+# Description: Wrapper script to build NixOS root filesystem
+# Scope: Script
+# ---
 set -euo pipefail
 
 IMAGE_SIZE="${IMAGE_SIZE:-auto}"

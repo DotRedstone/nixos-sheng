@@ -1,3 +1,9 @@
+# ---
+# Module: Headless No GUI
+# Description: Mobile NixOS stage-1 patch to disable GUI
+# Scope: Patch
+# ---
+
 module ShengHeadlessStage1
   def self.enabled?()
     (Configuration["gui"] && Configuration["gui"]["enable"] == false) ||

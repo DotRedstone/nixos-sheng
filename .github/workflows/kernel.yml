@@ -1,3 +1,9 @@
+# ---
+# Module: Kernel Build Workflow
+# Description: GitHub Actions workflow to build the Linux kernel
+# Scope: CI
+# ---
+
 name: Build Sheng Kernel
 
 env:
