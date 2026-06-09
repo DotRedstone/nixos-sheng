@@ -8,9 +8,9 @@
 
 {
   imports = [
-    ./hardware-sheng.nix
-    ./services/sheng-devauth.nix
-    ./services/xiaomi-mipps-auth.nix
+    ./hardware/hardware.nix
+    ./modules/sheng-devauth.nix
+    ./modules/xiaomi-mipps-auth.nix
   ];
 
   nixpkgs.hostPlatform = "aarch64-linux";
@@ -101,9 +101,9 @@
       systemctl reboot
     '';
     sheng-alsa-ucm = pkgs.runCommand "sheng-alsa-ucm" { } ''
-      install -Dm0644 ${./audio/ucm2/conf.d/sm8550/Xiaomi-Pad6SPro.conf} \
+      install -Dm0644 ${./hardware/audio/ucm2/conf.d/sm8550/Xiaomi-Pad6SPro.conf} \
         $out/share/alsa/ucm2/conf.d/sm8550/Xiaomi-Pad6SPro.conf
-      install -Dm0644 ${./audio/ucm2/Xiaomi/sheng/HiFi.conf} \
+      install -Dm0644 ${./hardware/audio/ucm2/Xiaomi/sheng/HiFi.conf} \
         $out/share/alsa/ucm2/Xiaomi/sheng/HiFi.conf
     '';
   in with pkgs; [

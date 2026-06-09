@@ -77,7 +77,7 @@
         let vars = import ./vars.nix; in
         import "${mobile-nixos}/lib/eval-with-configuration.nix" {
         inherit pkgs;
-        device = ./devices/xiaomi-sheng;
+        device = ./hardware/xiaomi-sheng;
         configuration = [
           { _module.args.vars = vars; }
           ({ lib, ... }: {
@@ -93,7 +93,7 @@
             home-manager.users.${vars.username} = import ./home/user.nix;
           })
         ] ++ extraModules ++ [
-          ./mobile-profile.nix
+          ./hardware/mobile.nix
         ];
       };
       mobileEval = mobileEvalFor [ ];
