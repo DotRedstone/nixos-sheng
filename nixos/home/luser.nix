@@ -27,7 +27,6 @@
     nano
     pciutils
     usbutils
-    v4l-utils
     vim
     wget
   ];

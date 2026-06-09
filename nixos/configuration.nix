@@ -162,4 +162,7 @@
   boot.initrd.verbose = true;
 
   boot.supportedFilesystems = [ "ext4" ];
+
+  # Disable default xterm
+  services.xserver.desktopManager.xterm.enable = false;
 }
