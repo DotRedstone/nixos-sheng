@@ -162,9 +162,4 @@ in
     };
   };
 
-  environment.systemPackages = with pkgs; [
-    gjs-osk
-    gnome-console
-    nautilus
-  ];
 }

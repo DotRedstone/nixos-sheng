@@ -17,6 +17,7 @@
     enable = true;
     shellAliases = {
       nrs = "sudo nixos-rebuild switch --flake /home/${vars.username}/nixos-xiaomi-sheng/nixos#sheng";
+      hms = "home-manager switch --flake /home/${vars.username}/nixos-xiaomi-sheng/nixos#${vars.username}@sheng";
     };
   };
 
@@ -24,6 +25,9 @@
     sheng-check = pkgs.writeShellScriptBin "sheng-check" (builtins.readFile ../scripts/sheng-check.sh);
   in with pkgs; [
     sheng-check
+    gjs-osk
+    gnome-console
+    nautilus
     curl
     evtest
     gitMinimal

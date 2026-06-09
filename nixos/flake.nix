@@ -110,6 +110,14 @@
         sheng-minimal = mobileEval;
       };
 
+      homeConfigurations = let vars = import ./vars.nix; in {
+        "${vars.username}@sheng" = home-manager.lib.homeManagerConfiguration {
+          inherit pkgs;
+          extraSpecialArgs = { inherit vars; };
+          modules = [ ./home/user.nix ];
+        };
+      };
+
       packages.${system} = {
         mobileAndroidBootimg = mobileEval.outputs.android.android-bootimg;
         mobileFastbootImages = mobileEval.outputs.android.android-fastboot-images;
