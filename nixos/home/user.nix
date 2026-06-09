@@ -4,12 +4,15 @@
 # Scope: Home Manager
 # ---
 
-{ pkgs, vars, ... }:
+{ pkgs, lib, vars, ... }:
 
 {
   home.username = vars.username;
   home.homeDirectory = "/home/${vars.username}";
-  home.stateVersion = "25.11";
+  home.stateVersion = "25.05";
+
+  # Workaround for Home Manager unstable zipAttrsWith conflict on fontconfig
+  fonts.fontconfig.enable = lib.mkForce false;
 
   programs.home-manager.enable = true;
 
@@ -26,7 +29,6 @@
   in with pkgs; [
     sheng-check
     gjs-osk
-    gnome-console
     nautilus
     curl
     evtest

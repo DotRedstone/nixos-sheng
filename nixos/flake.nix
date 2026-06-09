@@ -64,9 +64,11 @@
               '';
             });
         };
+        gjs-osk = final.callPackage ./packages/gjs-osk.nix { };
       };
       pkgs = import nixpkgs {
         inherit system;
+        overlays = [ shengOverlay ];
       };
       homeManagerModule = {
         environment.systemPackages = [

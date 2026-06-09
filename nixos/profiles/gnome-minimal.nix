@@ -7,7 +7,6 @@
 { lib, pkgs, ... }:
 
 let
-  gjs-osk = pkgs.callPackage ../packages/gjs-osk.nix { };
   powerKeyDisplayToggle = pkgs.writeShellScript "sheng-power-key-display-toggle" ''
     set -u
 
