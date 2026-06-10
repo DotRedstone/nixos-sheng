@@ -17,7 +17,7 @@ let
         local state
         state=$(${pkgs.systemd}/bin/loginctl show-session "$session" -p Active --value 2>/dev/null || true)
         if [ "$state" = "yes" ]; then
-          ${pkgs.systemd}/bin/loginctl show-session "$session" -p UID --value 2>/dev/null || true
+          ${pkgs.systemd}/bin/loginctl show-session "$session" -p User --value 2>/dev/null || true
           return
         fi
       done
