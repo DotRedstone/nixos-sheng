@@ -176,18 +176,26 @@ in
                     file=sys.stderr)
               sys.exit(1)
 
-          # 立即设置 SW_TABLET_MODE=1 — 必须在 libinput 扫描前完成
-          ui.write(ecodes.EV_SW, ecodes.SW_TABLET_MODE, 1)
-          ui.syn()
-          print("fake-tablet-mode: SW_TABLET_MODE=1 active",
-                file=sys.stderr)
-
           def shutdown(sig, frame):
               print("fake-tablet-mode: shutting down", file=sys.stderr)
               ui.close()
               sys.exit(0)
           signal.signal(signal.SIGTERM, shutdown)
           signal.signal(signal.SIGINT, shutdown)
+
+          # 初始化为笔记本模式 (0)，供 Mutter 之后检测到状态变化
+          ui.write(ecodes.EV_SW, ecodes.SW_TABLET_MODE, 0)
+          ui.syn()
+          print("fake-tablet-mode: initialized SW_TABLET_MODE=0", file=sys.stderr)
+
+          # 延迟 20 秒，等待 GDM / GNOME Shell 启动并加载完成
+          print("fake-tablet-mode: waiting 20s for GNOME Shell to initialize...", file=sys.stderr)
+          time.sleep(20)
+
+          # 切换为平板模式 (1) 触发 GNOME 旋转逻辑
+          ui.write(ecodes.EV_SW, ecodes.SW_TABLET_MODE, 1)
+          ui.syn()
+          print("fake-tablet-mode: toggled SW_TABLET_MODE=1", file=sys.stderr)
 
           while True:
               time.sleep(86400)
@@ -208,11 +216,4 @@ in
     };
   };
 
-  # 9. Mark gpio-keys lid switch as unreliable in libinput
-  # This prevents GNOME/Mutter from thinking the lid is closed and disabling auto-rotation.
-  environment.etc."libinput/local-overrides.quirks".text = ''
-    [sheng-gpio-keys-lid]
-    MatchName=gpio-keys
-    AttrLidSwitchReliability=unreliable
-  '';
 }
