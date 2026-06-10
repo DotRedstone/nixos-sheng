@@ -137,6 +137,7 @@
   services.udev.extraRules = ''
     ENV{ID_INPUT_TOUCHSCREEN}=="1", ENV{LIBINPUT_CALIBRATION_MATRIX}="1 0 0 0 1 0 0 0 1", ENV{ID_INPUT_TOUCHSCREEN_INTEGRATION}="internal"
     SUBSYSTEM=="block", ENV{DEVTYPE}=="partition", ENV{ID_PATH}=="platform-1d84000.ufshc-scsi-*", ENV{UDISKS_IGNORE}="1"
+    ATTRS{name}=="gpio-keys", ENV{ID_INPUT_SWITCH}=""
   '';
 
   security.rtkit.enable = true;
