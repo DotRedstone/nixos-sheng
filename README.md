@@ -20,13 +20,15 @@ This is an early bring-up project.
 | Kernel | Sheng mainline kernel | Built from `map220v/sm8550-mainline` through Nix |
 | Boot image | Bring-up | Mobile NixOS Android boot image for `boot_b` |
 | RootFS | Mobile NixOS generated rootfs | ext4 image labeled `linux` |
-| Display/desktop | Partially working | 3048x2032 panel and minimal GNOME work; refresh rate, Night Light, and four-way rotation need validation |
+| Display/desktop | Working | 3048x2032 panel, GNOME shell, gjs-osk onscreen keyboard, and physical power key toggle work; rotation needs validation |
 | Debug access | Bring-up | Stage-1/stage-2 ADB is enabled through Mobile NixOS |
-| Wi-Fi | Working | 2.4 GHz and 5 GHz scanning, connection, and networking verified; refresh the full NetworkManager scan before first 5 GHz activation; 6 GHz untested |
+| Wi-Fi | Working | 2.4 GHz and 5 GHz scanning, connection, and networking verified; **A soft reboot is required after the first cold boot for 5GHz to work reliably.** |
 | Bluetooth | Partially working | hci0 and bluetooth.service work; discovery, pairing, reconnect, and audio need validation |
 | Audio | Partially working | ALSA card and playback/capture PCM devices enumerate; playback and recording need validation |
 | Cameras | Partially working | front/rear RAW10 frames captured; libcamera, auto exposure, and desktop camera app need integration |
 | Sensors | User-space working | accelerometer, proximity, ambient light, and compass work through SSC + iio-sensor-proxy D-Bus |
+| Fingerprint | Unsupported | Hardware uses proprietary Qualcomm TEE/TrustZone encryption; no open-source Linux solution exists |
+| Charging | Working | Standard PD and Xiaomi 120W MiPPS private fast charging are supported |
 
 ## Upstream Projects
 
@@ -37,6 +39,8 @@ This is an early bring-up project.
   provides the complete proprietary firmware, ADSP sensor communication configs, and registry.
 - [map220v/sm8550-mainline](https://github.com/map220v/sm8550-mainline)
   provides the Xiaomi Pad 6S Pro mainline kernel work.
+- [ianchb/xiaomi-mipps-auth](https://github.com/ianchb/xiaomi-mipps-auth)
+  provides the userspace authentication daemon for the Xiaomi 120W private fast charging protocol.
 
 The kernel source is configured in `nixos/flake.nix`:
 
@@ -181,6 +185,8 @@ fastboot flash linux out/mobile-rootfs/rootfs.img
 If stage-1 code or the Android boot configuration changed, rebuild and flash
 `boot_b`. If only the NixOS userspace/rootfs changed, rebuild and flash
 `linux`.
+
+**Important**: After flashing a fresh image and completing the first cold boot from fastboot, hardware initialization race conditions (such as the ADSP modem loading before the Wi-Fi driver) may cause features like 5GHz Wi-Fi to fail. **You must perform a soft reboot (`systemctl reboot`) once after the initial flash to resolve these quirks and ensure all drivers initialize reliably.**
 
 Do not flash `userdata`. Firmware, packages, systemd units, users, and other
 rootfs content live in the `linux` partition; flashing only `boot_b` does not

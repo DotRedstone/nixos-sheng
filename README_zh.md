@@ -16,13 +16,15 @@ Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的实验性 Mobile NixOS 移�
 | 内核 | Sheng mainline kernel | 通过 Nix 从 `map220v/sm8550-mainline` 构建 |
 | 启动镜像 | Bring-up | 面向 `boot_b` 的 Mobile NixOS Android boot image |
 | RootFS | Mobile NixOS 生成的 rootfs | 面向 `linux` 分区的 ext4 镜像 |
-| 显示/桌面 | 部分可用 | 3048x2032 面板与精简 GNOME 可用；刷新率、Night Light、四向旋转仍待验证 |
+| 显示/桌面 | 可用 | 3048x2032 面板与 GNOME shell 可用，gjs-osk 屏幕键盘与物理电源键息屏唤醒已修复；四向旋转仍待验证 |
 | 调试访问 | Bring-up | Stage-1/stage-2 的 ADB 已通过 Mobile NixOS 启用 |
-| Wi-Fi | 可用 | 2.4GHz 与 5GHz 扫描、连接和联网已验证；首次连接 5GHz 前可能需要刷新 NetworkManager 完整扫描；6GHz 未验证 |
+| Wi-Fi | 可用 | 2.4GHz 与 5GHz 扫描、连接和联网已验证；**首次冷启动刷入后，必须软重启一次才能稳定激活 5GHz。** |
 | 蓝牙 | 部分可用 | hci0 与 bluetooth.service 正常；扫描、配对、重连和音频待验证 |
 | 音频 | 部分可用 | ALSA 声卡与播放/录音 PCM 已枚举；实际播放和录音待验证 |
 | 相机 | 部分可用 | 前后摄 RAW10 实际画面已抓取；libcamera、自动曝光与桌面相机应用待完善 |
 | 传感器 | 用户态可用 | 加速度计、距离传感器、光感、指南针已通过 SSC + iio-sensor-proxy D-Bus 路径验证 |
+| 指纹 | 不支持 | 硬件采用高通 TEE/TrustZone 专有加密，主线 Linux 无开源解密方案 |
+| 充电 | 可用 | 支持标准 PD 与小米 120W MiPPS 私有快充协议 |
 
 ## 上游项目
 
@@ -32,6 +34,8 @@ Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的实验性 Mobile NixOS 移�
   提供完整的闭源固件、ADSP 传感器通信配置与注册表。
 - [map220v/sm8550-mainline](https://github.com/map220v/sm8550-mainline)
   提供 Xiaomi Pad 6S Pro 的主线内核支持。
+- [ianchb/xiaomi-mipps-auth](https://github.com/ianchb/xiaomi-mipps-auth)
+  提供小米 120W 私有快充协议的用户态认证守护进程。
 
 内核源码在 `nixos/flake.nix` 中配置：
 
@@ -167,6 +171,8 @@ fastboot flash linux out/mobile-rootfs/rootfs.img
 ```
 
 如果 stage-1 代码或 Android 启动配置发生了变化，请重新构建并刷入 `boot_b`。如果只有 NixOS userspace/rootfs 发生了变化，请重新构建并刷入 `linux`。
+
+**重要提醒**：在刷入全新的系统镜像并通过 fastboot 首次冷启动后，可能会遭遇硬件初始化时序的竞争问题（例如 ADSP 调制解调器在 Wi-Fi 驱动之后才加载完毕），导致 5GHz Wi-Fi 等功能失效。**在首次刷机开机后，您必须执行一次软重启 (`systemctl reboot`) 来解决这些初始化怪癖，以确保所有驱动程序都能稳定加载。**
 
 不要刷入 `userdata`。固件、软件包、systemd 单元、用户和其他 rootfs 内容都位于 `linux` 分区；仅刷入 `boot_b` 并不会更新 `/lib/firmware`。
 
