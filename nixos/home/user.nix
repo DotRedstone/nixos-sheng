@@ -24,6 +24,13 @@
     };
   };
 
+  dconf.settings = {
+    "org/gnome/desktop/default-applications/terminal" = {
+      exec = "kgx";
+      exec-arg = "-e";
+    };
+  };
+
   home.packages = let
     sheng-check = pkgs.writeShellScriptBin "sheng-check" (builtins.readFile ../scripts/sheng-check.sh);
   in with pkgs; [

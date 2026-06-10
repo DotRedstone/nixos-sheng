@@ -67,6 +67,8 @@ let
 in
 {
   services.xserver.enable = true;
+  services.xserver.desktopManager.xterm.enable = false;
+  services.xserver.excludePackages = [ pkgs.xterm ];
   services.displayManager.gdm.enable = true;
   services.desktopManager.gnome.enable = true;
   services.desktopManager.gnome.sessionPath = [
