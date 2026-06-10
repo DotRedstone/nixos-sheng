@@ -6,7 +6,9 @@ Read the known issues before flashing.
 ## Working
 
 - Boot to the minimal GNOME desktop
-- Display, touchscreen, physical power and volume keys
+- Display, touchscreen, physical volume keys
+- **Physical power key** (properly toggles screen on/off via GNOME/logind)
+- **On-screen keyboard** (`gjs-osk`) enabled for touch input
 - 2.4 GHz and 5 GHz Wi-Fi
 - Bluetooth controller enumeration
 - USB-C role and Type-C enumeration
@@ -16,16 +18,14 @@ Read the known issues before flashing.
 
 ## Known issues
 
+- **Fingerprint sensor**: Unsupported (requires proprietary Qualcomm TEE/TrustZone decryption which is unavailable in mainline Linux).
+- **5GHz Wi-Fi on Cold Boot**: After a fresh `fastboot` flash (cold boot), 5GHz Wi-Fi networks may not appear due to a modem/firmware initialization race condition. A warm `reboot` resolves this.
 - Sensors use SSC plus D-Bus; kernel `/sys/bus/iio/devices/iio:device*` nodes
   are not available.
-- 6 GHz Wi-Fi is untested. A full NetworkManager rescan may be needed before
-  the first 5 GHz activation.
 - Audio playback/recording, Bluetooth pairing/audio, four-way rotation, and
   desktop camera integration still need broader validation.
 - Kernel, DTS, stage-1 initrd, and boot-command-line changes still require a
   separately built and flashed `boot_b` image.
-- This bring-up image uses the documented test credentials. Change them after
-  first boot before using the tablet on an untrusted network.
 
 ## Flashing
 
