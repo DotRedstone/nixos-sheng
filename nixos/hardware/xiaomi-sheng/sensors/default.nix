@@ -127,7 +127,7 @@ in
 
   # 6. Expose SSC-backed sensors to iio-sensor-proxy.
   services.udev.extraRules = ''
-    SUBSYSTEM=="misc", KERNEL=="fastrpc-adsp*", ENV{IIO_SENSOR_PROXY_TYPE}+="ssc-accel ssc-proximity ssc-light ssc-compass", ENV{ACCEL_MOUNT_MATRIX}+="0, 1, 0; -1, 0, 0; 0, 0, -1", TAG+="systemd", ENV{SYSTEMD_WANTS}+="iio-sensor-proxy.service"
+    SUBSYSTEM=="misc", KERNEL=="fastrpc-adsp*", ENV{IIO_SENSOR_PROXY_TYPE}+="ssc-accel ssc-proximity ssc-light ssc-compass", ENV{ACCEL_MOUNT_MATRIX}="0, 1, 0; -1, 0, 0; 0, 0, -1", TAG+="systemd", ENV{SYSTEMD_WANTS}+="iio-sensor-proxy.service"
   '';
 
   # 7. Ensure iio-sensor-proxy is enabled and starts after SSC is queryable.
@@ -145,5 +145,22 @@ in
 
       exit 0
     '';
+  };
+
+  # 8. Fake Tablet Mode Switch to coexist with SW_LID
+  boot.kernelModules = [ "uinput" ];
+  systemd.services.fake-tablet-mode = {
+    description = "Fake Tablet Mode Switch for GNOME Rotation";
+    wantedBy = [ "multi-user.target" ];
+    before = [ "display-manager.service" ];
+    serviceConfig = {
+      Type = "simple";
+      ExecStartPre = "${pkgs.kmod}/bin/modprobe uinput";
+      ExecStart = let
+        python = pkgs.python3.withPackages (p: [ p.evdev ]);
+      in "${python}/bin/python -c 'import evdev; import time; cap = {evdev.ecodes.EV_SW: [evdev.ecodes.SW_TABLET_MODE]}; ui = evdev.UInput(cap, name=\"Fake Tablet Mode Switch\", vendor=0x1234, product=0x5678); time.sleep(1); ui.write(evdev.ecodes.EV_SW, evdev.ecodes.SW_TABLET_MODE, 1); ui.syn(); time.sleep(999999999)'";
+      Restart = "always";
+      RestartSec = "3s";
+    };
   };
 }
