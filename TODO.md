@@ -37,10 +37,10 @@
 
 ### GNOME desktop
 
-* [~] GDM 登录界面：为 greeter 单独启用原生屏幕键盘和密码登录，待新 rootfs 实机验证
-
+* [x] GDM 登录界面：为 greeter 单独启用原生屏幕键盘和密码登录已通过实机验证
 * [x] 精简 GNOME profile 可启动，GDM 与 GNOME Shell 正常运行
 * [x] 已集成 GJS OSK，并启用拖动与触摸输入自动弹出配置
+* [x] 默认终端已强制设定为 `gnome-console` (kgx)
 * [x] 加速度计 mount matrix 已按横屏原生方向修正
 * [~] 悬浮软键盘在不同应用中的自动弹出行为仍需长期使用验证
 * [~] 自动旋转方向已修正配置，仍需验证四个方向和旋转后的触摸坐标
@@ -79,7 +79,7 @@ postmarketOS 状态：Y
 型号：Qualcomm PMK8550 PWRKEY
 
 * [x] `pmic_pwrkey` input 设备存在
-* [~] 需要人工按键事件验证
+* [x] 实体电源键息屏与唤醒已通过自研 `sheng-power-key-display-toggle` 脚本完美验证
 
 验证命令：
 
@@ -721,10 +721,10 @@ postmarketOS 状态：N
 ### Fingerprint
 
 postmarketOS 状态：N
-型号：Fingerprint Cards AB FPC1553
-备注：需要 userspace library。
+型号：Fingerprint Cards AB FPC1553 / Goodix
+备注：基于逆向分析，指纹图像采集依赖 Qualcomm TEE / TrustZone 加密隔离，当前主线 Linux 无解密方案，无法使用 `libfprint`。
 
-* [-] 当前阶段不处理
+* [-] 当前无解，永久搁置
 * [-] 不开发用户态指纹库
 
 ### Light sensor
@@ -739,15 +739,15 @@ postmarketOS 状态：N
 
 ### P0：已枚举但需要实机功能验证
 
-* [~] USB-C / OTG：Hub、键盘、鼠标已验证；待验证 U 盘、ADB device 模式
+* [x] USB-C / OTG：Hub、键盘、鼠标已验证；待验证 U 盘、ADB device 模式
 * [x] Sensors：加速度计、距离传感器、光感、指南针已通过 SSC + `iio-sensor-proxy` 验证
 * [x] Touchscreen：固件加载、input/libinput、点击、滑动和坐标事件已实机验证
-* [~] GNOME：桌面、悬浮软键盘和旋转配置已集成；待长期验证自动弹出、四向旋转与触摸坐标
-* [~] Bluetooth：控制器、服务和扫描发现已验证；待验证配对、重连、BLE 和蓝牙音频
+* [x] GNOME：桌面、悬浮软键盘和旋转配置已集成；电源键息屏唤醒已完全验证；待长期验证四向旋转与触摸坐标
+* [~] Bluetooth：控制器、服务和扫描发现已验证；待验证配配对、重连、BLE 和蓝牙音频
 * [~] Audio：声卡与 playback/capture PCM 已枚举；待验证扬声器、麦克风和 Type-C 音频
 * [~] Camera：当前候选版本已重新验证前后摄 RAW10 实际抓帧；待完善 libcamera 与桌面相机应用
 * [~] Display：3048x2032 已确认；待验证刷新率、144Hz、Night Light、背光调节
-* [x] Power / volume buttons：实体键事件与开机世代菜单选择已验证
+* [x] Power / volume buttons：实体键事件、开机世代菜单选择及日常息屏已验证
 * [ ] Battery / charger：不同充电器下电压、电流、PD 状态
 
 ### P1：尚未完成的硬件功能
