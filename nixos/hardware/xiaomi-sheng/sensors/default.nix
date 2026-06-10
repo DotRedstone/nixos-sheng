@@ -148,17 +148,61 @@ in
   };
 
   # 8. Fake Tablet Mode Switch to coexist with SW_LID
+  #
+  # GNOME/Mutter 的自动旋转门控逻辑：
+  # - 如果系统存在 SW_TABLET_MODE 开关 → 仅当 SW_TABLET_MODE=1 时允许旋转
+  # - 如果系统不存在 SW_TABLET_MODE 开关 → Mutter 认为不是平板，禁止旋转
+  # - 如果 SW_LID=1（盖板关闭）→ 即使平板模式也会抑制旋转
+  #
+  # sheng 的 gpio-keys Hall 传感器会上报 SW_LID，导致 Mutter 把平板当笔记本。
+  # 此服务通过 uinput 创建虚拟 SW_TABLET_MODE 开关，永久设为 1，告知 Mutter
+  # 当前是平板模式，从而在 SW_LID=0（盖板打开）时允许自动旋转。
   boot.kernelModules = [ "uinput" ];
-  systemd.services.fake-tablet-mode = {
+  systemd.services.fake-tablet-mode = let
+    python = pkgs.python3.withPackages (p: [ p.evdev ]);
+    script = pkgs.writeScript "fake-tablet-mode" ''
+      #!${python}/bin/python3
+      import sys, signal, time
+      import evdev
+      from evdev import ecodes, UInput
+
+      def main():
+          try:
+              cap = {ecodes.EV_SW: [ecodes.SW_TABLET_MODE]}
+              ui = UInput(cap, name="Fake Tablet Mode Switch",
+                          vendor=0x1234, product=0x5678)
+          except Exception as e:
+              print(f"FATAL: cannot create uinput device: {e}",
+                    file=sys.stderr)
+              sys.exit(1)
+
+          # 立即设置 SW_TABLET_MODE=1 — 必须在 libinput 扫描前完成
+          ui.write(ecodes.EV_SW, ecodes.SW_TABLET_MODE, 1)
+          ui.syn()
+          print("fake-tablet-mode: SW_TABLET_MODE=1 active",
+                file=sys.stderr)
+
+          def shutdown(sig, frame):
+              print("fake-tablet-mode: shutting down", file=sys.stderr)
+              ui.close()
+              sys.exit(0)
+          signal.signal(signal.SIGTERM, shutdown)
+          signal.signal(signal.SIGINT, shutdown)
+
+          while True:
+              time.sleep(86400)
+
+      if __name__ == "__main__":
+          main()
+    '';
+  in {
     description = "Fake Tablet Mode Switch for GNOME Rotation";
     wantedBy = [ "multi-user.target" ];
     before = [ "display-manager.service" ];
+    after = [ "systemd-modules-load.service" ];
     serviceConfig = {
       Type = "simple";
-      ExecStartPre = "${pkgs.kmod}/bin/modprobe uinput";
-      ExecStart = let
-        python = pkgs.python3.withPackages (p: [ p.evdev ]);
-      in "${python}/bin/python -c 'import evdev; import time; cap = {evdev.ecodes.EV_SW: [evdev.ecodes.SW_TABLET_MODE]}; ui = evdev.UInput(cap, name=\"Fake Tablet Mode Switch\", vendor=0x1234, product=0x5678); time.sleep(1); ui.write(evdev.ecodes.EV_SW, evdev.ecodes.SW_TABLET_MODE, 1); ui.syn(); time.sleep(999999999)'";
+      ExecStart = "${script}";
       Restart = "always";
       RestartSec = "3s";
     };

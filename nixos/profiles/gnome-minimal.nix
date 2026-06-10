@@ -107,6 +107,14 @@ in
         portrait-width-percent = lib.gvariant.mkInt32 100;
         portrait-height-percent = lib.gvariant.mkInt32 30;
       };
+
+      # 确保 GNOME 旋转插件处于激活状态且默认不锁定旋转
+      settings."org/gnome/settings-daemon/plugins/orientation" = {
+        active = true;
+      };
+      settings."org/gnome/settings-daemon/peripherals/touchscreen" = {
+        orientation-lock = false;
+      };
     }
   ];
 
