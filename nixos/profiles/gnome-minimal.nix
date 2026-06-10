@@ -26,11 +26,11 @@ let
     get_power_save_mode() {
       local uid="$1"
       local user
-      user=$(id -un "$uid" 2>/dev/null || true)
+      user=$(${pkgs.coreutils}/bin/id -un "$uid" 2>/dev/null || true)
       [ -z "$user" ] && echo "unknown" && return
       local bus="unix:path=/run/user/$uid/bus"
       local out
-      out=$(su -s /bin/sh "$user" -c "DBUS_SESSION_BUS_ADDRESS=$bus ${pkgs.systemd}/bin/busctl --user get-property org.gnome.Mutter.DisplayConfig /org/gnome/Mutter/DisplayConfig org.gnome.Mutter.DisplayConfig PowerSaveMode" 2>/dev/null || true)
+      out=$(/run/wrappers/bin/su -s /bin/sh "$user" -c "DBUS_SESSION_BUS_ADDRESS=$bus ${pkgs.systemd}/bin/busctl --user get-property org.gnome.Mutter.DisplayConfig /org/gnome/Mutter/DisplayConfig org.gnome.Mutter.DisplayConfig PowerSaveMode" 2>/dev/null || true)
       if [ -n "$out" ]; then
         echo "$out" | ${pkgs.gawk}/bin/awk '{print $2}'
       else
@@ -42,11 +42,15 @@ let
       local uid="$1"
       local target="$2"
       local user
-      user=$(id -un "$uid" 2>/dev/null || true)
+      user=$(${pkgs.coreutils}/bin/id -un "$uid" 2>/dev/null || true)
       [ -z "$user" ] && return
       local bus="unix:path=/run/user/$uid/bus"
-      su -s /bin/sh "$user" -c "DBUS_SESSION_BUS_ADDRESS=$bus ${pkgs.systemd}/bin/busctl --user set-property org.gnome.Mutter.DisplayConfig /org/gnome/Mutter/DisplayConfig org.gnome.Mutter.DisplayConfig PowerSaveMode i $target" >/dev/null 2>&1 || true
+      /run/wrappers/bin/su -s /bin/sh "$user" -c "DBUS_SESSION_BUS_ADDRESS=$bus ${pkgs.systemd}/bin/busctl --user set-property org.gnome.Mutter.DisplayConfig /org/gnome/Mutter/DisplayConfig org.gnome.Mutter.DisplayConfig PowerSaveMode i $target" >/dev/null 2>&1 || true
     }
+
+    while [ ! -e "$device" ]; do
+      sleep 1
+    done
 
     ${pkgs.coreutils}/bin/stdbuf -oL ${pkgs.evtest}/bin/evtest "$device" 2>/dev/null | while IFS= read -r line; do
       case "$line" in
