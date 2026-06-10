@@ -73,6 +73,17 @@ only `nix/store` and `nix-path-registration` at the top level is expected for
 the Mobile NixOS generated rootfs: stage-1 uses that registration data to find
 the NixOS system closure and then runs its `init`.
 
+### 🌟 Killer Feature: Stage-1 Boot Generation Menu
+
+Because standard Android bootloaders cannot render GRUB or systemd-boot menus, this project implements a **custom framebuffer text menu** directly inside the `stage-1` initramfs.
+
+By running `sudo sheng-reboot-generation-menu` from the OS, the tablet will reboot into a lightweight pre-boot selector:
+- Use **Volume Keys** to navigate through your NixOS history.
+- Use **Power Key** to confirm and boot.
+- Boots the default generation automatically after 30 seconds.
+
+This brings the full power of NixOS atomic upgrades and rollbacks to a mobile device! See [`docs/boot-generation-menu.md`](docs/boot-generation-menu.md) for details.
+
 ## Repository Layout
 
 ```text

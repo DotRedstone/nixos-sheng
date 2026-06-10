@@ -65,6 +65,17 @@ linux 分区
 
 这里的 rootfs 镜像故意没有采用标准的 PC 风格根目录。对于 Mobile NixOS 生成的 rootfs 而言，顶层只有 `nix/store` 和 `nix-path-registration` 是正常的现象：stage-1 会使用这些注册数据来寻找 NixOS 系统闭包并运行其 `init`。
 
+### 🌟 特色功能：Stage-1 世代回滚菜单 (Boot Generation Menu)
+
+由于 Android 设备的 Bootloader 无法直接引导标准的 GRUB/systemd-boot 菜单，本项目在 `stage-1` initramfs 中专门开发了一套**纯文本 framebuffer 启动菜单**。
+
+当你在系统中执行 `sudo sheng-reboot-generation-menu` 后，平板会重启并在屏幕上渲染一个轻量级的世代选择器：
+- 使用 **音量键** 上下切换历史 NixOS 世代。
+- 使用 **电源键** 确认启动。
+- 30秒无操作自动启动默认世代。
+
+这使得你在移动设备上也能享受到完整的 NixOS 原子化升级与“无限后悔药”回滚体验！详细文档请参阅 [`docs/boot-generation-menu.md`](docs/boot-generation-menu.md)。
+
 ## 仓库结构
 
 ```text
