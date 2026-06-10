@@ -42,15 +42,14 @@
   };
   i18n.defaultLocale = "en_US.UTF-8";
 
-  # Bring-up only: replace or remove this once stage-2 access is stable.
-  users.users.root.initialPassword = vars.rootPassword;
   users.users.${vars.username} = {
     isNormalUser = true;
     initialPassword = vars.userPassword;
     extraGroups = [ "wheel" "networkmanager" "audio" "video" "input" "render" ];
   };
 
-  security.sudo.wheelNeedsPassword = false;
+  # Bring-up hacks removed for better security
+  # security.sudo.wheelNeedsPassword = false;
 
   services.openssh.enable = true;
   services.openssh.settings = {
