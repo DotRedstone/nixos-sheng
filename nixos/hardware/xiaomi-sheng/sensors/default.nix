@@ -207,4 +207,12 @@ in
       RestartSec = "3s";
     };
   };
+
+  # 9. Mark gpio-keys lid switch as unreliable in libinput
+  # This prevents GNOME/Mutter from thinking the lid is closed and disabling auto-rotation.
+  environment.etc."libinput/local-overrides.quirks".text = ''
+    [sheng-gpio-keys-lid]
+    MatchName=gpio-keys
+    AttrLidSwitchReliability=unreliable
+  '';
 }
