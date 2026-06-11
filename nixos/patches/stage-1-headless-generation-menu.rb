@@ -7,8 +7,8 @@
 module ShengHeadlessGenerationMenu
   extend self
 
-  VOLUME_UP = [:KEY_VOLUMEUP]
-  VOLUME_DOWN = [:KEY_VOLUMEDOWN]
+  VOLUME_UP = [:KEY_VOLUMEUP, :KEY_UP]
+  VOLUME_DOWN = [:KEY_VOLUMEDOWN, :KEY_DOWN]
   CONFIRM = [:KEY_POWER, :KEY_ENTER]
   REQUEST_PATH = "/mnt/var/lib/sheng-boot-menu/requested"
   FONT_PATH = "/etc/sheng-generation-menu-font.psf.gz"
