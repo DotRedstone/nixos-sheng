@@ -39,11 +39,13 @@ let
                f"DBUS_SESSION_BUS_ADDRESS={bus} ${pkgs.systemd}/bin/busctl --user set-property org.gnome.Mutter.DisplayConfig /org/gnome/Mutter/DisplayConfig org.gnome.Mutter.DisplayConfig PowerSaveMode i {mode}"]
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    def simulate_user_activity(uid, username):
-        bus = f"unix:path=/run/user/{uid}/bus"
-        cmd = ["/run/wrappers/bin/su", "-s", "/bin/sh", username, "-c",
-               f"DBUS_SESSION_BUS_ADDRESS={bus} ${pkgs.systemd}/bin/busctl --user call org.gnome.ScreenSaver /org/gnome/ScreenSaver org.gnome.ScreenSaver SimulateUserActivity"]
-        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    def simulate_user_activity(ui):
+        # Inject a harmless key event to libinput to natively wake GNOME and force a screen repaint
+        ui.write(evdev.ecodes.EV_KEY, evdev.ecodes.KEY_WAKEUP, 1)
+        ui.syn()
+        time.sleep(0.01)
+        ui.write(evdev.ecodes.EV_KEY, evdev.ecodes.KEY_WAKEUP, 0)
+        ui.syn()
 
     def get_power_save_mode(uid, username):
         bus = f"unix:path=/run/user/{uid}/bus"
@@ -61,6 +63,7 @@ let
         time.sleep(1)
 
     dev = evdev.InputDevice(device_path)
+    ui = evdev.UInput(name="sheng-power-wakeup")
     
     # Exclusively grab the power button so GNOME/libinput never sees the events
     # This completely solves the race condition of GNOME auto-waking the screen
@@ -79,7 +82,7 @@ let
                     set_power_save_mode(uid, username, 3)
                 else:
                     # Simulate activity to properly wake GNOME session (fixes blank screen without repaint)
-                    simulate_user_activity(uid, username)
+                    simulate_user_activity(ui)
                     # Also set DisplayConfig just to be safe
                     set_power_save_mode(uid, username, 0)
   '';
