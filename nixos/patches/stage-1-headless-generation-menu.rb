@@ -150,6 +150,10 @@ module ShengHeadlessGenerationMenu
     last_remaining = nil
     volume_up_was_pressed = false
     volume_down_was_pressed = false
+    up_pressed_time = 0.0
+    up_last_repeat = 0.0
+    down_pressed_time = 0.0
+    down_last_repeat = 0.0
     full_redraw = true
 
     loop do
@@ -166,11 +170,37 @@ module ShengHeadlessGenerationMenu
       volume_up_pressed = pressed?(VOLUME_UP)
       volume_down_pressed = pressed?(VOLUME_DOWN)
 
-      if volume_up_pressed && !volume_up_was_pressed
+      action_up = false
+      action_down = false
+      now_t = Time.now.to_f
+
+      if volume_up_pressed
+        if !volume_up_was_pressed
+          action_up = true
+          up_pressed_time = now_t
+          up_last_repeat = now_t
+        elsif now_t - up_pressed_time > 0.4 && now_t - up_last_repeat > 0.1
+          action_up = true
+          up_last_repeat = now_t
+        end
+      end
+
+      if volume_down_pressed
+        if !volume_down_was_pressed
+          action_down = true
+          down_pressed_time = now_t
+          down_last_repeat = now_t
+        elsif now_t - down_pressed_time > 0.4 && now_t - down_last_repeat > 0.1
+          action_down = true
+          down_last_repeat = now_t
+        end
+      end
+
+      if action_up
         countdown_active = false
         menu_length = generations.empty? ? 1 : generations.length
         selected = (selected - 1) % menu_length
-      elsif volume_down_pressed && !volume_down_was_pressed
+      elsif action_down
         countdown_active = false
         menu_length = generations.empty? ? 1 : generations.length
         selected = (selected + 1) % menu_length
