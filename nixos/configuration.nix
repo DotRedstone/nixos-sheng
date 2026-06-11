@@ -68,9 +68,11 @@
   # Suspend currently times out in the sheng kernel. Ignoring short power-key
   # presses prevents GDM/logind from disconnecting the device for about 40s.
   services.logind.settings.Login.HandlePowerKey = "ignore";
-  services.logind.settings.Login.HandleLidSwitch = "ignore";
-  services.logind.settings.Login.HandleLidSwitchExternalPower = "ignore";
-  services.logind.settings.Login.HandleLidSwitchDocked = "ignore";
+  # GNOME 接管盖板行为：logind 合盖只锁屏，不挂起（suspend 会导致内核崩溃）。
+  # GNOME 的 gnome-settings-daemon 通过 UPower lid 事件根据 dconf
+  # lid-close-ac-action='blank' 执行息屏。
+  services.logind.settings.Login.HandleLidSwitch = "lock";
+  services.logind.settings.Login.HandleLidSwitchExternalPower = "lock";
 
   services.xiaomi-mipps-auth.enable = true;
 
