@@ -7,8 +7,8 @@
 module ShengHeadlessGenerationMenu
   extend self
 
-  VOLUME_UP = [:KEY_VOLUMEUP]
-  VOLUME_DOWN = [:KEY_VOLUMEDOWN]
+  VOLUME_UP = [:KEY_VOLUMEUP, :KEY_UP]
+  VOLUME_DOWN = [:KEY_VOLUMEDOWN, :KEY_DOWN]
   CONFIRM = [:KEY_POWER, :KEY_ENTER]
   REQUEST_PATH = "/mnt/var/lib/sheng-boot-menu/requested"
   FONT_PATH = "/etc/sheng-generation-menu-font.psf.gz"
@@ -27,6 +27,9 @@ module ShengHeadlessGenerationMenu
 
   def pressed?(keys)
     Evdev.keys_held(keys)
+  rescue Exception => e
+    $logger.warn("ShengGenerationMenu Evdev error: #{e}")
+    false
   end
 
   def requested?()
@@ -84,8 +87,7 @@ module ShengHeadlessGenerationMenu
   def render(generations, selected, remaining: nil)
     labels = generations.empty? ? ["NixOS - Default"] : generations.map { |generation| generation.label() }
 
-    console.write("\e[H")
-    console.write("\e[2K\n")
+    console.write("\e[2J\e[H")
     console.write("\e[2K  \e[1m\e[36m=== NixOS Boot Menu ===\e[0m\n\n")
     labels.each_with_index do |label, index|
       console.write("\e[2K\r")
