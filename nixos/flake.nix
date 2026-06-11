@@ -107,6 +107,18 @@
       # Reuse the exact Mobile NixOS evaluations used by the flashable images.
       # This keeps nixos-rebuild generations aligned with the fixed boot image,
       # sheng kernel modules, firmware, hardware services, and desktop profile.
+      # 对外暴露为标准的 NixOS 模块，供下游 dotfiles 或其他机器自由引用继承
+      nixosModules.default = { lib, ... }: {
+        imports = [
+          { _module.args.vars = import ./vars.nix; }
+          ./hardware/xiaomi-sheng
+          ./configuration.nix
+          ./profiles/gnome-minimal.nix
+          ./hardware/mobile.nix
+        ];
+        nixpkgs.overlays = lib.mkAfter [ shengOverlay ];
+      };
+
       nixosConfigurations = {
         sheng = mobileGnomeEval;
         sheng-minimal = mobileEval;
