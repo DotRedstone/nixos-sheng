@@ -7,66 +7,81 @@
 { lib, pkgs, ... }:
 
 let
-  powerKeyDisplayToggle = pkgs.writeShellScript "sheng-power-key-display-toggle" ''
-    set -u
+  powerKeyDisplayToggle = pkgs.writeScript "sheng-power-key-display-toggle" ''
+    #!${pkgs.python3.withPackages (p: [ p.evdev ])}/bin/python3
+    import evdev
+    import subprocess
+    import time
+    import sys
+    import os
 
-    device=/dev/input/by-path/platform-c400000.spmi-platform-c400000.spmi:pmic@0:pon@1300:pwrkey-event
+    device_path = "/dev/input/by-path/platform-c400000.spmi-platform-c400000.spmi:pmic@0:pon@1300:pwrkey-event"
 
-    get_active_session_info() {
-      for session in $(${pkgs.systemd}/bin/loginctl list-sessions --no-legend | ${pkgs.gawk}/bin/awk '{print $1}'); do
-        local state
-        state=$(${pkgs.systemd}/bin/loginctl show-session "$session" -p Active --value 2>/dev/null || true)
-        if [ "$state" = "yes" ]; then
-          ${pkgs.systemd}/bin/loginctl show-session "$session" -p User --value 2>/dev/null || true
-          return
-        fi
-      done
-    }
+    def get_active_session_info():
+        try:
+            out = subprocess.check_output(["${pkgs.systemd}/bin/loginctl", "list-sessions", "--no-legend"], text=True)
+            for line in out.strip().split("\n"):
+                parts = line.split()
+                if len(parts) >= 2:
+                    session_id = parts[0]
+                    state = subprocess.check_output(["${pkgs.systemd}/bin/loginctl", "show-session", session_id, "-p", "Active", "--value"], text=True).strip()
+                    if state == "yes":
+                        uid = subprocess.check_output(["${pkgs.systemd}/bin/loginctl", "show-session", session_id, "-p", "User", "--value"], text=True).strip()
+                        username = subprocess.check_output(["${pkgs.coreutils}/bin/id", "-un", uid], text=True).strip()
+                        return uid, username
+        except Exception as e:
+            print("Error getting session:", e, file=sys.stderr)
+        return None, None
 
-    get_power_save_mode() {
-      local uid="$1"
-      local user
-      user=$(${pkgs.coreutils}/bin/id -un "$uid" 2>/dev/null || true)
-      [ -z "$user" ] && echo "unknown" && return
-      local bus="unix:path=/run/user/$uid/bus"
-      local out
-      out=$(/run/wrappers/bin/su -s /bin/sh "$user" -c "DBUS_SESSION_BUS_ADDRESS=$bus ${pkgs.systemd}/bin/busctl --user get-property org.gnome.Mutter.DisplayConfig /org/gnome/Mutter/DisplayConfig org.gnome.Mutter.DisplayConfig PowerSaveMode" 2>/dev/null || true)
-      if [ -n "$out" ]; then
-        echo "$out" | ${pkgs.gawk}/bin/awk '{print $2}'
-      else
-        echo "unknown"
-      fi
-    }
+    def set_power_save_mode(uid, username, mode):
+        bus = f"unix:path=/run/user/{uid}/bus"
+        cmd = ["/run/wrappers/bin/su", "-s", "/bin/sh", username, "-c",
+               f"DBUS_SESSION_BUS_ADDRESS={bus} ${pkgs.systemd}/bin/busctl --user set-property org.gnome.Mutter.DisplayConfig /org/gnome/Mutter/DisplayConfig org.gnome.Mutter.DisplayConfig PowerSaveMode i {mode}"]
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    set_power_save_mode() {
-      local uid="$1"
-      local target="$2"
-      local user
-      user=$(${pkgs.coreutils}/bin/id -un "$uid" 2>/dev/null || true)
-      [ -z "$user" ] && return
-      local bus="unix:path=/run/user/$uid/bus"
-      /run/wrappers/bin/su -s /bin/sh "$user" -c "DBUS_SESSION_BUS_ADDRESS=$bus ${pkgs.systemd}/bin/busctl --user set-property org.gnome.Mutter.DisplayConfig /org/gnome/Mutter/DisplayConfig org.gnome.Mutter.DisplayConfig PowerSaveMode i $target" >/dev/null 2>&1 || true
-    }
+    def simulate_user_activity(uid, username):
+        bus = f"unix:path=/run/user/{uid}/bus"
+        cmd = ["/run/wrappers/bin/su", "-s", "/bin/sh", username, "-c",
+               f"DBUS_SESSION_BUS_ADDRESS={bus} ${pkgs.systemd}/bin/busctl --user call org.gnome.ScreenSaver /org/gnome/ScreenSaver org.gnome.ScreenSaver SimulateUserActivity"]
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    while [ ! -e "$device" ]; do
-      sleep 1
-    done
+    def get_power_save_mode(uid, username):
+        bus = f"unix:path=/run/user/{uid}/bus"
+        cmd = ["/run/wrappers/bin/su", "-s", "/bin/sh", username, "-c",
+               f"DBUS_SESSION_BUS_ADDRESS={bus} ${pkgs.systemd}/bin/busctl --user get-property org.gnome.Mutter.DisplayConfig /org/gnome/Mutter/DisplayConfig org.gnome.Mutter.DisplayConfig PowerSaveMode"]
+        try:
+            out = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL).strip()
+            if out:
+                return int(out.split()[-1])
+        except Exception as e:
+            print("Error getting power save mode:", e, file=sys.stderr)
+        return -1
 
-    ${pkgs.coreutils}/bin/stdbuf -oL ${pkgs.evtest}/bin/evtest "$device" 2>/dev/null | while IFS= read -r line; do
-      case "$line" in
-        *"type 1 (EV_KEY), code 116 (KEY_POWER), value 1"*)
-          uid=$(get_active_session_info)
-          if [ -n "$uid" ]; then
-            mode=$(get_power_save_mode "$uid")
-            if [ "$mode" = "0" ]; then
-              set_power_save_mode "$uid" 3
-            else
-              set_power_save_mode "$uid" 0
-            fi
-          fi
-          ;;
-      esac
-    done
+    while not os.path.exists(device_path):
+        time.sleep(1)
+
+    dev = evdev.InputDevice(device_path)
+    
+    # Exclusively grab the power button so GNOME/libinput never sees the events
+    # This completely solves the race condition of GNOME auto-waking the screen
+    try:
+        dev.grab()
+    except Exception as e:
+        print("Failed to grab device:", e, file=sys.stderr)
+        sys.exit(1)
+
+    for event in dev.read_loop():
+        if event.type == evdev.ecodes.EV_KEY and event.code == evdev.ecodes.KEY_POWER and event.value == 1:
+            uid, username = get_active_session_info()
+            if uid and username:
+                mode = get_power_save_mode(uid, username)
+                if mode == 0:
+                    set_power_save_mode(uid, username, 3)
+                else:
+                    # Simulate activity to properly wake GNOME session (fixes blank screen without repaint)
+                    simulate_user_activity(uid, username)
+                    # Also set DisplayConfig just to be safe
+                    set_power_save_mode(uid, username, 0)
   '';
 in
 {
@@ -167,14 +182,6 @@ in
   };
 
   services.dleyna.enable = lib.mkForce false;
-
-  # 彻底屏蔽物理电源键在底层输入框架（libinput/GNOME）中的识别。
-  # GNOME 会在收到任何有效输入事件时自动唤醒屏幕。如果让 GNOME 看到电源键，
-  # 它会瞬间点亮屏幕（PowerSaveMode变0），此时我们自己的脚本再检测，就会误以为
-  # 用户是想从亮屏变成息屏，导致“闪亮一下又黑掉”。屏蔽后，全部唤醒由脚本控制。
-  services.udev.extraRules = ''
-    ACTION=="add|change", SUBSYSTEM=="input", ATTRS{name}=="pmic_pwrkey", ENV{ID_INPUT}="", ENV{ID_INPUT_KEY}=""
-  '';
 
   systemd.services.sheng-power-key-display-toggle = {
     description = "Toggle the sheng display with the power key";
