@@ -150,22 +150,19 @@ in
     '';
   };
 
-  # 8. Fake Tablet Mode Switch to coexist with SW_LID
+  # 8. 平板模式 + 霍尔传感器息屏服务
   #
-  # GNOME/Mutter 的自动旋转门控逻辑：
-  # - 如果系统存在 SW_TABLET_MODE 开关 → 仅当 SW_TABLET_MODE=1 时允许旋转
-  # - 如果系统不存在 SW_TABLET_MODE 开关 → Mutter 认为不是平板，禁止旋转
-  # - 如果 SW_LID=1（盖板关闭）→ 即使平板模式也会抑制旋转
-  #
-  # sheng 的 gpio-keys Hall 传感器会上报 SW_LID，导致 Mutter 把平板当笔记本。
-  # 此服务通过 uinput 创建虚拟 SW_TABLET_MODE 开关，永久设为 1，告知 Mutter
-  # 当前是平板模式，从而在 SW_LID=0（盖板打开）时允许自动旋转。
+  # 设计思路：
+  # - 虚拟设备只上报 SW_TABLET_MODE=1，不暴露 SW_LID 给 GNOME
+  # - GNOME/Mutter 只看到平板模式，旋转永远可用，不受盖板影响
+  # - 合盖/开盖息屏亮屏通过直接调 Mutter D-Bus PowerSaveMode 实现
+  # - 与 GNOME 的 lid 逻辑完全解耦，避免开机早期合盖导致旋转失效
   boot.kernelModules = [ "uinput" ];
   systemd.services.fake-tablet-mode = let
     python = pkgs.python3.withPackages (p: [ p.evdev ]);
     script = pkgs.writeScript "fake-tablet-mode" ''
       #!${python}/bin/python3
-      import sys, signal, time, threading, array, fcntl
+      import sys, signal, time, subprocess, os
       import evdev
       from evdev import ecodes, UInput
 
@@ -180,6 +177,53 @@ in
               except Exception:
                   continue
           return None
+
+      def find_active_session():
+          """找到当前活跃的 GNOME 会话，返回 (uid, username)"""
+          try:
+              out = subprocess.check_output(
+                  ["${pkgs.systemd}/bin/loginctl", "list-sessions", "--no-legend"],
+                  text=True, timeout=5
+              )
+              for line in out.strip().split("\n"):
+                  parts = line.split()
+                  if len(parts) >= 2:
+                      session_id = parts[0]
+                      try:
+                          state = subprocess.check_output(
+                              ["${pkgs.systemd}/bin/loginctl", "show-session", session_id, "-p", "Active", "--value"],
+                              text=True, timeout=5
+                          ).strip()
+                          if state == "yes":
+                              uid = subprocess.check_output(
+                                  ["${pkgs.systemd}/bin/loginctl", "show-session", session_id, "-p", "User", "--value"],
+                                  text=True, timeout=5
+                              ).strip()
+                              username = subprocess.check_output(
+                                  ["${pkgs.coreutils}/bin/id", "-un", uid],
+                                  text=True, timeout=5
+                              ).strip()
+                              return (uid, username)
+                      except Exception:
+                          continue
+          except Exception:
+              pass
+          return None
+
+      def set_power_save_mode(uid, username, mode):
+          """通过 Mutter D-Bus 设置 PowerSaveMode (0=开屏, 3=息屏)"""
+          bus = f"unix:path=/run/user/{uid}/bus"
+          try:
+              subprocess.run(
+                  ["/run/wrappers/bin/su", "-s", "/bin/sh", username, "-c",
+                   f"DBUS_SESSION_BUS_ADDRESS={bus} ${pkgs.systemd}/bin/busctl --user set-property "
+                   f"org.gnome.Mutter.DisplayConfig /org/gnome/Mutter/DisplayConfig "
+                   f"org.gnome.Mutter.DisplayConfig PowerSaveMode i {mode}"],
+                  timeout=5, capture_output=True
+              )
+              print(f"fake-tablet-mode: set PowerSaveMode={mode}", file=sys.stderr)
+          except Exception as e:
+              print(f"WARNING: failed to set PowerSaveMode: {e}", file=sys.stderr)
 
       def main():
           # 查找物理 Hall 传感器输入设备
@@ -196,36 +240,22 @@ in
 
           print(f"fake-tablet-mode: found real lid device at {real_dev.path}", file=sys.stderr)
 
-          # 创建同时支持平板模式与盖板开关的虚拟设备
+          # 创建虚拟设备：只上报 SW_TABLET_MODE，不暴露 SW_LID
           try:
               cap = {
-                  ecodes.EV_SW: [ecodes.SW_TABLET_MODE, ecodes.SW_LID]
+                  ecodes.EV_SW: [ecodes.SW_TABLET_MODE]
               }
-              ui = UInput(cap, name="Fake Tablet and Lid Switch",
+              ui = UInput(cap, name="Fake Tablet Mode Switch",
                           vendor=0x1234, product=0x5678)
           except Exception as e:
               print(f"FATAL: cannot create uinput device: {e}",
                     file=sys.stderr)
               sys.exit(1)
 
-          # 使用 ioctl (EVIOCGSW) 查询物理 Hall 传感器的初始状态
-          real_lid_state = 0
-          try:
-              buf = array.array('B', [0] * 8)
-              fcntl.ioctl(real_dev.fd, 0x8008451b, buf)
-              real_lid_state = buf[0] & 1
-              print(f"fake-tablet-mode: real SW_LID state is {real_lid_state}", file=sys.stderr)
-          except Exception as e:
-              print(f"WARNING: failed to query initial lid state: {e}", file=sys.stderr)
-
-          # 直接透传霍尔元件盖板状态（硬件 0=开盖，1=合盖，极性正确无需取反）
-          virtual_lid_state = real_lid_state
-
-          # 初始化状态
-          ui.write(ecodes.EV_SW, ecodes.SW_TABLET_MODE, 0)
-          ui.write(ecodes.EV_SW, ecodes.SW_LID, virtual_lid_state)
+          # 直接设置 SW_TABLET_MODE=1，告知 GNOME 这是平板
+          ui.write(ecodes.EV_SW, ecodes.SW_TABLET_MODE, 1)
           ui.syn()
-          print(f"fake-tablet-mode: initialized SW_TABLET_MODE=0, SW_LID={virtual_lid_state}", file=sys.stderr)
+          print("fake-tablet-mode: set SW_TABLET_MODE=1 (tablet mode, no lid exposed)", file=sys.stderr)
 
           def shutdown(sig, frame):
               print("fake-tablet-mode: shutting down", file=sys.stderr)
@@ -234,24 +264,23 @@ in
           signal.signal(signal.SIGTERM, shutdown)
           signal.signal(signal.SIGINT, shutdown)
 
-          # 延迟 20 秒将虚拟平板模式切换为 1，触发 GNOME 旋转逻辑
-          def toggle_tablet_mode():
-              print("fake-tablet-mode: waiting 20s for GNOME to load...", file=sys.stderr)
-              time.sleep(20)
-              ui.write(ecodes.EV_SW, ecodes.SW_TABLET_MODE, 1)
-              ui.syn()
-              print("fake-tablet-mode: toggled SW_TABLET_MODE=1", file=sys.stderr)
-
-          t = threading.Thread(target=toggle_tablet_mode, daemon=True)
-          t.start()
-
-          # 循环监听物理 Hall 传感器，直接透传事件（极性正确无需取反）
+          # 循环监听物理 Hall 传感器，直接控制屏幕息屏/亮屏
           try:
               for event in real_dev.read_loop():
                   if event.type == ecodes.EV_SW and event.code == ecodes.SW_LID:
-                      ui.write(ecodes.EV_SW, ecodes.SW_LID, event.value)
-                      ui.syn()
-                      print(f"fake-tablet-mode: forwarded SW_LID event: {event.value}", file=sys.stderr)
+                      session = find_active_session()
+                      if session:
+                          uid, username = session
+                          if event.value == 1:
+                              # 合盖 → 息屏
+                              print("fake-tablet-mode: lid closed, blanking screen", file=sys.stderr)
+                              set_power_save_mode(uid, username, 3)
+                          else:
+                              # 开盖 → 亮屏
+                              print("fake-tablet-mode: lid opened, unblanking screen", file=sys.stderr)
+                              set_power_save_mode(uid, username, 0)
+                      else:
+                          print(f"fake-tablet-mode: lid event={event.value} but no active session", file=sys.stderr)
           except Exception as e:
               print(f"FATAL: error in event read loop: {e}", file=sys.stderr)
               ui.close()
@@ -261,7 +290,7 @@ in
           main()
     '';
   in {
-    description = "Fake Tablet and Lid Switch for GNOME Rotation & Lid control";
+    description = "Fake Tablet Mode Switch and Hall Sensor Screen Control";
     wantedBy = [ "multi-user.target" ];
     before = [ "display-manager.service" ];
     after = [ "systemd-modules-load.service" ];
@@ -272,12 +301,4 @@ in
       RestartSec = "3s";
     };
   };
-
-  # 9. Mark gpio-keys lid switch as unreliable in libinput
-  # This prevents GNOME/Mutter from thinking the lid is closed based on the real gpio-keys.
-  environment.etc."libinput/local-overrides.quirks".text = ''
-    [sheng-gpio-keys-lid]
-    MatchName=gpio-keys
-    AttrLidSwitchReliability=unreliable
-  '';
 }
