@@ -81,57 +81,44 @@ module ShengHeadlessGenerationMenu
     $logger.warn("Could not restore kernel console log level: #{error}")
   end
 
-  def render(generations, selected, remaining: nil, full: true, last_selected: nil)
+  def render(generations, selected, remaining: nil)
     labels = generations.empty? ? ["NixOS - Default"] : generations.map { |generation| generation.label() }
 
-    if full
-      out = "\e[H" # Move to top left
-      out += "\e[2K\n" # Blank line
-      out += "\e[2K  \e[1m\e[36m=== NixOS Boot Menu ===\e[0m\n" # Title
-      out += "\e[2K\n" # Blank line
+    # \e[H moves to top-left. We use space padding instead of \e[2K to completely eliminate flicker.
+    # \e[2K clears the line to black before drawing, causing a visible flash. Space padding overwrites seamlessly.
+    out = "\e[H"
+    out += "                                                                                \n"
+    out += "  \e[1m\e[36m=== NixOS Boot Menu ===\e[0m                                                       \n"
+    out += "                                                                                \n"
 
-      labels.each_with_index do |label, index|
-        if index == selected
-          out += "\e[2K\e[1m\e[32m  > #{label}  \e[0m\n"
-        else
-          out += "\e[2K    #{label}\n"
-        end
-      end
-
-      out += "\e[2K\n"
-      out += "\e[2K  [Vol +/-] Navigate   [Power] Select\n"
-      out += "\e[2K\n"
-
-      if remaining
-        out += "\e[2K  Autoboot in \e[1m#{remaining}\e[0m seconds. Press any key to stop.\n"
+    labels.each_with_index do |label, index|
+      padded_label = label.ljust(70)
+      if index == selected
+        out += "\e[1m\e[32m  > #{padded_label}\e[0m\n"
       else
-        out += "\e[2K  Autoboot stopped. Waiting for selection...\n"
+        out += "    #{padded_label}\n"
       end
-
-      out += "\e[J" # Clear anything below our menu
-      console.write(out)
-      console.flush
-    else
-      out = ""
-      # Update only the selection if it changed
-      if last_selected && last_selected != selected
-        # last_selected line number is 4 + last_selected (1-indexed ANSI)
-        out += "\e[#{4 + last_selected};1H\e[2K    #{labels[last_selected]}"
-        # selected line number is 4 + selected
-        out += "\e[#{4 + selected};1H\e[2K\e[1m\e[32m  > #{labels[selected]}  \e[0m"
-      end
-
-      # Update only countdown
-      out += "\e[#{7 + labels.length};1H\e[2K"
-      if remaining
-        out += "  Autoboot in \e[1m#{remaining}\e[0m seconds. Press any key to stop."
-      else
-        out += "  Autoboot stopped. Waiting for selection..."
-      end
-
-      console.write(out)
-      console.flush
     end
+
+    out += "                                                                                \n"
+    out += "  [Vol +/-] Navigate   [Power] Select                                           \n"
+    out += "                                                                                \n"
+
+    if remaining
+      msg = "  Autoboot in #{remaining} seconds. Press any key to stop."
+      # Embolden just the number, but calculate padding correctly
+      # We just pad the raw string and then insert the color codes
+      padded_msg = msg.ljust(80).sub(remaining.to_s, "\e[1m#{remaining}\e[0m")
+      out += "#{padded_msg}\n"
+    else
+      msg = "  Autoboot stopped. Waiting for selection..."
+      out += "#{msg.ljust(80)}\n"
+    end
+
+    # Clear anything below our menu just in case, this won't flicker because the area is already empty
+    out += "\e[J"
+    console.write(out)
+    console.flush
   end
 
   def choose(switch_root)
@@ -154,17 +141,15 @@ module ShengHeadlessGenerationMenu
     up_last_repeat = 0.0
     down_pressed_time = 0.0
     down_last_repeat = 0.0
-    full_redraw = true
 
     loop do
       remaining = countdown_active ? [deadline - Time.now.to_i, 0].max : nil
-      needs_redraw = (selected != last_selected) || (remaining != last_remaining) || full_redraw
+      needs_redraw = (selected != last_selected) || (remaining != last_remaining)
 
       if needs_redraw
-        render(generations, selected, remaining: remaining, full: full_redraw, last_selected: last_selected)
+        render(generations, selected, remaining: remaining)
         last_selected = selected
         last_remaining = remaining
-        full_redraw = false
       end
 
       volume_up_pressed = pressed?(VOLUME_UP)
