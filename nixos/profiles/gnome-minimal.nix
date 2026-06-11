@@ -96,6 +96,8 @@ in
 
       settings."org/gnome/settings-daemon/plugins/power" = {
         power-button-action = "nothing";
+        lid-close-ac-action = "nothing";
+        lid-close-battery-action = "nothing";
       };
 
       settings."org/gnome/shell/extensions/gjsosk" = {
@@ -135,6 +137,8 @@ in
         power-button-action = "nothing";
         sleep-inactive-ac-type = "nothing";
         sleep-inactive-battery-type = "nothing";
+        lid-close-ac-action = "nothing";
+        lid-close-battery-action = "nothing";
       };
 
       settings."org/gnome/desktop/session" = {
