@@ -162,7 +162,7 @@ in
     python = pkgs.python3.withPackages (p: [ p.evdev ]);
     script = pkgs.writeScript "fake-tablet-mode" ''
       #!${python}/bin/python3
-      import sys, signal, time, subprocess, os
+      import sys, signal, time, subprocess, os, threading
       import evdev
       from evdev import ecodes, UInput
 
@@ -252,10 +252,11 @@ in
                     file=sys.stderr)
               sys.exit(1)
 
-          # 直接设置 SW_TABLET_MODE=1，告知 GNOME 这是平板
-          ui.write(ecodes.EV_SW, ecodes.SW_TABLET_MODE, 1)
+          # 先设 SW_TABLET_MODE=0，等 GNOME 加载后再切 1
+          # Mutter 需要看到 0→1 的变化事件才能识别平板模式
+          ui.write(ecodes.EV_SW, ecodes.SW_TABLET_MODE, 0)
           ui.syn()
-          print("fake-tablet-mode: set SW_TABLET_MODE=1 (tablet mode, no lid exposed)", file=sys.stderr)
+          print("fake-tablet-mode: initialized SW_TABLET_MODE=0 (no lid exposed)", file=sys.stderr)
 
           def shutdown(sig, frame):
               print("fake-tablet-mode: shutting down", file=sys.stderr)
@@ -263,6 +264,17 @@ in
               sys.exit(0)
           signal.signal(signal.SIGTERM, shutdown)
           signal.signal(signal.SIGINT, shutdown)
+
+          # 延迟 20 秒将虚拟平板模式切换为 1，触发 GNOME 旋转逻辑
+          def toggle_tablet_mode():
+              print("fake-tablet-mode: waiting 20s for GNOME to load...", file=sys.stderr)
+              time.sleep(20)
+              ui.write(ecodes.EV_SW, ecodes.SW_TABLET_MODE, 1)
+              ui.syn()
+              print("fake-tablet-mode: toggled SW_TABLET_MODE=1", file=sys.stderr)
+
+          t = threading.Thread(target=toggle_tablet_mode, daemon=True)
+          t.start()
 
           # 循环监听物理 Hall 传感器，直接控制屏幕息屏/亮屏
           try:
