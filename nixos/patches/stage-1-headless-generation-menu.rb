@@ -7,8 +7,8 @@
 module ShengHeadlessGenerationMenu
   extend self
 
-  VOLUME_UP = [:KEY_VOLUMEUP, :KEY_UP]
-  VOLUME_DOWN = [:KEY_VOLUMEDOWN, :KEY_DOWN]
+  VOLUME_UP = [:KEY_VOLUMEUP]
+  VOLUME_DOWN = [:KEY_VOLUMEDOWN]
   CONFIRM = [:KEY_POWER, :KEY_ENTER]
   REQUEST_PATH = "/mnt/var/lib/sheng-boot-menu/requested"
   FONT_PATH = "/etc/sheng-generation-menu-font.psf.gz"
@@ -27,9 +27,6 @@ module ShengHeadlessGenerationMenu
 
   def pressed?(keys)
     Evdev.keys_held(keys)
-  rescue Exception => e
-    $logger.warn("ShengGenerationMenu Evdev error: #{e}")
-    false
   end
 
   def requested?()
@@ -84,35 +81,57 @@ module ShengHeadlessGenerationMenu
     $logger.warn("Could not restore kernel console log level: #{error}")
   end
 
-  def render(generations, selected, remaining: nil)
+  def render(generations, selected, remaining: nil, full: true, last_selected: nil)
     labels = generations.empty? ? ["NixOS - Default"] : generations.map { |generation| generation.label() }
 
-    out = "\e[H" # Move to top left
-    out += "\e[2K\n" # Blank line
-    out += "\e[2K  \e[1m\e[36m=== NixOS Boot Menu ===\e[0m\n" # Title
-    out += "\e[2K\n" # Blank line
+    if full
+      out = "\e[H" # Move to top left
+      out += "\e[2K\n" # Blank line
+      out += "\e[2K  \e[1m\e[36m=== NixOS Boot Menu ===\e[0m\n" # Title
+      out += "\e[2K\n" # Blank line
 
-    labels.each_with_index do |label, index|
-      if index == selected
-        out += "\e[2K\e[1m\e[32m  > #{label}  \e[0m\n"
-      else
-        out += "\e[2K    #{label}\n"
+      labels.each_with_index do |label, index|
+        if index == selected
+          out += "\e[2K\e[1m\e[32m  > #{label}  \e[0m\n"
+        else
+          out += "\e[2K    #{label}\n"
+        end
       end
-    end
 
-    out += "\e[2K\n"
-    out += "\e[2K  [Vol +/-] Navigate   [Power] Select\n"
-    out += "\e[2K\n"
+      out += "\e[2K\n"
+      out += "\e[2K  [Vol +/-] Navigate   [Power] Select\n"
+      out += "\e[2K\n"
 
-    if remaining
-      out += "\e[2K  Autoboot in \e[1m#{remaining}\e[0m seconds. Press any key to stop.\n"
+      if remaining
+        out += "\e[2K  Autoboot in \e[1m#{remaining}\e[0m seconds. Press any key to stop.\n"
+      else
+        out += "\e[2K  Autoboot stopped. Waiting for selection...\n"
+      end
+
+      out += "\e[J" # Clear anything below our menu
+      console.write(out)
+      console.flush
     else
-      out += "\e[2K  Autoboot stopped. Waiting for selection...\n"
-    end
+      out = ""
+      # Update only the selection if it changed
+      if last_selected && last_selected != selected
+        # last_selected line number is 4 + last_selected (1-indexed ANSI)
+        out += "\e[#{4 + last_selected};1H\e[2K    #{labels[last_selected]}"
+        # selected line number is 4 + selected
+        out += "\e[#{4 + selected};1H\e[2K\e[1m\e[32m  > #{labels[selected]}  \e[0m"
+      end
 
-    out += "\e[J" # Clear anything below our menu
-    console.write(out)
-    console.flush
+      # Update only countdown
+      out += "\e[#{7 + labels.length};1H\e[2K"
+      if remaining
+        out += "  Autoboot in \e[1m#{remaining}\e[0m seconds. Press any key to stop."
+      else
+        out += "  Autoboot stopped. Waiting for selection..."
+      end
+
+      console.write(out)
+      console.flush
+    end
   end
 
   def choose(switch_root)
@@ -131,15 +150,17 @@ module ShengHeadlessGenerationMenu
     last_remaining = nil
     volume_up_was_pressed = false
     volume_down_was_pressed = false
+    full_redraw = true
 
     loop do
       remaining = countdown_active ? [deadline - Time.now.to_i, 0].max : nil
-      needs_redraw = (selected != last_selected) || (remaining != last_remaining)
+      needs_redraw = (selected != last_selected) || (remaining != last_remaining) || full_redraw
 
       if needs_redraw
-        render(generations, selected, remaining: remaining)
+        render(generations, selected, remaining: remaining, full: full_redraw, last_selected: last_selected)
         last_selected = selected
         last_remaining = remaining
+        full_redraw = false
       end
 
       volume_up_pressed = pressed?(VOLUME_UP)
