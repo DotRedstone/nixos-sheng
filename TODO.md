@@ -43,7 +43,7 @@
 * [x] 默认终端已强制设定为 `gnome-console` (kgx)
 * [x] 加速度计 mount matrix 已按横屏原生方向修正
 * [~] 悬浮软键盘在不同应用中的自动弹出行为仍需长期使用验证
-* [~] 自动旋转方向已修正配置，仍需验证四个方向和旋转后的触摸坐标
+* [x] 自动旋转方向已修正配置，四个方向和旋转后的触摸坐标均已验证
 
 ### Firmware / remoteproc
 
@@ -492,8 +492,8 @@ journalctl -b -u adsprpcd-sensorspd -u iio-sensor-proxy --no-pager -o short-mono
 postmarketOS 状态：Y
 
 * [x] `gpio-keys` input 设备存在
-* [~] input 设备中出现 `SW=1`，疑似 Hall/LID switch
-* [ ] 需要人工磁吸/键盘盖状态变化验证
+* [x] input 设备中出现 `SW_LID`，已确认极性为 0=开盖，1=合盖
+* [x] 已通过 `fake-tablet-mode` 服务实现了屏蔽 `SW_LID` 并通过 Mutter D-Bus 控制合盖息屏，解决 GNOME 开机自动旋转失效问题
 
 验证命令：
 
@@ -748,6 +748,7 @@ postmarketOS 状态：N
 * [~] Camera：当前候选版本已重新验证前后摄 RAW10 实际抓帧；待完善 libcamera 与桌面相机应用
 * [~] Display：3048x2032 已确认；待验证刷新率、144Hz、Night Light、背光调节
 * [x] Power / volume buttons：实体键事件、开机世代菜单选择及日常息屏已验证
+* [x] Hall sensor：合盖息屏与开盖亮屏已通过 D-Bus 验证，且不影响 GNOME 旋转
 * [ ] Battery / charger：不同充电器下电压、电流、PD 状态
 
 ### P1：尚未完成的硬件功能
@@ -758,8 +759,6 @@ postmarketOS 状态：N
 * [~] Camera flash：节点已出现，待验证实际点亮
 
 ### P2：postmarketOS 已工作但需要更多用户态验证的项目
-
-* [ ] Hall sensor
 * [~] Sensors：SSC 用户态链路可用；严格 kernel IIO 验收仍未通过，需实现
   `iio:device*`、单独 gyroscope 暴露，并完善 proximity Davinci payload 解包
 
