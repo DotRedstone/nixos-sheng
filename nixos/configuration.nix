@@ -73,6 +73,16 @@
   services.logind.settings.Login.HandleLidSwitchExternalPower = "ignore";
   services.logind.settings.Login.HandleLidSwitchDocked = "ignore";
 
+  # 彻底禁用 suspend 功能，防止 GNOME 界面出现休眠按钮，避免误触导致设备内核假死
+  systemd.sleep.settings = {
+    Sleep = {
+      AllowSuspend = "no";
+      AllowHibernation = "no";
+      AllowHybridSleep = "no";
+      AllowSuspendThenHibernate = "no";
+    };
+  };
+
   services.xiaomi-mipps-auth.enable = true;
 
   console = {

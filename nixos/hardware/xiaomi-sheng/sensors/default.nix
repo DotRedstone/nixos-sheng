@@ -265,10 +265,22 @@ in
           signal.signal(signal.SIGTERM, shutdown)
           signal.signal(signal.SIGINT, shutdown)
 
-          # 延迟 20 秒将虚拟平板模式切换为 1，触发 GNOME 旋转逻辑
+          # 智能等待 GNOME 会话和 iio-sensor-proxy 启动后再将虚拟平板模式切换为 1
           def toggle_tablet_mode():
-              print("fake-tablet-mode: waiting 20s for GNOME to load...", file=sys.stderr)
-              time.sleep(20)
+              print("fake-tablet-mode: waiting for iio-sensor-proxy to own DBus name...", file=sys.stderr)
+              while True:
+                  try:
+                      subprocess.check_call(["${pkgs.systemd}/bin/busctl", "status", "net.hadess.SensorProxy"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                      break
+                  except Exception:
+                      time.sleep(2)
+              
+              print("fake-tablet-mode: waiting for active GNOME session...", file=sys.stderr)
+              while find_active_session() is None:
+                  time.sleep(2)
+              
+              print("fake-tablet-mode: both ready! waiting 5s for Mutter libinput init...", file=sys.stderr)
+              time.sleep(5)
               ui.write(ecodes.EV_SW, ecodes.SW_TABLET_MODE, 1)
               ui.syn()
               print("fake-tablet-mode: toggled SW_TABLET_MODE=1", file=sys.stderr)
