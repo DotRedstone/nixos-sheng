@@ -68,6 +68,10 @@
   # Suspend currently times out in the sheng kernel. Ignoring short power-key
   # presses prevents GDM/logind from disconnecting the device for about 40s.
   services.logind.settings.Login.HandlePowerKey = "ignore";
+  # 盖板事件由 fake-tablet-mode 服务直接处理（D-Bus 息屏），logind 不介入。
+  services.logind.settings.Login.HandleLidSwitch = "ignore";
+  services.logind.settings.Login.HandleLidSwitchExternalPower = "ignore";
+  services.logind.settings.Login.HandleLidSwitchDocked = "ignore";
 
   services.xiaomi-mipps-auth.enable = true;
 
@@ -132,7 +136,7 @@
   systemd.services.iio-sensor-proxy.wantedBy = [ "multi-user.target" ];
 
   services.udev.extraRules = ''
-    ENV{ID_INPUT_TOUCHSCREEN}=="1", ENV{LIBINPUT_CALIBRATION_MATRIX}="1 0 0 0 1 0 0 0 1"
+    ENV{ID_INPUT_TOUCHSCREEN}=="1", ENV{LIBINPUT_CALIBRATION_MATRIX}="1 0 0 0 1 0 0 0 1", ENV{ID_INPUT_TOUCHSCREEN_INTEGRATION}="internal"
     SUBSYSTEM=="block", ENV{DEVTYPE}=="partition", ENV{ID_PATH}=="platform-1d84000.ufshc-scsi-*", ENV{UDISKS_IGNORE}="1"
   '';
 

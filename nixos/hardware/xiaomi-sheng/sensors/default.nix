@@ -125,9 +125,12 @@ in
     };
   };
 
-  # 6. Expose SSC-backed sensors to iio-sensor-proxy.
+  # 6. Expose SSC-backed sensors to iio-sensor-proxy, and strip raw lid switch from logind
   services.udev.extraRules = ''
-    SUBSYSTEM=="misc", KERNEL=="fastrpc-adsp*", ENV{IIO_SENSOR_PROXY_TYPE}+="ssc-accel ssc-proximity ssc-light ssc-compass", ENV{ACCEL_MOUNT_MATRIX}+="0, 1, 0; -1, 0, 0; 0, 0, -1", TAG+="systemd", ENV{SYSTEMD_WANTS}+="iio-sensor-proxy.service"
+    # 彻底屏蔽物理 gpio-keys 的开关和输入设备属性，防止 logind 监听它并收到反向的合盖信号
+    ACTION=="add|change", SUBSYSTEM=="input", ATTRS{name}=="gpio-keys", ENV{ID_INPUT_SWITCH}="", ENV{ID_INPUT}=""
+
+    SUBSYSTEM=="misc", KERNEL=="fastrpc-adsp*", ENV{IIO_SENSOR_PROXY_TYPE}+="ssc-accel ssc-proximity ssc-light ssc-compass", ENV{ACCEL_MOUNT_MATRIX}="0, 1, 0; -1, 0, 0; 0, 0, -1", TAG+="systemd", ENV{SYSTEMD_WANTS}+="iio-sensor-proxy.service"
   '';
 
   # 7. Ensure iio-sensor-proxy is enabled and starts after SSC is queryable.
@@ -136,7 +139,7 @@ in
     after = [ "adsprpcd-sensorspd.service" "systemd-udev-settle.service" ];
     wants = [ "adsprpcd-sensorspd.service" ];
     serviceConfig.ExecStartPre = pkgs.writeShellScript "wait-for-sheng-ssc" ''
-      for _ in $(seq 1 30); do
+      for _ in $(seq 1 10); do
         if ${libssc}/bin/ssccli --sensor light --timeout 1 >/dev/null 2>&1; then
           exit 0
         fi
@@ -145,5 +148,169 @@ in
 
       exit 0
     '';
+  };
+
+  # 8. 平板模式 + 霍尔传感器息屏服务
+  #
+  # 设计思路：
+  # - 虚拟设备只上报 SW_TABLET_MODE=1，不暴露 SW_LID 给 GNOME
+  # - GNOME/Mutter 只看到平板模式，旋转永远可用，不受盖板影响
+  # - 合盖/开盖息屏亮屏通过直接调 Mutter D-Bus PowerSaveMode 实现
+  # - 与 GNOME 的 lid 逻辑完全解耦，避免开机早期合盖导致旋转失效
+  boot.kernelModules = [ "uinput" ];
+  systemd.services.fake-tablet-mode = let
+    python = pkgs.python3.withPackages (p: [ p.evdev ]);
+    script = pkgs.writeScript "fake-tablet-mode" ''
+      #!${python}/bin/python3
+      import sys, signal, time, subprocess, os, threading
+      import evdev
+      from evdev import ecodes, UInput
+
+      def get_real_lid_device():
+          for path in evdev.list_devices():
+              try:
+                  dev = evdev.InputDevice(path)
+                  if dev.name == "gpio-keys":
+                      caps = dev.capabilities()
+                      if ecodes.EV_SW in caps and ecodes.SW_LID in caps[ecodes.EV_SW]:
+                          return dev
+              except Exception:
+                  continue
+          return None
+
+      def find_active_session():
+          """找到当前活跃的 GNOME 会话，返回 (uid, username)"""
+          try:
+              out = subprocess.check_output(
+                  ["${pkgs.systemd}/bin/loginctl", "list-sessions", "--no-legend"],
+                  text=True, timeout=5
+              )
+              for line in out.strip().split("\n"):
+                  parts = line.split()
+                  if len(parts) >= 2:
+                      session_id = parts[0]
+                      try:
+                          state = subprocess.check_output(
+                              ["${pkgs.systemd}/bin/loginctl", "show-session", session_id, "-p", "Active", "--value"],
+                              text=True, timeout=5
+                          ).strip()
+                          if state == "yes":
+                              uid = subprocess.check_output(
+                                  ["${pkgs.systemd}/bin/loginctl", "show-session", session_id, "-p", "User", "--value"],
+                                  text=True, timeout=5
+                              ).strip()
+                              username = subprocess.check_output(
+                                  ["${pkgs.coreutils}/bin/id", "-un", uid],
+                                  text=True, timeout=5
+                              ).strip()
+                              return (uid, username)
+                      except Exception:
+                          continue
+          except Exception:
+              pass
+          return None
+
+      def set_power_save_mode(uid, username, mode):
+          """通过 Mutter D-Bus 设置 PowerSaveMode (0=开屏, 3=息屏)"""
+          bus = f"unix:path=/run/user/{uid}/bus"
+          try:
+              subprocess.run(
+                  ["/run/wrappers/bin/su", "-s", "/bin/sh", username, "-c",
+                   f"DBUS_SESSION_BUS_ADDRESS={bus} ${pkgs.systemd}/bin/busctl --user set-property "
+                   f"org.gnome.Mutter.DisplayConfig /org/gnome/Mutter/DisplayConfig "
+                   f"org.gnome.Mutter.DisplayConfig PowerSaveMode i {mode}"],
+                  timeout=5, capture_output=True
+              )
+              print(f"fake-tablet-mode: set PowerSaveMode={mode}", file=sys.stderr)
+          except Exception as e:
+              print(f"WARNING: failed to set PowerSaveMode: {e}", file=sys.stderr)
+
+      def main():
+          # 查找物理 Hall 传感器输入设备
+          real_dev = None
+          for _ in range(30):
+              real_dev = get_real_lid_device()
+              if real_dev is not None:
+                  break
+              time.sleep(1)
+
+          if real_dev is None:
+              print("FATAL: real gpio-keys lid device not found", file=sys.stderr)
+              sys.exit(1)
+
+          print(f"fake-tablet-mode: found real lid device at {real_dev.path}", file=sys.stderr)
+
+          # 创建虚拟设备：只上报 SW_TABLET_MODE，不暴露 SW_LID
+          try:
+              cap = {
+                  ecodes.EV_SW: [ecodes.SW_TABLET_MODE]
+              }
+              ui = UInput(cap, name="Fake Tablet Mode Switch",
+                          vendor=0x1234, product=0x5678)
+          except Exception as e:
+              print(f"FATAL: cannot create uinput device: {e}",
+                    file=sys.stderr)
+              sys.exit(1)
+
+          # 先设 SW_TABLET_MODE=0，等 GNOME 加载后再切 1
+          # Mutter 需要看到 0→1 的变化事件才能识别平板模式
+          ui.write(ecodes.EV_SW, ecodes.SW_TABLET_MODE, 0)
+          ui.syn()
+          print("fake-tablet-mode: initialized SW_TABLET_MODE=0 (no lid exposed)", file=sys.stderr)
+
+          def shutdown(sig, frame):
+              print("fake-tablet-mode: shutting down", file=sys.stderr)
+              ui.close()
+              sys.exit(0)
+          signal.signal(signal.SIGTERM, shutdown)
+          signal.signal(signal.SIGINT, shutdown)
+
+          # 延迟 20 秒将虚拟平板模式切换为 1，触发 GNOME 旋转逻辑
+          def toggle_tablet_mode():
+              print("fake-tablet-mode: waiting 20s for GNOME to load...", file=sys.stderr)
+              time.sleep(20)
+              ui.write(ecodes.EV_SW, ecodes.SW_TABLET_MODE, 1)
+              ui.syn()
+              print("fake-tablet-mode: toggled SW_TABLET_MODE=1", file=sys.stderr)
+
+          t = threading.Thread(target=toggle_tablet_mode, daemon=True)
+          t.start()
+
+          # 循环监听物理 Hall 传感器，直接控制屏幕息屏/亮屏
+          try:
+              for event in real_dev.read_loop():
+                  if event.type == ecodes.EV_SW and event.code == ecodes.SW_LID:
+                      session = find_active_session()
+                      if session:
+                          uid, username = session
+                          if event.value == 1:
+                              # 合盖 → 息屏
+                              print("fake-tablet-mode: lid closed, blanking screen", file=sys.stderr)
+                              set_power_save_mode(uid, username, 3)
+                          else:
+                              # 开盖 → 亮屏
+                              print("fake-tablet-mode: lid opened, unblanking screen", file=sys.stderr)
+                              set_power_save_mode(uid, username, 0)
+                      else:
+                          print(f"fake-tablet-mode: lid event={event.value} but no active session", file=sys.stderr)
+          except Exception as e:
+              print(f"FATAL: error in event read loop: {e}", file=sys.stderr)
+              ui.close()
+              sys.exit(1)
+
+      if __name__ == "__main__":
+          main()
+    '';
+  in {
+    description = "Fake Tablet Mode Switch and Hall Sensor Screen Control";
+    wantedBy = [ "multi-user.target" ];
+    before = [ "display-manager.service" ];
+    after = [ "systemd-modules-load.service" ];
+    serviceConfig = {
+      Type = "simple";
+      ExecStart = "${script}";
+      Restart = "always";
+      RestartSec = "3s";
+    };
   };
 }
