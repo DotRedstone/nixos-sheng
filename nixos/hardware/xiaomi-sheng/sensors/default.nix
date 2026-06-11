@@ -136,7 +136,7 @@ in
     after = [ "adsprpcd-sensorspd.service" "systemd-udev-settle.service" ];
     wants = [ "adsprpcd-sensorspd.service" ];
     serviceConfig.ExecStartPre = pkgs.writeShellScript "wait-for-sheng-ssc" ''
-      for _ in $(seq 1 30); do
+      for _ in $(seq 1 10); do
         if ${libssc}/bin/ssccli --sensor light --timeout 1 >/dev/null 2>&1; then
           exit 0
         fi
