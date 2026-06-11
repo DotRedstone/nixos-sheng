@@ -168,6 +168,14 @@ in
 
   services.dleyna.enable = lib.mkForce false;
 
+  # 彻底屏蔽物理电源键在底层输入框架（libinput/GNOME）中的识别。
+  # GNOME 会在收到任何有效输入事件时自动唤醒屏幕。如果让 GNOME 看到电源键，
+  # 它会瞬间点亮屏幕（PowerSaveMode变0），此时我们自己的脚本再检测，就会误以为
+  # 用户是想从亮屏变成息屏，导致“闪亮一下又黑掉”。屏蔽后，全部唤醒由脚本控制。
+  services.udev.extraRules = ''
+    ACTION=="add|change", SUBSYSTEM=="input", ATTRS{name}=="pmic_pwrkey", ENV{ID_INPUT}="", ENV{ID_INPUT_KEY}=""
+  '';
+
   systemd.services.sheng-power-key-display-toggle = {
     description = "Toggle the sheng display with the power key";
     wantedBy = [ "multi-user.target" ];
