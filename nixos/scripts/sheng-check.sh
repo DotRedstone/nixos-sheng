@@ -150,6 +150,36 @@ echo "$ cat /sys/kernel/debug/devices_deferred"
 cat /sys/kernel/debug/devices_deferred 2>/dev/null || echo "(not available or requires root)"
 echo ""
 
+# ── Sensors / Rotation / Tablet Mode ──
+section "Sensors / Rotation / Tablet Mode"
+run_cmd systemctl status sheng-fake-tablet-mode.service --no-pager
+run_cmd systemctl status iio-sensor-proxy.service --no-pager
+run_cmd systemctl status sheng-devauth.service --no-pager
+echo "$ busctl status net.hadess.SensorProxy"
+busctl status net.hadess.SensorProxy 2>/dev/null || true
+echo ""
+echo "$ cat /sys/class/dmi/id/chassis_type"
+cat /sys/class/dmi/id/chassis_type 2>/dev/null || true
+echo ""
+echo "$ udevadm info -e | grep -Ei 'iio|sensor|tablet|SW_TABLET_MODE'"
+udevadm info -e 2>/dev/null | grep -Ei 'iio|sensor|tablet|SW_TABLET_MODE' | tail -50 || true
+echo ""
+
+# ── Power / Wakeup / Sleep ──
+section "Power / Wakeup / Sleep"
+run_cmd systemctl status sheng-power-key-display-toggle.service --no-pager
+echo "$ cat /sys/power/mem_sleep"
+cat /sys/power/mem_sleep 2>/dev/null || true
+echo ""
+
+# ── Audio / Sound ──
+section "Audio / Sound"
+run_cmd aplay -l
+run_cmd arecord -l
+echo "$ dmesg audio excerpts"
+dmesg 2>/dev/null | grep -Ei 'snd|audio|wcd|lpass|codec' | tail -100 || true
+echo ""
+
 # ── Kernel Config Summary ──
 section "Kernel Config Summary"
 if [ -f /proc/config.gz ]; then

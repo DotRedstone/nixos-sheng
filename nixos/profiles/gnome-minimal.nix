@@ -186,6 +186,8 @@ in
 
   services.dleyna.enable = lib.mkForce false;
 
+  environment.gnome.excludePackages = [ pkgs.gnome-tour ];
+
   systemd.services.sheng-power-key-display-toggle = {
     description = "Toggle the sheng display with the power key";
     wantedBy = [ "multi-user.target" ];
