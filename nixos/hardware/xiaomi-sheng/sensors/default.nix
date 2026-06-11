@@ -218,8 +218,8 @@ in
           except Exception as e:
               print(f"WARNING: failed to query initial lid state: {e}", file=sys.stderr)
 
-          # 取反霍尔元件盖板状态（硬件 1 对应合盖，取反后 0 对应开盖）
-          virtual_lid_state = real_lid_state ^ 1
+          # 直接透传霍尔元件盖板状态（硬件 0=开盖，1=合盖，极性正确无需取反）
+          virtual_lid_state = real_lid_state
 
           # 初始化状态
           ui.write(ecodes.EV_SW, ecodes.SW_TABLET_MODE, 0)
@@ -245,14 +245,13 @@ in
           t = threading.Thread(target=toggle_tablet_mode, daemon=True)
           t.start()
 
-          # 循环监听物理 Hall 传感器，取反并转发事件
+          # 循环监听物理 Hall 传感器，直接透传事件（极性正确无需取反）
           try:
               for event in real_dev.read_loop():
                   if event.type == ecodes.EV_SW and event.code == ecodes.SW_LID:
-                      inverted_value = event.value ^ 1
-                      ui.write(ecodes.EV_SW, ecodes.SW_LID, inverted_value)
+                      ui.write(ecodes.EV_SW, ecodes.SW_LID, event.value)
                       ui.syn()
-                      print(f"fake-tablet-mode: intercepted SW_LID event: {event.value} -> {inverted_value}", file=sys.stderr)
+                      print(f"fake-tablet-mode: forwarded SW_LID event: {event.value}", file=sys.stderr)
           except Exception as e:
               print(f"FATAL: error in event read loop: {e}", file=sys.stderr)
               ui.close()
