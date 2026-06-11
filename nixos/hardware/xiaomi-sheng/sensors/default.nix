@@ -162,19 +162,67 @@ in
     python = pkgs.python3.withPackages (p: [ p.evdev ]);
     script = pkgs.writeScript "fake-tablet-mode" ''
       #!${python}/bin/python3
-      import sys, signal, time
+      import sys, signal, time, threading, array, fcntl
       import evdev
       from evdev import ecodes, UInput
 
+      def get_real_lid_device():
+          for path in evdev.list_devices():
+              try:
+                  dev = evdev.InputDevice(path)
+                  if dev.name == "gpio-keys":
+                      caps = dev.capabilities()
+                      if ecodes.EV_SW in caps and ecodes.SW_LID in caps[ecodes.EV_SW]:
+                          return dev
+              except Exception:
+                  continue
+          return None
+
       def main():
+          # 查找物理 Hall 传感器输入设备
+          real_dev = None
+          for _ in range(30):
+              real_dev = get_real_lid_device()
+              if real_dev is not None:
+                  break
+              time.sleep(1)
+
+          if real_dev is None:
+              print("FATAL: real gpio-keys lid device not found", file=sys.stderr)
+              sys.exit(1)
+
+          print(f"fake-tablet-mode: found real lid device at {real_dev.path}", file=sys.stderr)
+
+          # 创建同时支持平板模式与盖板开关的虚拟设备
           try:
-              cap = {ecodes.EV_SW: [ecodes.SW_TABLET_MODE]}
-              ui = UInput(cap, name="Fake Tablet Mode Switch",
+              cap = {
+                  ecodes.EV_SW: [ecodes.SW_TABLET_MODE, ecodes.SW_LID]
+              }
+              ui = UInput(cap, name="Fake Tablet and Lid Switch",
                           vendor=0x1234, product=0x5678)
           except Exception as e:
               print(f"FATAL: cannot create uinput device: {e}",
                     file=sys.stderr)
               sys.exit(1)
+
+          # 使用 ioctl (EVIOCGSW) 查询物理 Hall 传感器的初始状态
+          real_lid_state = 0
+          try:
+              buf = array.array('B', [0] * 8)
+              fcntl.ioctl(real_dev.fd, 0x8008451b, buf)
+              real_lid_state = buf[0] & 1
+              print(f"fake-tablet-mode: real SW_LID state is {real_lid_state}", file=sys.stderr)
+          except Exception as e:
+              print(f"WARNING: failed to query initial lid state: {e}", file=sys.stderr)
+
+          # 取反霍尔元件盖板状态（硬件 1 对应合盖，取反后 0 对应开盖）
+          virtual_lid_state = real_lid_state ^ 1
+
+          # 初始化状态
+          ui.write(ecodes.EV_SW, ecodes.SW_TABLET_MODE, 0)
+          ui.write(ecodes.EV_SW, ecodes.SW_LID, virtual_lid_state)
+          ui.syn()
+          print(f"fake-tablet-mode: initialized SW_TABLET_MODE=0, SW_LID={virtual_lid_state}", file=sys.stderr)
 
           def shutdown(sig, frame):
               print("fake-tablet-mode: shutting down", file=sys.stderr)
@@ -183,28 +231,35 @@ in
           signal.signal(signal.SIGTERM, shutdown)
           signal.signal(signal.SIGINT, shutdown)
 
-          # 初始化为笔记本模式 (0)，供 Mutter 之后检测到状态变化
-          ui.write(ecodes.EV_SW, ecodes.SW_TABLET_MODE, 0)
-          ui.syn()
-          print("fake-tablet-mode: initialized SW_TABLET_MODE=0", file=sys.stderr)
+          # 延迟 20 秒将虚拟平板模式切换为 1，触发 GNOME 旋转逻辑
+          def toggle_tablet_mode():
+              print("fake-tablet-mode: waiting 20s for GNOME to load...", file=sys.stderr)
+              time.sleep(20)
+              ui.write(ecodes.EV_SW, ecodes.SW_TABLET_MODE, 1)
+              ui.syn()
+              print("fake-tablet-mode: toggled SW_TABLET_MODE=1", file=sys.stderr)
 
-          # 延迟 20 秒，等待 GDM / GNOME Shell 启动并加载完成
-          print("fake-tablet-mode: waiting 20s for GNOME Shell to initialize...", file=sys.stderr)
-          time.sleep(20)
+          t = threading.Thread(target=toggle_tablet_mode, daemon=True)
+          t.start()
 
-          # 切换为平板模式 (1) 触发 GNOME 旋转逻辑
-          ui.write(ecodes.EV_SW, ecodes.SW_TABLET_MODE, 1)
-          ui.syn()
-          print("fake-tablet-mode: toggled SW_TABLET_MODE=1", file=sys.stderr)
-
-          while True:
-              time.sleep(86400)
+          # 循环监听物理 Hall 传感器，取反并转发事件
+          try:
+              for event in real_dev.read_loop():
+                  if event.type == ecodes.EV_SW and event.code == ecodes.SW_LID:
+                      inverted_value = event.value ^ 1
+                      ui.write(ecodes.EV_SW, ecodes.SW_LID, inverted_value)
+                      ui.syn()
+                      print(f"fake-tablet-mode: intercepted SW_LID event: {event.value} -> {inverted_value}", file=sys.stderr)
+          except Exception as e:
+              print(f"FATAL: error in event read loop: {e}", file=sys.stderr)
+              ui.close()
+              sys.exit(1)
 
       if __name__ == "__main__":
           main()
     '';
   in {
-    description = "Fake Tablet Mode Switch for GNOME Rotation";
+    description = "Fake Tablet and Lid Switch for GNOME Rotation & Lid control";
     wantedBy = [ "multi-user.target" ];
     before = [ "display-manager.service" ];
     after = [ "systemd-modules-load.service" ];
@@ -216,4 +271,11 @@ in
     };
   };
 
+  # 9. Mark gpio-keys lid switch as unreliable in libinput
+  # This prevents GNOME/Mutter from thinking the lid is closed based on the real gpio-keys.
+  environment.etc."libinput/local-overrides.quirks".text = ''
+    [sheng-gpio-keys-lid]
+    MatchName=gpio-keys
+    AttrLidSwitchReliability=unreliable
+  '';
 }
