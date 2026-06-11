@@ -125,8 +125,11 @@ in
     };
   };
 
-  # 6. Expose SSC-backed sensors to iio-sensor-proxy.
+  # 6. Expose SSC-backed sensors to iio-sensor-proxy, and strip raw lid switch from logind
   services.udev.extraRules = ''
+    # 彻底屏蔽物理 gpio-keys 的开关和输入设备属性，防止 logind 监听它并收到反向的合盖信号
+    ACTION=="add|change", SUBSYSTEM=="input", ATTRS{name}=="gpio-keys", ENV{ID_INPUT_SWITCH}="", ENV{ID_INPUT}=""
+
     SUBSYSTEM=="misc", KERNEL=="fastrpc-adsp*", ENV{IIO_SENSOR_PROXY_TYPE}+="ssc-accel ssc-proximity ssc-light ssc-compass", ENV{ACCEL_MOUNT_MATRIX}="0, 1, 0; -1, 0, 0; 0, 0, -1", TAG+="systemd", ENV{SYSTEMD_WANTS}+="iio-sensor-proxy.service"
   '';
 
