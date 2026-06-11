@@ -119,6 +119,12 @@
         nixpkgs.overlays = lib.mkAfter [ shengOverlay ];
       };
 
+      # 对外暴露 Mobile NixOS 专用的构造器函数
+      # 下游如果需要编译包含 mobile.xxx 属性的完整系统，应该调用这个函数传入额外模块
+      lib.${system}.mkShengSystem = extraModules: mobileEvalFor ( [
+        ./profiles/gnome-minimal.nix
+      ] ++ extraModules );
+
       nixosConfigurations = {
         sheng = mobileGnomeEval;
         sheng-minimal = mobileEval;
