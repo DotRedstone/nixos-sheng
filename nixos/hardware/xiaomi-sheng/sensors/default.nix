@@ -240,10 +240,11 @@ in
 
           print(f"fake-tablet-mode: found real lid device at {real_dev.path}", file=sys.stderr)
 
-          # 创建虚拟设备：只上报 SW_TABLET_MODE，不暴露 SW_LID
+          # 创建虚拟设备：只上报 SW_TABLET_MODE，并且允许发送 KEY_WAKEUP 唤醒系统
           try:
               cap = {
-                  ecodes.EV_SW: [ecodes.SW_TABLET_MODE]
+                  ecodes.EV_SW: [ecodes.SW_TABLET_MODE],
+                  ecodes.EV_KEY: [ecodes.KEY_WAKEUP]
               }
               ui = UInput(cap, name="Fake Tablet Mode Switch",
                           vendor=0x1234, product=0x5678)
@@ -265,10 +266,13 @@ in
           signal.signal(signal.SIGTERM, shutdown)
           signal.signal(signal.SIGINT, shutdown)
 
-          # 延迟 20 秒将虚拟平板模式切换为 1，触发 GNOME 旋转逻辑
+          # 智能等待 GNOME 会话启动后再将虚拟平板模式切换为 1，解决偶发旋转失效
           def toggle_tablet_mode():
-              print("fake-tablet-mode: waiting 20s for GNOME to load...", file=sys.stderr)
-              time.sleep(20)
+              print("fake-tablet-mode: waiting for active GNOME session...", file=sys.stderr)
+              while find_active_session() is None:
+                  time.sleep(2)
+              print("fake-tablet-mode: GNOME session found! waiting 5s for Mutter libinput init...", file=sys.stderr)
+              time.sleep(5)
               ui.write(ecodes.EV_SW, ecodes.SW_TABLET_MODE, 1)
               ui.syn()
               print("fake-tablet-mode: toggled SW_TABLET_MODE=1", file=sys.stderr)
@@ -288,8 +292,13 @@ in
                               print("fake-tablet-mode: lid closed, blanking screen", file=sys.stderr)
                               set_power_save_mode(uid, username, 3)
                           else:
-                              # 开盖 → 亮屏
-                              print("fake-tablet-mode: lid opened, unblanking screen", file=sys.stderr)
+                              # 开盖 → 亮屏并且注入唤醒事件强制重绘
+                              print("fake-tablet-mode: lid opened, unblanking and waking screen", file=sys.stderr)
+                              ui.write(ecodes.EV_KEY, ecodes.KEY_WAKEUP, 1)
+                              ui.syn()
+                              time.sleep(0.01)
+                              ui.write(ecodes.EV_KEY, ecodes.KEY_WAKEUP, 0)
+                              ui.syn()
                               set_power_save_mode(uid, username, 0)
                       else:
                           print(f"fake-tablet-mode: lid event={event.value} but no active session", file=sys.stderr)
