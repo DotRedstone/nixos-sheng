@@ -162,5 +162,12 @@
           cp ${mobileEval.outputs.initrd} $out/initrd
         '';
       };
+
+      checks.${system} = {
+        publicGnomeSystem =
+          (self.lib.${system}.mkShengSystem [ ]).config.system.build.toplevel;
+        publicMinimalSystem =
+          (self.lib.${system}.mkShengMinimalSystem [ ]).config.system.build.toplevel;
+      };
     };
 }
