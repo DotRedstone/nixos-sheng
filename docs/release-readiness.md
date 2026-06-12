@@ -36,16 +36,16 @@ replace `TODO.md`; it lists only release blockers and high-signal results.
   system profile was rolled back and activated successfully. The synthetic
   generation was removed after validation.
 
-## Alpha.2 publication
+## v0.1.0 publication
 
-- `v0.1.0-alpha.2` was published from release-candidate commit `1ac6c25`.
+- `v0.1.0` is prepared from the validated release configuration.
 - Public flake checks, the boot image build, and the GNOME rootfs build all
-  completed successfully from that commit.
+  must complete successfully from the final release commit.
 - The release tag, boot image, split GNOME rootfs archive, checksums, flashing
-  instructions, known issues, and rollback instructions were verified after
+  instructions, known issues, and rollback instructions must be verified after
   publication.
 
-## Stable release blockers
+## Future improvements
 
 - Expand the ext4 filesystem offline to the full `linux` partition, then
   validate a full device-side `nixos-rebuild --flake`.

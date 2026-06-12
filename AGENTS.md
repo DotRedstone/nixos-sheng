@@ -333,15 +333,15 @@ dmesg | grep -Ei 'adsp|cdsp|firmware|charger_pd|pd_running|ucsi|typec|ath12k|mhi
 
 ### 版本规则
 
-使用语义化版本，并在硬件 bring-up 阶段使用 alpha / beta 标记：
+使用语义化版本：
 
-* `v0.1.0-alpha.1`：首个可启动测试镜像
-* `v0.1.0-alpha.N`：每次修通一个用户可感知硬件功能后递增
-* `v0.1.0-beta.N`：主要硬件基本可用后使用
-* `v0.1.0`：达到可公开日用测试标准后使用
+* `v0.1.0`：首个正式公开版本
+* `v0.1.N`：兼容的修复和硬件支持改进
+* `v0.N.0`：新增重要能力或有明显行为变化
+* `vN.0.0`：存在不兼容变更
 
 不要因为普通文档修改、日志降噪、小型重构发布 release。
-每修通一个明确硬件能力，例如 Wi-Fi、触摸、蓝牙、音频、传感器、相机，可以考虑发布新的 alpha release。
+每修通一个明确硬件能力，例如 Wi-Fi、触摸、蓝牙、音频、传感器、相机，可以考虑发布新的版本。
 
 ### 构建产物规则
 
@@ -391,16 +391,16 @@ Release 至少包含：
 推荐命名：
 
 ```text
-sheng-v0.1.0-alpha.1-boot.img
-sheng-v0.1.0-alpha.1-rootfs-minimal.img.zst
-sheng-v0.1.0-alpha.1-sha256sums.txt
+sheng-v0.1.0-boot.img
+sheng-v0.1.0-rootfs-minimal.img.zst
+sheng-v0.1.0-sha256sums.txt
 ```
 
 GNOME 或其它大桌面环境不要默认塞进 minimal 镜像。
 如果提供 GNOME 测试镜像，使用单独附件：
 
 ```text
-sheng-v0.1.0-alpha.N-rootfs-gnome.img.zst
+sheng-v0.1.N-rootfs-gnome.img.zst
 ```
 
 ### Release notes 必须包含
@@ -466,4 +466,4 @@ Actions 和 release 中不得包含：
 - `sheng`：开发主线，保留真实 bring-up 历史。
 - `stable/v0.1`：面向 release 的稳定分支。
 - `feat/...`、`fix/...`、`exp/...`：功能和实验分支。
-- 每个可用硬件能力通过 release tag 记录，例如 `v0.1.0-alpha.1`、`v0.1.0-alpha.2`。
+- 每个可用硬件能力通过 release tag 记录，例如 `v0.1.0`、`v0.1.1`。

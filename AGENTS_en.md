@@ -306,15 +306,15 @@ The build artifacts of this project are meant for real flashing usage, so after 
 
 ### Versioning Rules
 
-Use semantic versioning and use alpha / beta tags during the hardware bring-up phase:
+Use semantic versioning:
 
-* `v0.1.0-alpha.1`: First bootable test image
-* `v0.1.0-alpha.N`: Increment after each user-perceivable hardware feature is working
-* `v0.1.0-beta.N`: Use when major hardware is basically usable
-* `v0.1.0`: Use when it reaches public daily-driver testing standards
+* `v0.1.0`: First official public release
+* `v0.1.N`: Compatible fixes and hardware support improvements
+* `v0.N.0`: Important new capabilities or noticeable behavior changes
+* `vN.0.0`: Incompatible changes
 
 Do not publish releases for plain documentation changes, log noise reduction, or minor refactoring.
-Consider publishing a new alpha release every time a distinct hardware capability is working, such as Wi-Fi, touch, Bluetooth, audio, sensors, or cameras.
+Consider publishing a new release every time a distinct hardware capability is working, such as Wi-Fi, touch, Bluetooth, audio, sensors, or cameras.
 
 ### Artifact Build Rules
 
@@ -364,16 +364,16 @@ Releases must contain at least:
 Recommended naming:
 
 ```text
-sheng-v0.1.0-alpha.1-boot.img
-sheng-v0.1.0-alpha.1-rootfs-minimal.img.zst
-sheng-v0.1.0-alpha.1-sha256sums.txt
+sheng-v0.1.0-boot.img
+sheng-v0.1.0-rootfs-minimal.img.zst
+sheng-v0.1.0-sha256sums.txt
 ```
 
 Do not bundle GNOME or other large desktop environments into the minimal image by default.
 If providing a GNOME test image, use a separate artifact:
 
 ```text
-sheng-v0.1.0-alpha.N-rootfs-gnome.img.zst
+sheng-v0.1.N-rootfs-gnome.img.zst
 ```
 
 ### Release Notes Must Include
@@ -439,4 +439,4 @@ Recommended future development model:
 - `sheng`: Mainline development, retains real bring-up history.
 - `stable/v0.1`: Stable branch targeting releases.
 - `feat/...`, `fix/...`, `exp/...`: Feature and experimental branches.
-- Every usable hardware capability is recorded via release tags, for example `v0.1.0-alpha.1`, `v0.1.0-alpha.2`.
+- Every usable hardware capability is recorded via release tags, for example `v0.1.0`, `v0.1.1`.

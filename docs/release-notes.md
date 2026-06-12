@@ -1,6 +1,6 @@
-# Xiaomi Pad 6S Pro (sheng) Mobile NixOS v0.1.0-alpha.2
+# Xiaomi Pad 6S Pro (sheng) Mobile NixOS v0.1.0
 
-This is an early bring-up image for the Xiaomi Pad 6S Pro 12.4 (`sheng`).
+This is the first stable release for the Xiaomi Pad 6S Pro 12.4 (`sheng`).
 Read the known issues before flashing.
 
 ## Working
@@ -63,7 +63,7 @@ fastboot reboot
 Both `boot_b` and `linux` must be flashed for the complete release. Do not
 flash `userdata`.
 
-The public test image uses the bring-up credentials `luser` / `1` and root
+The public image uses the default credentials `luser` / `1` and root
 password `123456`. Change them immediately, or build a personalized system
 from a private flake using the template in `examples/sheng-dotfiles`.
 
