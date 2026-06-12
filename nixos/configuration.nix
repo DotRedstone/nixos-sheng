@@ -4,7 +4,7 @@
 # Scope: System
 # ---
 
-{ config, pkgs, lib, vars, ... }:
+{ config, pkgs, lib, ... }:
 
 {
   imports = [
@@ -22,7 +22,7 @@
     "flakes"
   ];
 
-  networking.hostName = "nixos-sheng";
+  networking.hostName = lib.mkDefault "nixos-sheng";
   networking.networkmanager = {
     enable = true;
     # Managing the P2P device can leave WCN7850 scans stuck after Wi-Fi is
@@ -31,34 +31,23 @@
   };
   networking.useDHCP = lib.mkDefault true;
 
-  time.timeZone = "Asia/Shanghai";
+  time.timeZone = lib.mkDefault "Asia/Shanghai";
   services.timesyncd = {
-    enable = true;
-    servers = [
+    enable = lib.mkDefault true;
+    servers = lib.mkDefault [
       "ntp.aliyun.com"
       "cn.pool.ntp.org"
       "time.cloudflare.com"
     ];
   };
-  i18n.defaultLocale = "en_US.UTF-8";
-
-  users.users.${vars.username} = {
-    isNormalUser = true;
-    initialPassword = vars.userPassword;
-    extraGroups = [ "wheel" "networkmanager" "audio" "video" "input" "render" ];
-  };
+  i18n.defaultLocale = lib.mkDefault "en_US.UTF-8";
 
   # Bring-up hacks removed for better security
   # security.sudo.wheelNeedsPassword = false;
 
-  services.openssh.enable = true;
-  services.openssh.settings = {
-    PermitRootLogin = "yes";
-    PasswordAuthentication = true;
-  };
+  services.openssh.enable = lib.mkDefault true;
 
   services.getty = {
-    autologinUser = "luser";
     helpLine = ''
       NixOS sheng debug console
       Useful checks: dmesg -w, journalctl -b, ip addr, lsmod
@@ -93,13 +82,16 @@
 
   services.kmscon = {
     enable = true;
-    hwRender = false;
     config = {
+      hwaccel = false;
       "font-size" = 18;
     };
   };
 
   environment.systemPackages = let
+    sheng-check = pkgs.writeShellScriptBin "sheng-check" (
+      builtins.readFile ./scripts/sheng-check.sh
+    );
     sheng-reboot-generation-menu = pkgs.writeShellScriptBin "sheng-reboot-generation-menu" ''
       set -eu
 
@@ -120,6 +112,7 @@
         $out/share/alsa/ucm2/Xiaomi/sheng/HiFi.conf
     '';
   in with pkgs; [
+    sheng-check
     sheng-reboot-generation-menu
     sheng-alsa-ucm
     alsa-ucm-conf
@@ -135,9 +128,8 @@
   ];
 
   environment.variables.ALSA_CONFIG_UCM2 = "/run/current-system/sw/share/alsa/ucm2";
-  systemd.user.extraConfig = ''
-    DefaultEnvironment=ALSA_CONFIG_UCM2=/run/current-system/sw/share/alsa/ucm2
-  '';
+  systemd.user.settings.Manager.DefaultEnvironment =
+    "ALSA_CONFIG_UCM2=/run/current-system/sw/share/alsa/ucm2";
 
   systemd.packages = [ pkgs.iio-sensor-proxy ];
   services.dbus.packages = [ pkgs.iio-sensor-proxy ];

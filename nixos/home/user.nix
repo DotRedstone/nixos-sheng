@@ -31,10 +31,7 @@
     };
   };
 
-  home.packages = let
-    sheng-check = pkgs.writeShellScriptBin "sheng-check" (builtins.readFile ../scripts/sheng-check.sh);
-  in with pkgs; [
-    sheng-check
+  home.packages = with pkgs; [
     gjs-osk
     gnome-console
     nautilus

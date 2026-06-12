@@ -75,7 +75,12 @@
           home-manager.packages.${system}.default
         ];
       };
-      mobileEvalFor = extraModules:
+      mobileEvalFor = {
+        extraModules ? [ ],
+        desktop ? null,
+        includeDefaultUser ? false,
+        includeHomeManager ? false,
+      }:
         let vars = import ./vars.nix; in
         import "${mobile-nixos}/lib/eval-with-configuration.nix" {
         inherit pkgs;
@@ -86,6 +91,10 @@
             nixpkgs.overlays = lib.mkAfter [ shengOverlay ];
           })
           ./configuration.nix
+        ]
+        ++ pkgs.lib.optional (desktop == "gnome") ./profiles/gnome-minimal.nix
+        ++ pkgs.lib.optional includeDefaultUser ./profiles/default-user.nix
+        ++ pkgs.lib.optionals includeHomeManager [
           homeManagerModule
           home-manager.nixosModules.home-manager
           ({ ... }: {
@@ -94,36 +103,38 @@
             home-manager.extraSpecialArgs = { inherit vars; };
             home-manager.users.${vars.username} = import ./home/user.nix;
           })
-        ] ++ extraModules ++ [
+        ]
+        ++ extraModules
+        ++ [
           ./hardware/mobile.nix
         ];
       };
-      mobileEval = mobileEvalFor [ ];
-      mobileGnomeEval = mobileEvalFor [
-        ./profiles/gnome-minimal.nix
-      ];
+      mobileEval = mobileEvalFor {
+        includeDefaultUser = true;
+        includeHomeManager = true;
+      };
+      mobileGnomeEval = mobileEvalFor {
+        desktop = "gnome";
+        includeDefaultUser = true;
+        includeHomeManager = true;
+      };
     in
     {
       # Reuse the exact Mobile NixOS evaluations used by the flashable images.
       # This keeps nixos-rebuild generations aligned with the fixed boot image,
       # sheng kernel modules, firmware, hardware services, and desktop profile.
-      # 对外暴露为标准的 NixOS 模块，供下游 dotfiles 或其他机器自由引用继承
-      nixosModules.default = { lib, ... }: {
-        imports = [
-          { _module.args.vars = import ./vars.nix; }
-          ./hardware/xiaomi-sheng
-          ./configuration.nix
-          ./profiles/gnome-minimal.nix
-          ./hardware/mobile.nix
-        ];
-        nixpkgs.overlays = lib.mkAfter [ shengOverlay ];
+      # Public downstream interface. It evaluates the complete Mobile NixOS
+      # platform while leaving users, credentials, Home Manager, and personal
+      # packages to the caller's modules.
+      lib.${system} = {
+        mkShengSystem = extraModules: mobileEvalFor {
+          desktop = "gnome";
+          inherit extraModules;
+        };
+        mkShengMinimalSystem = extraModules: mobileEvalFor {
+          inherit extraModules;
+        };
       };
-
-      # 对外暴露 Mobile NixOS 专用的构造器函数
-      # 下游如果需要编译包含 mobile.xxx 属性的完整系统，应该调用这个函数传入额外模块
-      lib.${system}.mkShengSystem = extraModules: mobileEvalFor ( [
-        ./profiles/gnome-minimal.nix
-      ] ++ extraModules );
 
       nixosConfigurations = {
         sheng = mobileGnomeEval;

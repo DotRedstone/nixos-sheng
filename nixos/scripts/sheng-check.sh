@@ -152,7 +152,7 @@ echo ""
 
 # ── Sensors / Rotation / Tablet Mode ──
 section "Sensors / Rotation / Tablet Mode"
-run_cmd systemctl status sheng-fake-tablet-mode.service --no-pager
+run_cmd systemctl status fake-tablet-mode.service --no-pager
 run_cmd systemctl status iio-sensor-proxy.service --no-pager
 run_cmd systemctl status sheng-devauth.service --no-pager
 echo "$ busctl status net.hadess.SensorProxy"
