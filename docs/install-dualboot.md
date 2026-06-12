@@ -16,43 +16,76 @@ Mobile NixOS 安装到槽位 `b` 和独立 `linux` 分区。
 
 ## 创建 linux 分区
 
-进入 TWRP，并将可用的 `parted` 推送到设备：
+本节参考
+[`sheng-pmos-builds` 的 Dual Boot 安装流程](https://github.com/alghiffaryfa19/sheng-pmos-builds#dual-boot)。
+该项目在仓库根目录提供了可在 TWRP 中运行的
+[`parted`](https://github.com/alghiffaryfa19/sheng-pmos-builds/blob/10c023a01fbeb8ac3ccb83e48eb4b58b6bad6dac/parted)。
+
+在电脑上下载该工具，然后进入 TWRP 并推送到设备：
 
 ```sh
+curl -L -o parted \
+  https://raw.githubusercontent.com/alghiffaryfa19/sheng-pmos-builds/10c023a01fbeb8ac3ccb83e48eb4b58b6bad6dac/parted
 adb reboot recovery
 adb push parted /sdcard/parted
+```
+
+以下操作会删除并重建 `userdata`。继续前再次确认 Android 用户数据已经备份。
+进入 TWRP shell，先确认 `sda` 确实是包含 `userdata` 的磁盘：
+
+```sh
 adb shell
+readlink -f /dev/block/by-name/userdata
+ls -l /dev/block/sda
 chmod +x /sdcard/parted
 /sdcard/parted /dev/block/sda
 ```
 
-先使用 `print` 确认 `userdata` 的编号和起止位置。sheng 常见布局中
-`userdata` 是分区 29，新建的 `linux` 是分区 30，但不要未经确认直接照抄编号。
+`readlink` 的结果必须指向 `/dev/block/sda` 上的某个分区，例如常见的
+`/dev/block/sda29`。如果指向其他磁盘，停止操作并使用实际磁盘路径。
 
-下面只是 256GB 设备的布局示例。分界位置应根据设备容量和希望保留给 Android
-的空间调整：
+在 `parted` 交互界面中切换为 GB，并打印完整布局和空闲空间：
 
 ```text
-print
+unit GB
+print free
+```
+
+必须记录 `userdata` 的分区编号、起点和终点。sheng 常见布局中
+`userdata` 是分区 29，新建的 `linux` 是分区 30，但不同容量或已有改动的设备
+可能不同。不要未经确认直接照抄编号或起点。
+
+下面只是 256GB 设备的布局示例。分界位置应根据设备容量和希望保留给 Android
+的空间调整。示例保留 `userdata` 原本的 `12.7GB` 起点，在 `180GB` 处分界：
+
+```text
 rm 29
 mkpart userdata ext4 12.7GB 180GB
 mkpart linux ext4 180GB -0MB
-print
+print free
 quit
 ```
 
 确认新布局中：
 
-- `userdata` 保留正确的起始位置
+- `userdata` 使用原本记录的起始位置
 - `linux` 使用剩余空间
+- 两个分区没有重叠，末尾没有意外的大块未分配空间
 - 没有修改 boot、super、persist 或其他分区
 
-退出 shell 并进入 bootloader：
+退出 `parted` 后，确认 TWRP 已建立 `linux` 分区设备节点。若节点未出现，先重启
+一次 TWRP 再检查，不要继续刷写：
 
 ```sh
+ls -l /dev/block/by-name/userdata
+ls -l /dev/block/by-name/linux
 exit
 adb reboot bootloader
 ```
+
+重新创建 `userdata` 会清空 Android 用户数据，并且可能需要在 TWRP 中格式化
+`userdata` 后才能重新进入 Android。不要格式化新建的 `linux` 分区；刷写 rootfs
+镜像会覆盖它。
 
 ## 刷写 release
 
@@ -60,7 +93,8 @@ adb reboot bootloader
 
 ```sh
 sha256sum -c sha256sums.txt
-zstd -d sheng-*-rootfs-*.img.zst
+cat sheng-*-rootfs-*.img.zst.part-* > sheng-rootfs.img.zst
+zstd -d sheng-rootfs.img.zst
 ```
 
 刷写槽位 `b` 和 `linux`：
@@ -68,10 +102,13 @@ zstd -d sheng-*-rootfs-*.img.zst
 ```sh
 fastboot erase dtbo_b
 fastboot flash boot_b sheng-*-boot.img
-fastboot flash linux sheng-*-rootfs-*.img
+fastboot flash linux sheng-rootfs.img
 fastboot --set-active=b
 fastboot reboot
 ```
+
+如果下载的版本提供单个 rootfs `.img.zst` 而不是 `.part-*` 文件，则直接运行
+`zstd -d sheng-*-rootfs-*.img.zst`，并刷入解压得到的 `.img`。
 
 不要刷 `boot_a`，它用于保留 Android。不要刷 `userdata`。
 

@@ -39,7 +39,7 @@ are uploaded as numbered `.part-*` files. Verify the checksums before joining
 the parts or flashing.
 
 For first-time dual-boot partitioning and installation, follow
-[`install-dualboot.md`](install-dualboot.md).
+the [dual-boot installation guide](https://github.com/DotRedstone/nixos-xiaomi-sheng/blob/sheng/docs/install-dualboot.md).
 
 ```sh
 sha256sum -c sha256sums.txt
@@ -69,8 +69,8 @@ from a private flake using the template in `examples/sheng-dotfiles`.
 
 The rootfs image filesystem may be smaller than the dedicated `linux`
 partition. To use the remaining space for NixOS generations, follow
-[`linux-partition-resize.md`](linux-partition-resize.md) from TWRP or another
-rescue environment after flashing.
+the [linux filesystem resize guide](https://github.com/DotRedstone/nixos-xiaomi-sheng/blob/sheng/docs/linux-partition-resize.md)
+from TWRP or another rescue environment after flashing.
 
 ## Rollback
 
