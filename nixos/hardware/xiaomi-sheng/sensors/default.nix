@@ -178,8 +178,8 @@ in
                   continue
           return None
 
-      def find_active_session():
-          """找到当前活跃的 GNOME 会话，返回 (uid, username)"""
+      def find_active_session(user_only=False):
+          """找到当前活跃的图形会话；user_only=True 时排除 GDM greeter"""
           try:
               out = subprocess.check_output(
                   ["${pkgs.systemd}/bin/loginctl", "list-sessions", "--no-legend"],
@@ -194,7 +194,19 @@ in
                               ["${pkgs.systemd}/bin/loginctl", "show-session", session_id, "-p", "Active", "--value"],
                               text=True, timeout=5
                           ).strip()
-                          if state == "yes":
+                          session_class = subprocess.check_output(
+                              ["${pkgs.systemd}/bin/loginctl", "show-session", session_id, "-p", "Class", "--value"],
+                              text=True, timeout=5
+                          ).strip()
+                          session_type = subprocess.check_output(
+                              ["${pkgs.systemd}/bin/loginctl", "show-session", session_id, "-p", "Type", "--value"],
+                              text=True, timeout=5
+                          ).strip()
+                          graphical = session_type in ("wayland", "x11")
+                          allowed_class = session_class == "user" or (
+                              not user_only and session_class == "greeter"
+                          )
+                          if state == "yes" and graphical and allowed_class:
                               uid = subprocess.check_output(
                                   ["${pkgs.systemd}/bin/loginctl", "show-session", session_id, "-p", "User", "--value"],
                                   text=True, timeout=5
@@ -240,10 +252,11 @@ in
 
           print(f"fake-tablet-mode: found real lid device at {real_dev.path}", file=sys.stderr)
 
-          # 创建虚拟设备：只上报 SW_TABLET_MODE，不暴露 SW_LID
+          # 创建虚拟设备：不暴露 SW_LID，并允许开盖时注入 KEY_WAKEUP 强制重绘
           try:
               cap = {
-                  ecodes.EV_SW: [ecodes.SW_TABLET_MODE]
+                  ecodes.EV_SW: [ecodes.SW_TABLET_MODE],
+                  ecodes.EV_KEY: [ecodes.KEY_WAKEUP]
               }
               ui = UInput(cap, name="Fake Tablet Mode Switch",
                           vendor=0x1234, product=0x5678)
@@ -274,11 +287,11 @@ in
                       break
                   except Exception:
                       time.sleep(2)
-              
+
               print("fake-tablet-mode: waiting for active GNOME session...", file=sys.stderr)
-              while find_active_session() is None:
+              while find_active_session(user_only=True) is None:
                   time.sleep(2)
-              
+
               print("fake-tablet-mode: both ready! waiting 5s for Mutter libinput init...", file=sys.stderr)
               time.sleep(5)
               ui.write(ecodes.EV_SW, ecodes.SW_TABLET_MODE, 1)
@@ -300,8 +313,13 @@ in
                               print("fake-tablet-mode: lid closed, blanking screen", file=sys.stderr)
                               set_power_save_mode(uid, username, 3)
                           else:
-                              # 开盖 → 亮屏
-                              print("fake-tablet-mode: lid opened, unblanking screen", file=sys.stderr)
+                              # 开盖 → 注入唤醒事件强制 Mutter 重绘，再亮屏
+                              print("fake-tablet-mode: lid opened, waking and unblanking screen", file=sys.stderr)
+                              ui.write(ecodes.EV_KEY, ecodes.KEY_WAKEUP, 1)
+                              ui.syn()
+                              time.sleep(0.01)
+                              ui.write(ecodes.EV_KEY, ecodes.KEY_WAKEUP, 0)
+                              ui.syn()
                               set_power_save_mode(uid, username, 0)
                       else:
                           print(f"fake-tablet-mode: lid event={event.value} but no active session", file=sys.stderr)
