@@ -38,12 +38,12 @@ replace `TODO.md`; it lists only release blockers and high-signal results.
 
 ## v0.1.0 publication
 
-- `v0.1.0` was published from release commit `244cc4b`.
-- Public flake checks, the boot image build, and the GNOME rootfs build all
+- `v0.1.0` was published from release commit `2e54371`.
+- Public flake checks, the boot image build, and the minimal and GNOME rootfs builds all
   completed successfully from that commit.
-- The release tag, boot image, split GNOME rootfs archive, checksums, flashing
-  instructions, known issues, and rollback instructions were verified after
-  publication.
+- The release tag, versioned kernel-aware asset names, boot image, split raw
+  minimal and GNOME rootfs images, optional checksums, flashing instructions,
+  known issues, and rollback instructions were verified after publication.
 
 ## Future improvements
 

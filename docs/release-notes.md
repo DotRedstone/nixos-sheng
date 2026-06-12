@@ -46,6 +46,7 @@ the [dual-boot installation guide](https://github.com/DotRedstone/nixos-xiaomi-s
 cat nixos-sheng-*-rootfs-minimal.img.part-* > nixos-sheng-rootfs.img
 fastboot flash boot_b nixos-sheng-*-boot.img
 fastboot flash linux nixos-sheng-rootfs.img
+fastboot --set-active=b
 fastboot reboot
 ```
 
