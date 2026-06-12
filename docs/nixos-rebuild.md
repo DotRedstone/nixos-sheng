@@ -27,6 +27,20 @@ rootfs images:
 This is important because a separate ordinary `nixosSystem` evaluation could
 select a different kernel module tree or omit sheng hardware services.
 
+For a private dotfiles repository, use the public Mobile NixOS constructor:
+
+```nix
+nixosConfigurations.sheng =
+  xiaomi-sheng.lib.aarch64-linux.mkShengSystem [
+    ./hosts/sheng/configuration.nix
+  ];
+```
+
+The constructor provides the complete sheng platform and GNOME profile, but
+does not create users, inject credentials, or install this repository's Home
+Manager configuration. Keep those personal concerns in the downstream
+dotfiles repository. Use `mkShengMinimalSystem` for a console-only system.
+
 ## First safe test
 
 Clone the repository on the tablet and build without activating it:
@@ -108,10 +122,9 @@ Do not flash `userdata`.
 
 ## Configuration ownership
 
-Use the NixOS configuration for system-wide users, packages, GNOME, services,
-firmware, and hardware integration. Use Home Manager for personal applications,
-shell configuration, editor configuration, and per-user GNOME preferences.
+This repository owns hardware integration, boot behavior, firmware, rootfs
+layout, and platform services. A private downstream flake owns users,
+credentials, personal system packages, and optional Home Manager configuration.
 
-The repository currently defines the bring-up users in
-`nixos/configuration.nix`. Replace the temporary passwords before distributing
-a personalized image or using the tablet as a daily system.
+Repository-built test images still include a disposable default user through
+`nixos/profiles/default-user.nix`; public constructors do not.

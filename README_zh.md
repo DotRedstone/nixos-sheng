@@ -102,15 +102,35 @@ linux 分区
 `-- build-nixos-rootfs.sh
 ```
 
-## 双轨制包管理 (系统级 vs 应用级)
+## 仓库职责
 
-本项目采用 Nix 社区推崇的“底层固化、上层敏捷”的拆分包管理策略：
+本仓库负责可复用的 sheng 平台：kernel、DTB、firmware、Mobile NixOS
+启动流程、硬件服务、rootfs 布局，以及可选的最小 GNOME profile。
+本仓库也会构建带临时默认用户的公开测试镜像。
 
-1. **底层固化 (`nixos/configuration.nix`)**：
-   系统核心硬件强依赖（音频驱动、传感器驱动、USB/充电服务）被“焊死”在 System Packages 里。更新这类配置需要使用 `nrs` (即 `sudo nixos-rebuild switch ...`)。由于其改动可能影响全局稳定，请保持极其克制。
-2. **应用敏捷 (`nixos/home/user.nix`)**：
-   面向用户的桌面软件（浏览器、终端、文件管理器、虚拟键盘等）完全从系统级抽离，由 Home Manager 独立管理。
-   **您可以在设备上直接拉取仓库并修改 `home/user.nix`，随后执行 `hms` 别名即可实现毫秒级应用刷新，完全无需编译或重构整个系统。**
+个人用户、凭据、应用、Home Manager 配置，以及 hostname、locale、时区等个人设置
+应放在独立的 dotfiles flake 中。下游 flake 应调用
+`xiaomi-sheng.lib.aarch64-linux.mkShengSystem`，不要尝试将 Mobile NixOS
+设备模块导入普通的 `nixpkgs.lib.nixosSystem` 求值。
+
+```nix
+{
+  inputs.xiaomi-sheng.url =
+    "github:DotRedstone/nixos-xiaomi-sheng?dir=nixos";
+
+  outputs = { self, xiaomi-sheng, ... }@inputs: {
+    nixosConfigurations.sheng =
+      xiaomi-sheng.lib.aarch64-linux.mkShengSystem [
+        { _module.args.inputs = inputs; }
+        ./hosts/sheng/configuration.nix
+      ];
+  };
+}
+```
+
+`mkShengSystem` 默认包含 GNOME profile；纯控制台系统可使用
+`mkShengMinimalSystem`。这两个公开构造器都不会创建用户，也不会注入本仓库的
+Home Manager profile，用户配置必须由下游模块提供。
 
 ## 使用 GitHub Actions 构建
 
@@ -230,13 +250,16 @@ scripts/inspect-bootimg.sh out/mobile-bootimg
 
 为了避免将敏感密码硬编码进开源仓库中，我们的 `vars.nix` 会在系统构建期进行**参数动态注入**。
 
+这些凭据只用于本仓库构建的测试镜像。通过 `mkShengSystem` 或
+`mkShengMinimalSystem` 创建的系统，其用户和凭据完全由下游 flake 定义。
+
 - **云端构建**：在 GitHub Actions 手动触发 `Build NixOS RootFS` 工作流时，您可以**直接输入**自定义的用户名、用户密码和 Root 密码。Actions 运行时会生成携带您专属密码的专属镜像。
 - **本地开发**：您可以直接在本地创建或修改 `nixos/vars.nix`。
 
 如果在 Actions 中留空或未做修改，当前测试镜像将回落到预设体验凭据：
 
 - 用户名：`luser`
-- 密码：`luser`
+- 密码：`1`
 - root 密码：`123456`
 
 ## 警告

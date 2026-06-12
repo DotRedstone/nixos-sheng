@@ -110,15 +110,37 @@ This brings the full power of NixOS atomic upgrades and rollbacks to a mobile de
 `-- build-nixos-rootfs.sh
 ```
 
-## Dual-Track Package Management (System vs App Level)
+## Repository Responsibility
 
-This project adopts the "solid base, agile top" package management strategy highly recommended by the Nix community:
+This repository owns the reusable sheng platform: kernel, DTB, firmware,
+Mobile NixOS boot flow, hardware services, rootfs layout, and the optional
+minimal GNOME profile. It also builds public test images with a disposable
+default user.
 
-1. **Solid Base (`nixos/configuration.nix`)**:
-   Core hardware dependencies (audio drivers, sensor drivers, USB/charging services) are "hardcoded" into System Packages. Updating these requires using `nrs` (`sudo nixos-rebuild switch ...`). Since changes here can affect global stability, please modify them with extreme caution.
-2. **Agile Apps (`nixos/home/user.nix`)**:
-   User-facing desktop software (browsers, terminals, file managers, virtual keyboards) is completely decoupled from the system level and managed independently by Home Manager.
-   **You can directly modify `home/user.nix` on the device and run the `hms` alias to achieve millisecond-level app refreshes without needing to recompile or rebuild the entire OS.**
+Personal users, credentials, applications, Home Manager configuration, and
+private settings such as hostname, locale, and time zone belong in a separate
+dotfiles flake. Downstream flakes should use
+`xiaomi-sheng.lib.aarch64-linux.mkShengSystem` rather than importing a Mobile
+NixOS module into an ordinary `nixpkgs.lib.nixosSystem` evaluation.
+
+```nix
+{
+  inputs.xiaomi-sheng.url =
+    "github:DotRedstone/nixos-xiaomi-sheng?dir=nixos";
+
+  outputs = { self, xiaomi-sheng, ... }@inputs: {
+    nixosConfigurations.sheng =
+      xiaomi-sheng.lib.aarch64-linux.mkShengSystem [
+        { _module.args.inputs = inputs; }
+        ./hosts/sheng/configuration.nix
+      ];
+  };
+}
+```
+
+`mkShengSystem` includes the GNOME profile. Use `mkShengMinimalSystem` for a
+console-only system. Neither public constructor creates a user or installs the
+repository's Home Manager profile; downstream modules must define those.
 
 ## Build With GitHub Actions
 
@@ -255,13 +277,17 @@ The helper prints `/etc/boot/config`, initrd applets, and key boot flags such as
 
 To avoid hardcoding sensitive passwords into the open-source repository, our `vars.nix` uses **dynamic parameter injection** during system build time.
 
+These credentials apply only to repository-built test images. Systems created
+through `mkShengSystem` or `mkShengMinimalSystem` define their users and
+credentials entirely in the downstream flake.
+
 - **Cloud Build**: When manually triggering the `Build NixOS RootFS` workflow in GitHub Actions, you can **directly input** a custom username, user password, and Root password. The Actions runner will generate an exclusive image containing your specific credentials.
 - **Local Development**: You can directly create or modify `nixos/vars.nix` locally.
 
 If left blank or unmodified in Actions, the test image will fall back to the preset credentials:
 
 - user: `luser`
-- password: `luser`
+- password: `1`
 - root password: `123456`
 
 ## Warning
