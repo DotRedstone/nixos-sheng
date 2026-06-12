@@ -38,9 +38,9 @@ replace `TODO.md`; it lists only release blockers and high-signal results.
 
 ## Alpha.2 release blockers
 
-- Build the current boot image and GNOME rootfs from the release candidate.
-- Verify the release workflow using explicit boot and rootfs Action run IDs
-  from the release-candidate commit.
+- Publish the validated boot image and GNOME rootfs from the same
+  release-candidate commit.
+- Verify the release attachments, checksums, and tag after publication.
 
 ## Stable release blockers
 

@@ -34,13 +34,26 @@ Read the known issues before flashing.
 ## Flashing
 
 The release contains a boot image, a compressed rootfs image, and
-`sha256sums.txt`. Verify the checksums before flashing.
+`sha256sums.txt`. Rootfs archives larger than GitHub's 2 GiB per-asset limit
+are uploaded as numbered `.part-*` files. Verify the checksums before joining
+the parts or flashing.
 
 For first-time dual-boot partitioning and installation, follow
 [`install-dualboot.md`](install-dualboot.md).
 
 ```sh
 sha256sum -c sha256sums.txt
+cat sheng-*-rootfs-*.img.zst.part-* > sheng-rootfs.img.zst
+zstd -d sheng-rootfs.img.zst
+fastboot flash boot_b sheng-*-boot.img
+fastboot flash linux sheng-rootfs.img
+fastboot reboot
+```
+
+If the release contains a single rootfs `.img.zst` instead of `.part-*`
+files, use:
+
+```sh
 zstd -d sheng-*-rootfs-*.img.zst
 fastboot flash boot_b sheng-*-boot.img
 fastboot flash linux sheng-*-rootfs-*.img

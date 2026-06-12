@@ -6,6 +6,9 @@
 
 name: Publish Release
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
   push:
     tags:
@@ -117,7 +120,19 @@ jobs:
             *) flavor="minimal" ;;
           esac
           echo "Compressing $rootfs_img..."
-          zstd -T0 -10 "$rootfs_img" -o "release-upload/sheng-${tag}-rootfs-${flavor}.img.zst"
+          rootfs_archive="release-upload/sheng-${tag}-rootfs-${flavor}.img.zst"
+          zstd -T0 -10 "$rootfs_img" -o "$rootfs_archive"
+
+          # GitHub Release assets must be smaller than 2 GiB. Split only when
+          # necessary so smaller images remain convenient single-file assets.
+          max_asset_size=$((1900 * 1024 * 1024))
+          rootfs_size="$(stat -c %s "$rootfs_archive")"
+          if [ "$rootfs_size" -gt "$max_asset_size" ]; then
+            echo "Splitting rootfs archive because it exceeds the GitHub asset limit"
+            split -b "$max_asset_size" -d -a 2 \
+              "$rootfs_archive" "${rootfs_archive}.part-"
+            rm "$rootfs_archive"
+          fi
 
           cd release-upload
           sha256sum * > sha256sums.txt
