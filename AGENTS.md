@@ -384,23 +384,23 @@ Release 至少包含：
 
 * boot 镜像，如果本版本需要刷 `boot_b`
 * rootfs 镜像，如果本版本需要刷 `linux`
-* `sha256sums.txt`
+* `sha256sums.txt`（用户校验步骤可选）
 * 简要刷机说明
 * Known issues
 
 推荐命名：
 
 ```text
-sheng-v0.1.0-boot.img
-sheng-v0.1.0-rootfs-minimal.img.zst
-sheng-v0.1.0-sha256sums.txt
+nixos-sheng-v0.1.0-kernel-7.0.0-boot.img
+nixos-sheng-v0.1.0-kernel-7.0.0-rootfs-minimal.img
+sha256sums.txt
 ```
 
 GNOME 或其它大桌面环境不要默认塞进 minimal 镜像。
 如果提供 GNOME 测试镜像，使用单独附件：
 
 ```text
-sheng-v0.1.N-rootfs-gnome.img.zst
+nixos-sheng-v0.1.N-kernel-7.0.0-rootfs-gnome.img
 ```
 
 ### Release notes 必须包含

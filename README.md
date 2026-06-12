@@ -113,9 +113,9 @@ This brings the full power of NixOS atomic upgrades and rollbacks to a mobile de
 ## Repository Responsibility
 
 This repository owns the reusable sheng platform: kernel, DTB, firmware,
-Mobile NixOS boot flow, hardware services, rootfs layout, and the optional
-minimal GNOME profile. It also builds public test images with a disposable
-default user.
+Mobile NixOS boot flow, hardware services, rootfs layout, and an optional
+GNOME profile. It also builds public test images with a disposable default
+user.
 
 Personal users, credentials, applications, Home Manager configuration, and
 private settings such as hostname, locale, and time zone belong in a separate
@@ -138,9 +138,11 @@ NixOS module into an ordinary `nixpkgs.lib.nixosSystem` evaluation.
 }
 ```
 
-`mkShengSystem` includes the GNOME profile. Use `mkShengMinimalSystem` for a
-console-only system. Neither public constructor creates a user or installs the
-repository's Home Manager profile; downstream modules must define those.
+`mkShengSystem` provides the desktop-neutral sheng platform. Use
+`mkShengGnomeSystem` only when the downstream configuration explicitly wants
+the repository's GNOME profile. `mkShengMinimalSystem` remains as a
+compatibility alias for `mkShengSystem`. Public constructors do not create a
+user or install the repository's Home Manager profile.
 
 A complete private-flake starting point is available in
 [`examples/sheng-dotfiles`](examples/sheng-dotfiles).

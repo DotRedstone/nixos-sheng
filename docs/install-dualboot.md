@@ -11,7 +11,7 @@ Mobile NixOS 安装到槽位 `b` 和独立 `linux` 分区。
 - bootloader 已解锁
 - 已安装可用的 TWRP 或其他救援环境
 - 已下载本项目同一版本的 boot 与 rootfs 镜像
-- 电脑已安装 `adb`、`fastboot` 和 `zstd`
+- 电脑已安装 `adb` 和 `fastboot`
 - 已备份 Android 用户数据和重要文件
 
 ## 创建 linux 分区
@@ -89,26 +89,32 @@ adb reboot bootloader
 
 ## 刷写 release
 
-校验并解压 release 文件：
+如果下载的 rootfs 是多个 `.img.part-*` 文件，先合并为一个可直接刷写的镜像：
 
 ```sh
-sha256sum -c sha256sums.txt
-cat sheng-*-rootfs-*.img.zst.part-* > sheng-rootfs.img.zst
-zstd -d sheng-rootfs.img.zst
+cat nixos-sheng-*-rootfs-minimal.img.part-* > nixos-sheng-rootfs.img
 ```
 
-刷写槽位 `b` 和 `linux`：
+如果下载的是单个 `.img`，无需合并。然后刷写槽位 `b` 和 `linux`：
 
 ```sh
 fastboot erase dtbo_b
-fastboot flash boot_b sheng-*-boot.img
-fastboot flash linux sheng-rootfs.img
+fastboot flash boot_b nixos-sheng-*-boot.img
+fastboot flash linux nixos-sheng-rootfs.img
 fastboot --set-active=b
 fastboot reboot
 ```
 
-如果下载的版本提供单个 rootfs `.img.zst` 而不是 `.part-*` 文件，则直接运行
-`zstd -d sheng-*-rootfs-*.img.zst`，并刷入解压得到的 `.img`。
+GNOME 镜像将命令中的 `rootfs-minimal` 换成 `rootfs-gnome`。若下载的是单个
+rootfs `.img`，可直接将其路径传给 `fastboot flash linux`。
+
+可选：刷写前下载 `sha256sums.txt`，并在所有附件所在目录运行：
+
+```sh
+sha256sum -c sha256sums.txt
+```
+
+校验可以发现下载损坏，但不是刷写命令的必需步骤。
 
 不要刷 `boot_a`，它用于保留 Android。不要刷 `userdata`。
 

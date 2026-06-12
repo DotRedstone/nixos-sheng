@@ -5,7 +5,7 @@ Read the known issues before flashing.
 
 ## Working
 
-- Boot to the minimal GNOME desktop
+- Boot to the console-oriented minimal image or the optional GNOME image
 - Display, touchscreen, physical volume keys
 - **Physical power key** (toggles screen on/off without triggering suspend)
 - **On-screen keyboard** (`gjs-osk`) enabled for touch input
@@ -17,8 +17,8 @@ Read the known issues before flashing.
 - Accelerometer, proximity, ambient light, and compass through SSC user space
 - ALSA card and camera media-node enumeration
 - Nix, `nixos-rebuild`, and the stage-2 generation framework
-- Reusable `mkShengSystem` and `mkShengMinimalSystem` constructors for private
-  downstream dotfiles flakes
+- Desktop-neutral `mkShengSystem` and explicit `mkShengGnomeSystem`
+  constructors for private downstream dotfiles flakes
 
 ## Known issues
 
@@ -33,31 +33,30 @@ Read the known issues before flashing.
 
 ## Flashing
 
-The release contains a boot image, a compressed rootfs image, and
-`sha256sums.txt`. Rootfs archives larger than GitHub's 2 GiB per-asset limit
-are uploaded as numbered `.part-*` files. Verify the checksums before joining
-the parts or flashing.
+The release contains one boot image plus minimal and GNOME rootfs variants.
+Images smaller than GitHub's 2 GiB per-asset limit are uploaded as directly
+flashable `.img` files. Larger raw images are uploaded as numbered
+`.img.part-*` files and only need to be joined before flashing. Asset names
+include `nixos`, the release version, and the kernel version.
 
 For first-time dual-boot partitioning and installation, follow
 the [dual-boot installation guide](https://github.com/DotRedstone/nixos-xiaomi-sheng/blob/sheng/docs/install-dualboot.md).
 
 ```sh
-sha256sum -c sha256sums.txt
-cat sheng-*-rootfs-*.img.zst.part-* > sheng-rootfs.img.zst
-zstd -d sheng-rootfs.img.zst
-fastboot flash boot_b sheng-*-boot.img
-fastboot flash linux sheng-rootfs.img
+cat nixos-sheng-*-rootfs-minimal.img.part-* > nixos-sheng-rootfs.img
+fastboot flash boot_b nixos-sheng-*-boot.img
+fastboot flash linux nixos-sheng-rootfs.img
 fastboot reboot
 ```
 
-If the release contains a single rootfs `.img.zst` instead of `.part-*`
-files, use:
+Choose `rootfs-gnome` instead of `rootfs-minimal` only when you want the
+repository-provided GNOME desktop. If a variant is provided as a single
+`.img`, flash that file directly without the `cat` command.
+
+Checksum verification is optional but recommended:
 
 ```sh
-zstd -d sheng-*-rootfs-*.img.zst
-fastboot flash boot_b sheng-*-boot.img
-fastboot flash linux sheng-*-rootfs-*.img
-fastboot reboot
+sha256sum -c sha256sums.txt
 ```
 
 Both `boot_b` and `linux` must be flashed for the complete release. Do not

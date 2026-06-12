@@ -128,12 +128,15 @@
       # packages to the caller's modules.
       lib.${system} = {
         mkShengSystem = extraModules: mobileEvalFor {
+          inherit extraModules;
+        };
+        mkShengGnomeSystem = extraModules: mobileEvalFor {
           desktop = "gnome";
           inherit extraModules;
         };
-        mkShengMinimalSystem = extraModules: mobileEvalFor {
-          inherit extraModules;
-        };
+        # Compatibility alias. mkShengSystem is the desktop-neutral platform.
+        mkShengMinimalSystem = extraModules:
+          self.lib.${system}.mkShengSystem extraModules;
       };
 
       nixosConfigurations = {
@@ -165,9 +168,9 @@
 
       checks.${system} = {
         publicGnomeSystem =
-          (self.lib.${system}.mkShengSystem [ ]).config.system.build.toplevel;
+          (self.lib.${system}.mkShengGnomeSystem [ ]).config.system.build.toplevel;
         publicMinimalSystem =
-          (self.lib.${system}.mkShengMinimalSystem [ ]).config.system.build.toplevel;
+          (self.lib.${system}.mkShengSystem [ ]).config.system.build.toplevel;
       };
     };
 }

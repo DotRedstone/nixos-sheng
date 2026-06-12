@@ -22,13 +22,16 @@ on:
       release_name:
         description: "Release name"
         required: true
-        default: "Sheng v0.1.0"
+        default: "NixOS Sheng v0.1.0 (kernel 7.0.0)"
       kernel_run_id:
         description: "Run ID for the kernel build (leave empty for latest)"
         required: false
-      rootfs_run_id:
-        description: "Run ID for the rootfs build (leave empty for latest)"
-        required: false
+      minimal_rootfs_run_id:
+        description: "Run ID for the minimal rootfs build"
+        required: true
+      gnome_rootfs_run_id:
+        description: "Run ID for the GNOME rootfs build"
+        required: true
 
 jobs:
   release:
@@ -48,12 +51,14 @@ jobs:
             echo "tag=${{ github.event.inputs.tag_name }}" >> $GITHUB_OUTPUT
             echo "name=${{ github.event.inputs.release_name }}" >> $GITHUB_OUTPUT
             echo "kernel_run=${{ github.event.inputs.kernel_run_id }}" >> $GITHUB_OUTPUT
-            echo "rootfs_run=${{ github.event.inputs.rootfs_run_id }}" >> $GITHUB_OUTPUT
+            echo "minimal_rootfs_run=${{ github.event.inputs.minimal_rootfs_run_id }}" >> $GITHUB_OUTPUT
+            echo "gnome_rootfs_run=${{ github.event.inputs.gnome_rootfs_run_id }}" >> $GITHUB_OUTPUT
           else
             echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "name=Sheng ${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "name=NixOS Sheng ${{ github.ref_name }} (kernel 7.0.0)" >> $GITHUB_OUTPUT
             echo "kernel_run=" >> $GITHUB_OUTPUT
-            echo "rootfs_run=" >> $GITHUB_OUTPUT
+            echo "minimal_rootfs_run=" >> $GITHUB_OUTPUT
+            echo "gnome_rootfs_run=" >> $GITHUB_OUTPUT
           fi
 
       - name: Download artifacts using gh CLI
@@ -64,9 +69,26 @@ jobs:
           mkdir -p release-artifacts
           expected_sha="${{ github.sha }}"
 
+          find_run_with_artifact() {
+            workflow="$1"
+            artifact="$2"
+            while read -r run_id; do
+              if gh api "repos/${{ github.repository }}/actions/runs/$run_id/artifacts" \
+                --jq '.artifacts[].name' | grep -Fxq "$artifact"; then
+                echo "$run_id"
+                return 0
+              fi
+            done < <(
+              gh run list --workflow="$workflow" --status=success --limit=30 \
+                --json databaseId,headSha \
+                --jq ".[] | select(.headSha == \"$expected_sha\") | .databaseId"
+            )
+            return 1
+          }
+
           KERNEL_RUN="${{ steps.release_info.outputs.kernel_run }}"
           if [ -z "$KERNEL_RUN" ]; then
-            KERNEL_RUN=$(gh run list --workflow=kernel.yml --status=success --limit=1 --json databaseId -q ".[0].databaseId")
+            KERNEL_RUN="$(find_run_with_artifact kernel.yml sheng-mobile-nixos-boot)"
           fi
           kernel_sha="$(gh run view "$KERNEL_RUN" --json headSha -q .headSha)"
           test "$kernel_sha" = "$expected_sha" || {
@@ -76,23 +98,41 @@ jobs:
           echo "Downloading kernel from run $KERNEL_RUN"
           gh run download "$KERNEL_RUN" --dir release-artifacts/boot
 
-          ROOTFS_RUN="${{ steps.release_info.outputs.rootfs_run }}"
-          if [ -z "$ROOTFS_RUN" ]; then
-            ROOTFS_RUN=$(gh run list --workflow=nixos-rootfs.yml --status=success --limit=1 --json databaseId -q ".[0].databaseId")
-          fi
-          rootfs_sha="$(gh run view "$ROOTFS_RUN" --json headSha -q .headSha)"
-          test "$rootfs_sha" = "$expected_sha" || {
-            echo "Rootfs run $ROOTFS_RUN belongs to $rootfs_sha, expected $expected_sha"
-            exit 1
-          }
-          echo "Downloading rootfs from run $ROOTFS_RUN"
-          gh run download "$ROOTFS_RUN" --dir release-artifacts/rootfs
+          for flavor in minimal gnome; do
+            if [ "$flavor" = "minimal" ]; then
+              ROOTFS_RUN="${{ steps.release_info.outputs.minimal_rootfs_run }}"
+              artifact="nixos-sheng-rootfs-mobileRootfsImage"
+            else
+              ROOTFS_RUN="${{ steps.release_info.outputs.gnome_rootfs_run }}"
+              artifact="nixos-sheng-rootfs-mobileRootfsImageGnome"
+            fi
+            if [ -z "$ROOTFS_RUN" ]; then
+              ROOTFS_RUN="$(find_run_with_artifact nixos-rootfs.yml "$artifact")"
+            fi
+            test -n "$ROOTFS_RUN" || {
+              echo "A $flavor rootfs run ID is required"
+              exit 1
+            }
+            rootfs_sha="$(gh run view "$ROOTFS_RUN" --json headSha -q .headSha)"
+            test "$rootfs_sha" = "$expected_sha" || {
+              echo "$flavor rootfs run $ROOTFS_RUN belongs to $rootfs_sha, expected $expected_sha"
+              exit 1
+            }
+            echo "Downloading $flavor rootfs from run $ROOTFS_RUN"
+            gh run download "$ROOTFS_RUN" --dir "release-artifacts/rootfs-$flavor"
+          done
 
-      - name: Compress and prepare files
+      - name: Prepare directly flashable files
         run: |
           set -euo pipefail
 
           tag="${{ steps.release_info.outputs.tag }}"
+          kernel_version="$(
+            sed -n 's/^[[:space:]]*version = "\([^"]*\)";/\1/p' \
+              nixos/hardware/xiaomi-sheng/kernel/default.nix | head -1
+          )"
+          test -n "$kernel_version"
+          prefix="nixos-sheng-${tag}-kernel-${kernel_version}"
           mkdir -p release-upload
 
           boot_img="$(find release-artifacts/boot -type f -name '*.img' -print -quit)"
@@ -100,32 +140,42 @@ jobs:
             echo "No boot image found in the selected kernel run"
             exit 1
           fi
-          cp "$boot_img" "release-upload/sheng-${tag}-boot.img"
+          cp "$boot_img" "release-upload/${prefix}-boot.img"
 
-          rootfs_img="$(find release-artifacts/rootfs -type f -name '*.img' -print -quit)"
-          if [ -z "$rootfs_img" ]; then
-            echo "No rootfs image found in the selected rootfs run"
-            exit 1
-          fi
-
-          case "$rootfs_img" in
-            *mobileRootfsImageGnome*) flavor="gnome" ;;
-            *) flavor="minimal" ;;
-          esac
-          echo "Compressing $rootfs_img..."
-          rootfs_archive="release-upload/sheng-${tag}-rootfs-${flavor}.img.zst"
-          zstd -T0 -10 "$rootfs_img" -o "$rootfs_archive"
-
-          # GitHub Release assets must be smaller than 2 GiB. Split only when
-          # necessary so smaller images remain convenient single-file assets.
+          # Shrink each ext4 filesystem to its used size so it is convenient to
+          # download. Stage-1 expands it to the linux partition on first boot.
+          # GitHub Release assets must be smaller than 2 GiB, so split the raw
+          # directly flashable image only when it still exceeds that limit.
           max_asset_size=$((1900 * 1024 * 1024))
-          rootfs_size="$(stat -c %s "$rootfs_archive")"
-          if [ "$rootfs_size" -gt "$max_asset_size" ]; then
-            echo "Splitting rootfs archive because it exceeds the GitHub asset limit"
-            split -b "$max_asset_size" -d -a 2 \
-              "$rootfs_archive" "${rootfs_archive}.part-"
-            rm "$rootfs_archive"
-          fi
+          for flavor in minimal gnome; do
+            rootfs_img="$(find "release-artifacts/rootfs-$flavor" -type f -name '*.img' -print -quit)"
+            test -n "$rootfs_img" || {
+              echo "No $flavor rootfs image found"
+              exit 1
+            }
+            output="release-upload/${prefix}-rootfs-${flavor}.img"
+            cp "$rootfs_img" "$output"
+            set +e
+            e2fsck -fy "$output"
+            fsck_status=$?
+            set -e
+            if [ "$fsck_status" -gt 1 ]; then
+              echo "e2fsck failed for $flavor rootfs with status $fsck_status"
+              exit "$fsck_status"
+            fi
+            resize2fs -M "$output"
+            block_count="$(dumpe2fs -h "$output" 2>/dev/null | awk -F: '/Block count:/ { gsub(/ /, "", $2); print $2 }')"
+            block_size="$(dumpe2fs -h "$output" 2>/dev/null | awk -F: '/Block size:/ { gsub(/ /, "", $2); print $2 }')"
+            truncate -s "$((block_count * block_size))" "$output"
+            rootfs_size="$(stat -c %s "$output")"
+            if [ "$rootfs_size" -le "$max_asset_size" ]; then
+              echo "$flavor rootfs fits as one directly flashable image"
+            else
+              echo "Splitting raw $flavor rootfs because it exceeds the GitHub asset limit"
+              split -b "$max_asset_size" -d -a 2 "$output" "${output}.part-"
+              rm "$output"
+            fi
+          done
 
           cd release-upload
           sha256sum * > sha256sums.txt

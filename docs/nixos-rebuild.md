@@ -21,8 +21,8 @@ rootfs images:
 
 | Configuration | Desktop | Matching rootfs output |
 | --- | --- | --- |
-| `sheng` | Minimal GNOME | `mobileRootfsImageGnome` |
-| `sheng-minimal` | Console | `mobileRootfsImage` |
+| `sheng` | Optional minimal GNOME | `mobileRootfsImageGnome` |
+| `sheng-minimal` | Desktop-neutral console platform | `mobileRootfsImage` |
 
 This is important because a separate ordinary `nixosSystem` evaluation could
 select a different kernel module tree or omit sheng hardware services.
@@ -36,10 +36,11 @@ nixosConfigurations.sheng =
   ];
 ```
 
-The constructor provides the complete sheng platform and GNOME profile, but
-does not create users, inject credentials, or install this repository's Home
-Manager configuration. Keep those personal concerns in the downstream
-dotfiles repository. Use `mkShengMinimalSystem` for a console-only system.
+The constructor provides the complete desktop-neutral sheng platform, but does
+not create users, inject credentials, install GNOME, or install this
+repository's Home Manager configuration. Keep those personal concerns in the
+downstream dotfiles repository. Use `mkShengGnomeSystem` only when the
+repository GNOME profile is explicitly wanted.
 
 ## First safe test
 

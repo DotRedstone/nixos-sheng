@@ -357,23 +357,23 @@ Releases must contain at least:
 
 * boot image, if this version needs to flash `boot_b`
 * rootfs image, if this version needs to flash `linux`
-* `sha256sums.txt`
+* `sha256sums.txt` (verification is optional for users)
 * Brief flashing instructions
 * Known issues
 
 Recommended naming:
 
 ```text
-sheng-v0.1.0-boot.img
-sheng-v0.1.0-rootfs-minimal.img.zst
-sheng-v0.1.0-sha256sums.txt
+nixos-sheng-v0.1.0-kernel-7.0.0-boot.img
+nixos-sheng-v0.1.0-kernel-7.0.0-rootfs-minimal.img
+sha256sums.txt
 ```
 
 Do not bundle GNOME or other large desktop environments into the minimal image by default.
 If providing a GNOME test image, use a separate artifact:
 
 ```text
-sheng-v0.1.N-rootfs-gnome.img.zst
+nixos-sheng-v0.1.N-kernel-7.0.0-rootfs-gnome.img
 ```
 
 ### Release Notes Must Include

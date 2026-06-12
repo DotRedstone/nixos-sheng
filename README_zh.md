@@ -105,7 +105,7 @@ linux 分区
 ## 仓库职责
 
 本仓库负责可复用的 sheng 平台：kernel、DTB、firmware、Mobile NixOS
-启动流程、硬件服务、rootfs 布局，以及可选的最小 GNOME profile。
+启动流程、硬件服务、rootfs 布局，以及可选的 GNOME profile。
 本仓库也会构建带临时默认用户的公开测试镜像。
 
 个人用户、凭据、应用、Home Manager 配置，以及 hostname、locale、时区等个人设置
@@ -128,8 +128,9 @@ linux 分区
 }
 ```
 
-`mkShengSystem` 默认包含 GNOME profile；纯控制台系统可使用
-`mkShengMinimalSystem`。这两个公开构造器都不会创建用户，也不会注入本仓库的
+`mkShengSystem` 只提供不绑定桌面环境的 sheng 平台。只有下游明确希望使用本仓库
+GNOME profile 时才调用 `mkShengGnomeSystem`。`mkShengMinimalSystem` 作为
+`mkShengSystem` 的兼容别名保留。公开构造器不会创建用户，也不会注入本仓库的
 Home Manager profile，用户配置必须由下游模块提供。
 
 完整的私人 flake 起始模板位于
