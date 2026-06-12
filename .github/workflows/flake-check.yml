@@ -29,8 +29,13 @@ jobs:
 
       - name: Generate or verify lock file
         run: |
-          nix flake lock ./nixos
+          lock_was_tracked=false
           if git ls-files --error-unmatch nixos/flake.lock >/dev/null 2>&1; then
+            lock_was_tracked=true
+          fi
+
+          nix flake lock ./nixos
+          if [ "$lock_was_tracked" = true ]; then
             git diff --exit-code -- nixos/flake.lock
           fi
 
