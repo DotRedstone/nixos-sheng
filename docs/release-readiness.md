@@ -36,11 +36,14 @@ replace `TODO.md`; it lists only release blockers and high-signal results.
   system profile was rolled back and activated successfully. The synthetic
   generation was removed after validation.
 
-## Alpha.2 release blockers
+## Alpha.2 publication
 
-- Publish the validated boot image and GNOME rootfs from the same
-  release-candidate commit.
-- Verify the release attachments, checksums, and tag after publication.
+- `v0.1.0-alpha.2` was published from release-candidate commit `1ac6c25`.
+- Public flake checks, the boot image build, and the GNOME rootfs build all
+  completed successfully from that commit.
+- The release tag, boot image, split GNOME rootfs archive, checksums, flashing
+  instructions, known issues, and rollback instructions were verified after
+  publication.
 
 ## Stable release blockers
 
