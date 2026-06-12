@@ -1,0 +1,49 @@
+# ---
+# Module: Flake Check Workflow
+# Description: Validates the public flake interface and produces the repository lock file
+# Scope: CI
+# ---
+
+name: Check Public Flake
+
+on:
+  push:
+    branches:
+      - sheng
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Validate public Mobile NixOS interface
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Generate or verify lock file
+        run: |
+          nix flake lock ./nixos
+          if git ls-files --error-unmatch nixos/flake.lock >/dev/null 2>&1; then
+            git diff --exit-code -- nixos/flake.lock
+          fi
+
+      - name: Evaluate public constructors
+        run: |
+          nix eval ./nixos#lib.aarch64-linux \
+            --apply 'lib: builtins.attrNames lib' \
+            --json
+          nix flake check ./nixos --no-build
+
+      - name: Upload generated lock file
+        uses: actions/upload-artifact@v4
+        with:
+          name: nixos-flake-lock
+          path: nixos/flake.lock
+          retention-days: 7

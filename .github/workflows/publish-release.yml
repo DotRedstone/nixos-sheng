@@ -13,13 +13,13 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: "Tag name for the release (e.g., v0.1.0-alpha.1)"
+        description: "Tag name for the release (e.g., v0.1.0-alpha.2)"
         required: true
-        default: "v0.1.0-alpha.1"
+        default: "v0.1.0-alpha.2"
       release_name:
         description: "Release name"
         required: true
-        default: "Sheng v0.1.0-alpha.1"
+        default: "Sheng v0.1.0-alpha.2"
       kernel_run_id:
         description: "Run ID for the kernel build (leave empty for latest)"
         required: false
@@ -64,12 +64,19 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           mkdir -p release-artifacts
+          expected_sha="${{ github.sha }}"
 
           KERNEL_RUN="${{ steps.release_info.outputs.kernel_run }}"
           if [ -z "$KERNEL_RUN" ]; then
             KERNEL_RUN=$(gh run list --workflow=kernel.yml --status=success --limit=1 --json databaseId -q ".[0].databaseId")
           fi
+          kernel_sha="$(gh run view "$KERNEL_RUN" --json headSha -q .headSha)"
+          test "$kernel_sha" = "$expected_sha" || {
+            echo "Kernel run $KERNEL_RUN belongs to $kernel_sha, expected $expected_sha"
+            exit 1
+          }
           echo "Downloading kernel from run $KERNEL_RUN"
           gh run download "$KERNEL_RUN" --dir release-artifacts/boot
 
@@ -77,6 +84,11 @@ jobs:
           if [ -z "$ROOTFS_RUN" ]; then
             ROOTFS_RUN=$(gh run list --workflow=nixos-rootfs.yml --status=success --limit=1 --json databaseId -q ".[0].databaseId")
           fi
+          rootfs_sha="$(gh run view "$ROOTFS_RUN" --json headSha -q .headSha)"
+          test "$rootfs_sha" = "$expected_sha" || {
+            echo "Rootfs run $ROOTFS_RUN belongs to $rootfs_sha, expected $expected_sha"
+            exit 1
+          }
           echo "Downloading rootfs from run $ROOTFS_RUN"
           gh run download "$ROOTFS_RUN" --dir release-artifacts/rootfs
 
