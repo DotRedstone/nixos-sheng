@@ -33,7 +33,7 @@
 * [~] 开机世代菜单、音量选择和电源确认已实机验证；当前仅有一个真实 system
   generation，仍待扩容后验证跨世代选择与回滚
 * [~] `nixos-rebuild --flake` 仅更新 stage-2 系统世代；涉及 kernel、DTS、stage-1 initrd 或 boot cmdline 时仍需另外生成并刷写 `boot_b`
-* [ ] 发布前补充并验证 `nixos/flake.lock`，避免设备端求值重复下载大型 inputs
+* [~] 发布前补充并验证 `nixos/flake.lock`，避免设备端求值重复下载大型 inputs
 
 ### GNOME desktop
 

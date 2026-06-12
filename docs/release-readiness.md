@@ -3,7 +3,7 @@
 This document records the latest release-candidate validation. It does not
 replace `TODO.md`; it lists only release blockers and high-signal results.
 
-## Validated on 2026-06-06
+## Validated through 2026-06-12
 
 - Kernel 7.0.0 boots into the GNOME rootfs.
 - Display manager, NetworkManager, NTP, Bluetooth, sensors, Type-C, ALSA, and
@@ -26,23 +26,25 @@ replace `TODO.md`; it lists only release blockers and high-signal results.
   audio remain unverified.
 - The one-time boot generation menu appears and physical volume-key navigation
   works.
+- The generation menu supports held-key repeat and external arrow/Enter keys.
+- Four-way automatic rotation and rotated touch coordinates were verified.
+- Hall cover close/open blanks and redraws the display without exposing
+  `SW_LID` to GNOME.
+- A private downstream flake successfully evaluated and activated through the
+  public `mkShengSystem` constructor.
 - A second synthetic stage-2 generation was created and activated, then the
   system profile was rolled back and activated successfully. The synthetic
   generation was removed after validation.
 
-## Alpha release blockers
+## Alpha.2 release blockers
 
-- Rebuild and verify the rootfs after removing the invalid
-  `serial-getty@ttyMSM0` service.
-- Re-verify the final boot image after the latest menu log/highlight cleanup.
-- Replace or explicitly document the bring-up default passwords before a
-  public image is published.
-- Verify the release workflow with explicit kernel and rootfs Action run IDs.
+- Commit and validate `nixos/flake.lock`.
+- Build the current boot image and GNOME rootfs from the release candidate.
+- Verify the release workflow using explicit boot and rootfs Action run IDs
+  from the release-candidate commit.
 
 ## Stable release blockers
 
-- Add and validate `nixos/flake.lock`. Without it, device-side flake evaluation
-  re-resolves large inputs and can exhaust a small rootfs.
 - Expand the ext4 filesystem offline to the full `linux` partition, then
   validate a full device-side `nixos-rebuild --flake`.
 - Build and activate the repository Home Manager configuration once. The
@@ -61,5 +63,5 @@ replace `TODO.md`; it lists only release blockers and high-signal results.
 - 6 GHz Wi-Fi remains disabled and untested.
 - Kernel, DTS, stage-1 initrd, and boot command-line updates still require
   separately flashing `boot_b`.
-- Audio playback/recording, Bluetooth pairing/audio, four-way rotation, and
-  desktop camera integration still require broader user-facing validation.
+- Audio playback/recording, Bluetooth pairing/audio, official keyboard/touchpad,
+  and desktop camera integration still require broader user-facing validation.

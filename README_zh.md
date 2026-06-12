@@ -12,11 +12,11 @@ Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的实验性 Mobile NixOS 移�
 
 | 领域 | 状态 | 备注 |
 | --- | --- | --- |
-| 设备框架 | Mobile NixOS | 设备定义位于 `nixos/devices/xiaomi-sheng` |
+| 设备框架 | Mobile NixOS | 设备定义位于 `nixos/hardware/xiaomi-sheng` |
 | 内核 | Sheng mainline kernel | 通过 Nix 从 `map220v/sm8550-mainline` 构建 |
 | 启动镜像 | Bring-up | 面向 `boot_b` 的 Mobile NixOS Android boot image |
 | RootFS | Mobile NixOS 生成的 rootfs | 面向 `linux` 分区的 ext4 镜像 |
-| 显示/桌面 | 可用 | 3048x2032 面板与 GNOME shell 可用，gjs-osk 屏幕键盘与物理电源键息屏唤醒已修复；四向旋转仍待验证 |
+| 显示/桌面 | 可用 | 3048x2032 面板、GNOME shell、gjs-osk 屏幕键盘、物理电源键息屏唤醒、四向旋转与盖板开合亮灭屏均可用 |
 | 调试访问 | Bring-up | Stage-1/stage-2 的 ADB 已通过 Mobile NixOS 启用 |
 | Wi-Fi | 可用 | 2.4GHz 与 5GHz 扫描、连接和联网已验证；**首次冷启动刷入后，必须软重启一次才能稳定激活 5GHz。** |
 | 蓝牙 | 部分可用 | hci0 与 bluetooth.service 正常；扫描、配对、重连和音频待验证 |
@@ -132,12 +132,16 @@ linux 分区
 `mkShengMinimalSystem`。这两个公开构造器都不会创建用户，也不会注入本仓库的
 Home Manager profile，用户配置必须由下游模块提供。
 
+完整的私人 flake 起始模板位于
+[`examples/sheng-dotfiles`](examples/sheng-dotfiles)。
+
 ## 使用 GitHub Actions 构建
 
 打开 Actions 标签页并在 `sheng` 分支上运行以下工作流：
 
 - `Build Sheng Kernel`：构建 `boot_sheng_nixos.img`。
 - `Build NixOS RootFS`：构建可刷入的 `nixos-sheng-*.img`。
+- `Check Public Flake`：验证公开构造器与仓库锁文件。
 
 对于测试构建，请保持开启 `Skip GitHub release`，这样工作流就只会上传产物而不会发布 Release。
 

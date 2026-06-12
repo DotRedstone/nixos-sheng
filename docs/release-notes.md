@@ -1,4 +1,4 @@
-# Xiaomi Pad 6S Pro (sheng) Mobile NixOS
+# Xiaomi Pad 6S Pro (sheng) Mobile NixOS v0.1.0-alpha.2
 
 This is an early bring-up image for the Xiaomi Pad 6S Pro 12.4 (`sheng`).
 Read the known issues before flashing.
@@ -7,14 +7,18 @@ Read the known issues before flashing.
 
 - Boot to the minimal GNOME desktop
 - Display, touchscreen, physical volume keys
-- **Physical power key** (properly toggles screen on/off via GNOME/logind)
+- **Physical power key** (toggles screen on/off without triggering suspend)
 - **On-screen keyboard** (`gjs-osk`) enabled for touch input
+- Four-way automatic rotation, cover-close blanking, and cover-open redraw
+- Stage-1 generation menu with volume/power keys and external arrow/Enter keys
 - 2.4 GHz and 5 GHz Wi-Fi
 - Bluetooth controller enumeration
 - USB-C role and Type-C enumeration
 - Accelerometer, proximity, ambient light, and compass through SSC user space
 - ALSA card and camera media-node enumeration
 - Nix, `nixos-rebuild`, and the stage-2 generation framework
+- Reusable `mkShengSystem` and `mkShengMinimalSystem` constructors for private
+  downstream dotfiles flakes
 
 ## Known issues
 
@@ -22,8 +26,8 @@ Read the known issues before flashing.
 - **5GHz Wi-Fi on Cold Boot**: After a fresh `fastboot` flash (cold boot), 5GHz Wi-Fi networks may not appear due to a modem/firmware initialization race condition. A warm `reboot` resolves this.
 - Sensors use SSC plus D-Bus; kernel `/sys/bus/iio/devices/iio:device*` nodes
   are not available.
-- Audio playback/recording, Bluetooth pairing/audio, four-way rotation, and
-  desktop camera integration still need broader validation.
+- Audio playback/recording, Bluetooth pairing/audio, official keyboard/touchpad,
+  and desktop camera integration still need broader validation.
 - Kernel, DTS, stage-1 initrd, and boot-command-line changes still require a
   separately built and flashed `boot_b` image.
 
@@ -45,6 +49,10 @@ fastboot reboot
 
 Both `boot_b` and `linux` must be flashed for the complete release. Do not
 flash `userdata`.
+
+The public test image uses the bring-up credentials `luser` / `1` and root
+password `123456`. Change them immediately, or build a personalized system
+from a private flake using the template in `examples/sheng-dotfiles`.
 
 The rootfs image filesystem may be smaller than the dedicated `linux`
 partition. To use the remaining space for NixOS generations, follow

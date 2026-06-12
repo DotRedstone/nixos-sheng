@@ -16,11 +16,11 @@ This is an early bring-up project.
 
 | Area | Status | Notes |
 | --- | --- | --- |
-| Device framework | Mobile NixOS | Device definition lives in `nixos/devices/xiaomi-sheng` |
+| Device framework | Mobile NixOS | Device definition lives in `nixos/hardware/xiaomi-sheng` |
 | Kernel | Sheng mainline kernel | Built from `map220v/sm8550-mainline` through Nix |
 | Boot image | Bring-up | Mobile NixOS Android boot image for `boot_b` |
 | RootFS | Mobile NixOS generated rootfs | ext4 image labeled `linux` |
-| Display/desktop | Working | 3048x2032 panel, GNOME shell, gjs-osk onscreen keyboard, and physical power key toggle work; rotation needs validation |
+| Display/desktop | Working | 3048x2032 panel, GNOME shell, gjs-osk onscreen keyboard, physical power key toggle, four-way rotation, and cover open/close display control work |
 | Debug access | Bring-up | Stage-1/stage-2 ADB is enabled through Mobile NixOS |
 | Wi-Fi | Working | 2.4 GHz and 5 GHz scanning, connection, and networking verified; **A soft reboot is required after the first cold boot for 5GHz to work reliably.** |
 | Bluetooth | Partially working | hci0 and bluetooth.service work; discovery, pairing, reconnect, and audio need validation |
@@ -142,12 +142,17 @@ NixOS module into an ordinary `nixpkgs.lib.nixosSystem` evaluation.
 console-only system. Neither public constructor creates a user or installs the
 repository's Home Manager profile; downstream modules must define those.
 
+A complete private-flake starting point is available in
+[`examples/sheng-dotfiles`](examples/sheng-dotfiles).
+
 ## Build With GitHub Actions
 
 Open the Actions tab and run these workflows on the `sheng` branch:
 
 - `Build Sheng Kernel`: builds `boot_sheng_nixos.img`.
 - `Build NixOS RootFS`: builds the flashable `nixos-sheng-*.img`.
+- `Check Public Flake`: verifies the public constructors and committed lock
+  file.
 
 For test builds, keep `Skip GitHub release` enabled so the workflow only
 uploads artifacts.

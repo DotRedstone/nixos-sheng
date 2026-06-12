@@ -22,13 +22,15 @@ NixOS Sheng - Select stage-2 generation
 Volume +/-: select    Power: boot
 ```
 
-- Volume up/down changes the highlighted stage-2 generation.
+- Volume up/down or an external keyboard's up/down arrows change the
+  highlighted stage-2 generation.
+- Holding a navigation key repeats the selection movement.
 - Volume key handling is edge-triggered, so selection redraw does not wait for
   a delayed key-release event.
-- Power confirms the selection.
+- Power or an external keyboard's Enter key confirms the selection.
 - The highlighted entry boots automatically after 30 seconds.
-- The menu uses a 16x32 console font and only redraws when the selection
-  changes, avoiding periodic screen flicker.
+- The menu uses a 16x32 console font and padded full redraws when visible state
+  changes, avoiding stale rows, coordinate drift, and periodic screen flicker.
 - Console input echo and VT keyboard translation are disabled while the menu is
   active, preventing physical volume keys from printing escape sequences over
   the menu.

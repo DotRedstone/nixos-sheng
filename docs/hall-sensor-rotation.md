@@ -32,10 +32,12 @@ Sheng 设备包含一个物理霍尔传感器，通过 `gpio-keys` 子系统向�
 * 通过 udev 规则，给物理 `gpio-keys` 添加 libinput 忽略配置。
 * `fake-tablet-mode` 创建的虚拟设备**只上报 `SW_TABLET_MODE`**，完全剥离 `SW_LID`。
 
-### 2. 构建 0 到 1 的状态跳变
+### 2. 在真实用户会话就绪后构建 0 到 1 的状态跳变
 Mutter 需要明确看到设备进入平板模式的动作：
 * 虚拟设备在启动时先上报 `SW_TABLET_MODE=0`。
-* 延迟 20 秒（等待 GNOME 桌面加载完成）后，再上报 `SW_TABLET_MODE=1`。
+* 等待 `iio-sensor-proxy` 注册 D-Bus 名称。
+* 等待真实图形用户会话，明确排除 GDM greeter，再留出短暂的 Mutter/libinput 初始化时间。
+* 随后上报 `SW_TABLET_MODE=1`。
 这强制触发了 Mutter 的平板模式激活，解锁自动旋转和悬浮键盘。
 
 ### 3. D-Bus 接管合盖息屏
@@ -43,6 +45,7 @@ Mutter 需要明确看到设备进入平板模式的动作：
 * `fake-tablet-mode` 监听底层的物理 `gpio-keys` 的 `SW_LID` 原始事件（0=开盖，1=合盖，极性本身是正确的）。
 * 当检测到合盖/开盖时，脚本通过 `loginctl` 查找当前活跃的 GNOME 会话。
 * 利用 `busctl` 向该用户的 `org.gnome.Mutter.DisplayConfig` 发送 D-Bus 指令，直接修改 `PowerSaveMode` 属性（0=亮屏，3=息屏）。
+* 开盖时额外注入 `KEY_WAKEUP`，强制 Mutter 重绘，避免屏幕点亮但内容不刷新的问题。
 
 ### 4. 禁用 logind 干扰
 在 `configuration.nix` 中：
