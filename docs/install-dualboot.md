@@ -108,11 +108,14 @@ fastboot reboot
 GNOME 镜像将命令中的 `rootfs-minimal` 换成 `rootfs-gnome`。若下载的是单个
 rootfs `.img`，可直接将其路径传给 `fastboot flash linux`。
 
-可选：刷写前下载 `sha256sums.txt`，并在所有附件所在目录运行：
+可选：刷写前下载 `sha256sums.txt`。请仅筛选并校验已下载的 boot 与 rootfs
+版本，避免未下载的另一个 rootfs 版本被报告为文件缺失：
 
 ```sh
-sha256sum -c sha256sums.txt
+grep -E 'boot\.img|rootfs-minimal\.img\.part-' sha256sums.txt | sha256sum -c -
 ```
+
+使用 GNOME 镜像时，将命令中的 `rootfs-minimal` 替换为 `rootfs-gnome`。
 
 校验可以发现下载损坏，但不是刷写命令的必需步骤。
 

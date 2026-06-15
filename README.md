@@ -2,7 +2,7 @@
 
 # nixos-xiaomi-sheng
 
-Experimental Mobile NixOS port for the Xiaomi Pad 6S Pro 12.4 (`sheng`,
+Mobile NixOS port for the Xiaomi Pad 6S Pro 12.4 (`sheng`,
 Qualcomm SM8550).
 
 This repository is a NixOS-only device port. The maintained flashing path is
@@ -12,7 +12,10 @@ partition.
 
 ## Status
 
-This is an early bring-up project.
+The first public release is available from
+[GitHub Releases](https://github.com/DotRedstone/nixos-xiaomi-sheng/releases/latest).
+Some hardware remains partially supported; review the status table and known
+issues before flashing.
 
 | Area | Status | Notes |
 | --- | --- | --- |

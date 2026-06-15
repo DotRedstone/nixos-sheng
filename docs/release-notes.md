@@ -26,6 +26,9 @@ Read the known issues before flashing.
 - **5GHz Wi-Fi on Cold Boot**: After a fresh `fastboot` flash (cold boot), 5GHz Wi-Fi networks may not appear due to a modem/firmware initialization race condition. A warm `reboot` resolves this.
 - Sensors use SSC plus D-Bus; kernel `/sys/bus/iio/devices/iio:device*` nodes
   are not available.
+- The v0.1.0 GNOME image may change brightness unexpectedly because automatic
+  ambient-light adjustment and idle dimming are enabled. This is fixed on the
+  `sheng` branch but is not included in the v0.1.0 image.
 - Audio playback/recording, Bluetooth pairing/audio, official keyboard/touchpad,
   and desktop camera integration still need broader validation.
 - Kernel, DTS, stage-1 initrd, and boot-command-line changes still require a
@@ -54,11 +57,15 @@ Choose `rootfs-gnome` instead of `rootfs-minimal` only when you want the
 repository-provided GNOME desktop. If a variant is provided as a single
 `.img`, flash that file directly without the `cat` command.
 
-Checksum verification is optional but recommended:
+Checksum verification is optional but recommended. Filter the checksum list to
+the variant you downloaded so missing files from the other variant are not
+reported as failures:
 
 ```sh
-sha256sum -c sha256sums.txt
+grep -E 'boot\.img|rootfs-minimal\.img\.part-' sha256sums.txt | sha256sum -c -
 ```
+
+Replace `rootfs-minimal` with `rootfs-gnome` when using the GNOME image.
 
 Both `boot_b` and `linux` must be flashed for the complete release. Do not
 flash `userdata`.

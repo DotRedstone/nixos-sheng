@@ -2,13 +2,15 @@
 
 # nixos-xiaomi-sheng
 
-Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的实验性 Mobile NixOS 移植项目。
+Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的 Mobile NixOS 移植项目。
 
 本仓库仅提供 NixOS 设备移植。当前维护的刷机路径是基于 Mobile NixOS 的 Android 启动流程：编译一个 `boot.img` 刷入非活动（inactive）的 Android slot，以及一个由 Mobile NixOS 生成的 ext4 rootfs 镜像刷入专门分配的 `linux` 分区。
 
 ## 当前状态
 
-这是一个早期的 bring-up 项目。
+首个公开版本可从
+[GitHub Releases](https://github.com/DotRedstone/nixos-xiaomi-sheng/releases/latest)
+下载。部分硬件仍未完全支持，刷写前请阅读下方状态表和已知问题。
 
 | 领域 | 状态 | 备注 |
 | --- | --- | --- |
