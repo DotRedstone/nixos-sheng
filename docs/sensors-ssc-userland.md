@@ -12,6 +12,10 @@ sheng 的传感器链路已经通过 Qualcomm SSC 用户态方案跑通。实机
 
 当前实现不是内核 IIO sysfs 方案，因此 `/sys/bus/iio/devices` 下面仍不会出现 `iio:device*`。这不影响 `iio-sensor-proxy` 通过 D-Bus 给桌面和应用提供传感器数据。
 
+GNOME profile 默认关闭 `ambient-enabled` 和 `idle-dim`。SSC 光感仍会通过
+`iio-sensor-proxy` 暴露给应用和诊断工具，但 GNOME 不会根据有波动的 lux 数值
+自动改写背光，也不会在闲置时临时降低亮度。用户仍可手动调节亮度。
+
 ## 路线判断
 
 sheng 的传感器不是普通 Linux AP 侧 I2C/SPI 设备路径。不要在 DTS 中强行编造 `icm42607`、`qmc6308`、`stk36c61` 等物理设备节点，也不要把“没有 `/sys/bus/iio/devices/iio:device*`”直接等同于传感器失败。
@@ -82,6 +86,10 @@ monitor-sensor --accel
 monitor-sensor --proximity
 monitor-sensor --light
 monitor-sensor --compass
+
+echo '=== GNOME brightness policy ==='
+gsettings get org.gnome.settings-daemon.plugins.power ambient-enabled
+gsettings get org.gnome.settings-daemon.plugins.power idle-dim
 
 echo '=== libssc direct ==='
 ssccli --sensor accelerometer --timeout 5

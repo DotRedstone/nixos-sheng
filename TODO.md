@@ -177,6 +177,7 @@ postmarketOS 状态：Y
 * [x] `ktz8866-backlight` 节点存在
 * [x] `brightness` / `max_brightness` / `actual_brightness` 可读
 * [~] 需要人工验证亮度调节是否实际生效
+* [x] GNOME profile 默认关闭光感自动亮度与闲置调暗，避免背光自行波动
 
 验证命令：
 

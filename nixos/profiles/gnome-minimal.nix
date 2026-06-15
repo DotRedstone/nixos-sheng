@@ -113,6 +113,10 @@ in
       };
 
       settings."org/gnome/settings-daemon/plugins/power" = {
+        # SSC ambient-light readings are useful for diagnostics but currently
+        # fluctuate enough to make GNOME's automatic brightness distracting.
+        ambient-enabled = false;
+        idle-dim = false;
         power-button-action = "nothing";
         lid-close-ac-action = "blank";
         lid-close-battery-action = "blank";
@@ -152,6 +156,8 @@ in
       };
 
       settings."org/gnome/settings-daemon/plugins/power" = {
+        ambient-enabled = false;
+        idle-dim = false;
         power-button-action = "nothing";
         sleep-inactive-ac-type = "nothing";
         sleep-inactive-battery-type = "nothing";
