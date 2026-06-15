@@ -21,7 +21,8 @@ stdenv.mkDerivation {
 
   meta = with lib; {
     description = "Library to expose Qualcomm Sensor Core sensors";
-    license = licenses.gpl3Plus;
+    # Most vendored source files identify themselves as AGPL-3.0-or-later.
+    license = licenses.agpl3Plus;
     platforms = platforms.linux;
   };
 }
