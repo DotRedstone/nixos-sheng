@@ -8,7 +8,12 @@ Read the known issues before flashing.
 
 - Disable GNOME ambient-light automatic brightness changes.
 - Disable GNOME idle dimming.
+- Re-enable ZRAM with the Zstandard compressor.
+- Restore commonly needed kernel capabilities for containers, desktop tools,
+  and filesystems: BPF, io_uring, FUSE, OverlayFS, SquashFS, EROFS, NFS, and
+  CIFS. Unprivileged BPF remains disabled by default.
 - Clarify flashing, checksum verification, and public-release documentation.
+- Add repository license and third-party/proprietary-material notices.
 
 ## Working
 
@@ -73,6 +78,11 @@ Replace `rootfs-minimal` with `rootfs-gnome` when using the GNOME image.
 
 Both `boot_b` and `linux` must be flashed for the complete release. Do not
 flash `userdata`.
+
+Original project material is MIT licensed. Third-party code and proprietary
+firmware retain their own terms; review
+[THIRD_PARTY_NOTICES.md](https://github.com/DotRedstone/nixos-xiaomi-sheng/blob/sheng/THIRD_PARTY_NOTICES.md)
+before redistributing images.
 
 The public image uses the default credentials `luser` / `1` and root
 password `123456`. Change them immediately, or build a personalized system

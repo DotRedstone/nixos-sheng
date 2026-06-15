@@ -177,6 +177,8 @@ jobs:
             fi
           done
 
+          cp LICENSE THIRD_PARTY_NOTICES.md release-upload/
+
           cd release-upload
           sha256sum * > sha256sums.txt
           cd ..

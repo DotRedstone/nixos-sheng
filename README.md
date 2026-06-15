@@ -269,6 +269,20 @@ For the full dependency chain, offline rootfs checks, runtime verification comma
 - [docs/release-readiness.md](docs/release-readiness.md)
 - [docs/release-notes.md](docs/release-notes.md)
 
+## License and third-party material
+
+Original project material authored by DotRedstone is licensed under the
+[MIT License](LICENSE). Third-party source code, Linux kernel code and patches,
+firmware, binaries, and trademarks remain under their respective terms; see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+The device-specific firmware used by this port is proprietary. Its presence in
+a public source repository does not by itself grant redistribution permission.
+Anyone distributing prebuilt images is responsible for confirming permission
+for every included binary in their jurisdiction. The lowest-risk distribution
+model is source-only, with users supplying firmware extracted from devices they
+own.
+
 ## Debugging
 
 ADB is enabled through `mobile.adbd.enable`. During a successful transition,

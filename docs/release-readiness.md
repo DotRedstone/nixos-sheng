@@ -49,6 +49,11 @@ replace `TODO.md`; it lists only release blockers and high-signal results.
 
 - GNOME ambient-light automatic brightness adjustment and idle dimming are
   disabled to prevent unexpected brightness changes.
+- ZRAM is enabled with Zstandard compression.
+- Common BPF, io_uring, FUSE, OverlayFS, SquashFS, EROFS, NFS, and CIFS kernel
+  capabilities are restored. Unprivileged BPF is disabled by default.
+- The repository license, third-party notices, and release attachment notices
+  are documented.
 - Public flashing and checksum instructions have been corrected.
 - Boot, minimal rootfs, and GNOME rootfs release artifacts must be rebuilt from
   the same v0.1.1 release commit before publication.

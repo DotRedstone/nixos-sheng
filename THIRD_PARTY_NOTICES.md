@@ -1,0 +1,55 @@
+# Third-party notices
+
+This repository combines original integration code with independently
+licensed upstream software and device-specific binary firmware. The top-level
+MIT license applies only to original project material authored by DotRedstone.
+It does not relicense third-party material.
+
+## Source dependencies
+
+| Component | Source | License/status |
+| --- | --- | --- |
+| Mobile NixOS | https://github.com/mobile-nixos/mobile-nixos | MIT |
+| Nixpkgs | https://github.com/NixOS/nixpkgs | Mixed; see upstream package metadata |
+| Home Manager | https://github.com/nix-community/home-manager | MIT |
+| Sheng Linux kernel | https://github.com/map220v/sm8550-mainline | GPL-2.0-only Linux kernel terms |
+| MiPPS authentication script | https://github.com/ianchb/xiaomi-mipps-auth | GPL-2.0-only, as declared by its source SPDX header |
+| GJS OSK | https://github.com/Vishram1123/gjs-osk | GPL-3.0 |
+| FastRPC | https://github.com/qualcomm/fastrpc | BSD-3-Clause |
+| QRTR | https://github.com/linux-msm/qrtr | BSD-3-Clause |
+| PD Mapper | https://github.com/linux-msm/pd-mapper | BSD-3-Clause |
+| libssc | https://codeberg.org/DylanVanAssche/libssc | Source files predominantly declare AGPL-3.0-or-later; exact vendored origin is recorded in `nixos/vendor/libssc/ORIGIN.md` |
+| Sheng sensor configuration | https://github.com/alghiffaryfa19/sheng-sensors-file | No upstream license published; treated as unfree |
+
+Kernel patches remain subject to the Linux kernel's GPL-2.0-only terms and any
+copyright notices embedded in the patched source or patch files.
+
+The complete corresponding project source, Nix expressions, downstream
+patches, and vendored libssc source used to build a release are available from
+the Git tag associated with that release.
+
+## Proprietary firmware and binaries
+
+`DotRedstone/sheng-firmware-full` contains device firmware, Android vendor
+libraries, configuration data, and executables originating from Xiaomi,
+Qualcomm, component vendors, or device images. These files are not covered by
+this repository's MIT license. Their copyright and redistribution terms remain
+with their respective owners.
+
+The public rootfs and boot images may include redistributable firmware selected
+by Nixpkgs as well as device-specific proprietary files from
+`sheng-firmware-full`. Publication of a file in a repository does not itself
+grant redistribution permission. Distributors are responsible for confirming
+that they have permission to redistribute every included binary in their
+jurisdiction.
+
+For the lowest redistribution risk, do not redistribute prebuilt rootfs or
+boot images containing proprietary files. Build from source while supplying
+firmware extracted from a device you own, and distribute only the original
+project source and patches.
+
+## No endorsement
+
+Xiaomi, Qualcomm, Snapdragon, and other names and marks belong to their
+respective owners. This community project is not affiliated with or endorsed
+by those companies.

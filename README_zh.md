@@ -241,6 +241,17 @@ sheng 上的 USB-C 主机模式和各类传感器均强依赖于完整的 Qualco
 - [docs/release-readiness.md](docs/release-readiness.md)
 - [docs/release-notes.md](docs/release-notes.md)
 
+## 许可证与第三方材料
+
+由 DotRedstone 原创的项目内容采用 [MIT License](LICENSE)。第三方源代码、
+Linux 内核代码与补丁、固件、二进制文件和商标仍受各自条款约束，详情见
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+本移植使用的设备专有固件并非开源软件。文件出现在公开仓库中并不自动代表获得了
+再分发许可。任何分发预构建镜像的人都需要自行确认其所在地对所有内含二进制文件的
+再分发权限。法律风险最低的发布方式是仅发布源代码，并由用户从自己拥有的设备中
+提取和提供固件。
+
 ## 调试
 
 ADB 通过 `mobile.adbd.enable` 启用。在成功的过渡期间，stage-1 的 ADB 可能会在 stage-2 接管 USB gadget 设置时短暂断开。
