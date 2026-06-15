@@ -19,7 +19,12 @@
     options = [ "ro" "noatime" ];
   };
 
-  zramSwap.enable = false;
+  zramSwap = {
+    enable = true;
+    algorithm = "zstd";
+    memoryPercent = 25;
+    priority = 100;
+  };
 
   hardware.enableRedistributableFirmware = true;
   hardware.firmware = [ pkgs.sheng-firmware ];
