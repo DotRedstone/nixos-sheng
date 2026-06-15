@@ -1,7 +1,14 @@
-# Xiaomi Pad 6S Pro (sheng) Mobile NixOS v0.1.0
+# Xiaomi Pad 6S Pro (sheng) Mobile NixOS v0.1.1
 
-This is the first stable release for the Xiaomi Pad 6S Pro 12.4 (`sheng`).
+This maintenance release fixes unexpected GNOME brightness changes on the
+Xiaomi Pad 6S Pro 12.4 (`sheng`).
 Read the known issues before flashing.
+
+## Changes since v0.1.0
+
+- Disable GNOME ambient-light automatic brightness changes.
+- Disable GNOME idle dimming.
+- Clarify flashing, checksum verification, and public-release documentation.
 
 ## Working
 
@@ -26,9 +33,6 @@ Read the known issues before flashing.
 - **5GHz Wi-Fi on Cold Boot**: After a fresh `fastboot` flash (cold boot), 5GHz Wi-Fi networks may not appear due to a modem/firmware initialization race condition. A warm `reboot` resolves this.
 - Sensors use SSC plus D-Bus; kernel `/sys/bus/iio/devices/iio:device*` nodes
   are not available.
-- The v0.1.0 GNOME image may change brightness unexpectedly because automatic
-  ambient-light adjustment and idle dimming are enabled. This is fixed on the
-  `sheng` branch but is not included in the v0.1.0 image.
 - Audio playback/recording, Bluetooth pairing/audio, official keyboard/touchpad,
   and desktop camera integration still need broader validation.
 - Kernel, DTS, stage-1 initrd, and boot-command-line changes still require a

@@ -45,6 +45,14 @@ replace `TODO.md`; it lists only release blockers and high-signal results.
   minimal and GNOME rootfs images, optional checksums, flashing instructions,
   known issues, and rollback instructions were verified after publication.
 
+## v0.1.1 release candidate
+
+- GNOME ambient-light automatic brightness adjustment and idle dimming are
+  disabled to prevent unexpected brightness changes.
+- Public flashing and checksum instructions have been corrected.
+- Boot, minimal rootfs, and GNOME rootfs release artifacts must be rebuilt from
+  the same v0.1.1 release commit before publication.
+
 ## Future improvements
 
 - Expand the ext4 filesystem offline to the full `linux` partition, then
