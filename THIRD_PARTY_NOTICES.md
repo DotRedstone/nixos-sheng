@@ -48,6 +48,27 @@ boot images containing proprietary files. Build from source while supplying
 firmware extracted from a device you own, and distribute only the original
 project source and patches.
 
+## Rights-holder notices
+
+If you are a rights holder and believe that material in this repository or in
+published release artifacts infringes your rights, please open a GitHub issue
+or contact the repository owner through GitHub with enough information to
+identify the affected file, the right being asserted, and the requested action.
+The project maintainer will review good-faith requests and remove or replace
+affected material when appropriate.
+
+This notice is a practical contact path for rights holders. It does not state
+or imply that every third-party file is owned by this project or that every
+redistribution right has been granted.
+
+## Warranty and device risk
+
+This project, including source code, instructions, boot images, rootfs images,
+and other release artifacts, is provided without warranty. Flashing low-level
+device partitions can brick hardware, break Android boot, or destroy data.
+Users and downstream distributors are responsible for verifying legality,
+fitness, safety, and compatibility before use or redistribution.
+
 ## No endorsement
 
 Xiaomi, Qualcomm, Snapdragon, and other names and marks belong to their

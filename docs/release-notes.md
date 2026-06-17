@@ -84,6 +84,11 @@ firmware retain their own terms; review
 [THIRD_PARTY_NOTICES.md](https://github.com/DotRedstone/nixos-xiaomi-sheng/blob/sheng/THIRD_PARTY_NOTICES.md)
 before redistributing images.
 
+Rights holders can request review of affected files or release artifacts
+through GitHub. The project is not affiliated with or endorsed by Xiaomi,
+Qualcomm, or other component vendors. Source code, instructions, images, and
+other artifacts are provided without warranty.
+
 The public image uses the default credentials `luser` / `1` and root
 password `123456`. Change them immediately, or build a personalized system
 from a private flake using the template in `examples/sheng-dotfiles`.

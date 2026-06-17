@@ -283,6 +283,10 @@ for every included binary in their jurisdiction. The lowest-risk distribution
 model is source-only, with users supplying firmware extracted from devices they
 own.
 
+Rights holders can request review of affected files or release artifacts
+through GitHub; see `THIRD_PARTY_NOTICES.md`. This project is not affiliated
+with or endorsed by Xiaomi, Qualcomm, or other component vendors.
+
 ## Debugging
 
 ADB is enabled through `mobile.adbd.enable`. During a successful transition,
@@ -319,4 +323,5 @@ If left blank or unmodified in Actions, the test image will fall back to the pre
 This is a low-level device-porting project. Flashing boot images, changing the
 active slot, and writing partitions can brick the tablet or destroy data. Back
 up everything and assume every command is dangerous until proven on your own
-device.
+device. Source code, instructions, images, and other artifacts are provided
+without warranty.
