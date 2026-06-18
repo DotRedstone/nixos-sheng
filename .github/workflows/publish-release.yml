@@ -44,6 +44,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install release packaging tools
+        run: |
+          sudo apt update
+          sudo apt install -y e2fsprogs zip
+
       - name: Determine Release Info
         id: release_info
         run: |
@@ -144,9 +149,12 @@ jobs:
 
           # Shrink each ext4 filesystem to its used size so it is convenient to
           # download. Stage-1 expands it to the linux partition on first boot.
-          # GitHub Release assets must be smaller than 2 GiB, so split the raw
-          # directly flashable image only when it still exceeds that limit.
-          max_asset_size=$((1900 * 1024 * 1024))
+          #
+          # Rootfs images are published as split ZIP archives instead of raw
+          # .img.part-* files. This is friendlier for Windows users: Bandizip,
+          # 7-Zip, and similar tools can open the final .zip volume and extract
+          # the directly flashable .img.
+          max_zip_part_size="1900m"
           for flavor in minimal gnome; do
             rootfs_img="$(find "release-artifacts/rootfs-$flavor" -type f -name '*.img' -print -quit)"
             test -n "$rootfs_img" || {
@@ -167,14 +175,15 @@ jobs:
             block_count="$(dumpe2fs -h "$output" 2>/dev/null | awk -F: '/Block count:/ { gsub(/ /, "", $2); print $2 }')"
             block_size="$(dumpe2fs -h "$output" 2>/dev/null | awk -F: '/Block size:/ { gsub(/ /, "", $2); print $2 }')"
             truncate -s "$((block_count * block_size))" "$output"
-            rootfs_size="$(stat -c %s "$output")"
-            if [ "$rootfs_size" -le "$max_asset_size" ]; then
-              echo "$flavor rootfs fits as one directly flashable image"
-            else
-              echo "Splitting raw $flavor rootfs because it exceeds the GitHub asset limit"
-              split -b "$max_asset_size" -d -a 2 "$output" "${output}.part-"
-              rm "$output"
-            fi
+
+            (
+              cd release-upload
+              image_name="$(basename "$output")"
+              archive_name="${image_name%.img}.zip"
+              echo "Creating split ZIP archive for $image_name"
+              zip -9 -s "$max_zip_part_size" -- "$archive_name" "$image_name"
+              rm "$image_name"
+            )
           done
 
           cp LICENSE THIRD_PARTY_NOTICES.md release-upload/

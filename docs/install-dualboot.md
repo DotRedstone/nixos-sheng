@@ -1,5 +1,7 @@
 # Sheng 双系统安装指南
 
+[English](install-dualboot_en.md) | [简体中文](install-dualboot.md)
+
 本文适用于在 Xiaomi Pad 6S Pro 12.4（`sheng`）上保留 Android，并将
 Mobile NixOS 安装到槽位 `b` 和独立 `linux` 分区。
 
@@ -89,30 +91,40 @@ adb reboot bootloader
 
 ## 刷写 release
 
-如果下载的 rootfs 是多个 `.img.part-*` 文件，先合并为一个可直接刷写的镜像：
+Release rootfs 会以分卷 ZIP 发布，方便 Windows 用户直接使用 Bandizip、
+7-Zip、WinRAR 等图形解压工具。请下载同一个 rootfs 版本的所有分卷，例如：
 
-```sh
-cat nixos-sheng-*-rootfs-minimal.img.part-* > nixos-sheng-rootfs.img
+```text
+nixos-sheng-v0.1.1-kernel-7.0.0-rootfs-minimal.z01
+nixos-sheng-v0.1.1-kernel-7.0.0-rootfs-minimal.z02
+nixos-sheng-v0.1.1-kernel-7.0.0-rootfs-minimal.zip
 ```
 
-如果下载的是单个 `.img`，无需合并。然后刷写槽位 `b` 和 `linux`：
+把所有分卷放在同一个文件夹，打开最后的 `.zip` 文件并解压，得到可直接刷入的
+`.img`。然后刷写槽位 `b` 和 `linux`：
 
 ```sh
 fastboot erase dtbo_b
 fastboot flash boot_b nixos-sheng-*-boot.img
-fastboot flash linux nixos-sheng-rootfs.img
+fastboot flash linux nixos-sheng-*-rootfs-minimal.img
 fastboot --set-active=b
 fastboot reboot
 ```
 
-GNOME 镜像将命令中的 `rootfs-minimal` 换成 `rootfs-gnome`。若下载的是单个
-rootfs `.img`，可直接将其路径传给 `fastboot flash linux`。
+GNOME 镜像将命令中的 `rootfs-minimal` 换成 `rootfs-gnome`。解压得到的
+`.img` 才是传给 `fastboot flash linux` 的文件。
 
 可选：刷写前下载 `sha256sums.txt`。请仅筛选并校验已下载的 boot 与 rootfs
 版本，避免未下载的另一个 rootfs 版本被报告为文件缺失：
 
 ```sh
-grep -E 'boot\.img|rootfs-minimal\.img\.part-' sha256sums.txt | sha256sum -c -
+grep -E 'boot\.img|rootfs-minimal\.(z[0-9]+|zip)$' sha256sums.txt | sha256sum -c -
+```
+
+Windows 用户也可以先直接右键解压；如果想单独校验某个下载文件，可用 PowerShell：
+
+```powershell
+Get-FileHash .\nixos-sheng-*-rootfs-minimal.zip -Algorithm SHA256
 ```
 
 使用 GNOME 镜像时，将命令中的 `rootfs-minimal` 替换为 `rootfs-gnome`。

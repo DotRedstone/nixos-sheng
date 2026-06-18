@@ -41,9 +41,10 @@ replace `TODO.md`; it lists only release blockers and high-signal results.
 - `v0.1.0` was published from release commit `2e54371`.
 - Public flake checks, the boot image build, and the minimal and GNOME rootfs builds all
   completed successfully from that commit.
-- The release tag, versioned kernel-aware asset names, boot image, split raw
-  minimal and GNOME rootfs images, optional checksums, flashing instructions,
-  known issues, and rollback instructions were verified after publication.
+- The release tag, versioned kernel-aware asset names, boot image, the
+  then-current minimal and GNOME rootfs artifact format, optional checksums,
+  flashing instructions, known issues, and rollback instructions were verified
+  after publication.
 
 ## v0.1.1 release candidate
 
@@ -57,6 +58,8 @@ replace `TODO.md`; it lists only release blockers and high-signal results.
 - Public flashing and checksum instructions have been corrected.
 - Boot, minimal rootfs, and GNOME rootfs release artifacts must be rebuilt from
   the same v0.1.1 release commit before publication.
+- Rootfs release artifacts must be uploaded as Windows-friendly split ZIP
+  archives, with checksums covering every uploaded volume.
 
 ## Future improvements
 

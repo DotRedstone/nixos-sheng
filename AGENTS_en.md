@@ -323,7 +323,7 @@ Choose the build target according to the modification scope:
 | Modification Scope | Actions Build Target | Release Artifacts |
 | --- | --- | --- |
 | kernel config / patch / DTS / DTB / initrd / cmdline | boot image | `sheng-boot-*.img` |
-| firmware / systemd / udev / packages / desktop / rootfs | rootfs image | `sheng-rootfs-*.img.zst` |
+| firmware / systemd / udev / packages / desktop / rootfs | rootfs image | split ZIP rootfs archive |
 | Affects both boot and rootfs | boot + rootfs | Upload both |
 | Documentation only | No flashable build | Do not publish release |
 
@@ -356,7 +356,7 @@ Tag pushes:
 Releases must contain at least:
 
 * boot image, if this version needs to flash `boot_b`
-* rootfs image, if this version needs to flash `linux`
+* split ZIP rootfs archive, if this version needs to flash `linux`
 * `sha256sums.txt` (verification is optional for users)
 * Brief flashing instructions
 * Known issues
@@ -365,7 +365,8 @@ Recommended naming:
 
 ```text
 nixos-sheng-v0.1.0-kernel-7.0.0-boot.img
-nixos-sheng-v0.1.0-kernel-7.0.0-rootfs-minimal.img
+nixos-sheng-v0.1.0-kernel-7.0.0-rootfs-minimal.z01
+nixos-sheng-v0.1.0-kernel-7.0.0-rootfs-minimal.zip
 sha256sums.txt
 ```
 
@@ -373,8 +374,14 @@ Do not bundle GNOME or other large desktop environments into the minimal image b
 If providing a GNOME test image, use a separate artifact:
 
 ```text
-nixos-sheng-v0.1.N-kernel-7.0.0-rootfs-gnome.img
+nixos-sheng-v0.1.N-kernel-7.0.0-rootfs-gnome.z01
+nixos-sheng-v0.1.N-kernel-7.0.0-rootfs-gnome.zip
 ```
+
+Rootfs release assets should use split ZIP archives that are friendly to
+Windows graphical extraction tools. Users download all `.z01` / `.z02` /
+`.zip` volumes for one rootfs variant, open the final `.zip`, and extract the
+directly flashable `.img`.
 
 ### Release Notes Must Include
 

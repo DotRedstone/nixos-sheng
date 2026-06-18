@@ -1,4 +1,4 @@
-[🇨🇳 简体中文](README_zh.md) | [🇬🇧 English](README.md)
+[🇬🇧 English](README.md) | [🇨🇳 简体中文](README_zh.md)
 
 # nixos-xiaomi-sheng
 
@@ -147,6 +147,11 @@ Home Manager profile，用户配置必须由下游模块提供。
 - `Check Public Flake`：验证公开构造器与仓库锁文件。
 
 对于测试构建，请保持开启 `Skip GitHub release`，这样工作流就只会上传产物而不会发布 Release。
+
+正式 Release 的 rootfs 镜像会以分卷 ZIP 发布，方便 Windows 用户使用 Bandizip、
+7-Zip、WinRAR 等图形解压工具。请下载所选版本的全部分卷，例如
+`rootfs-minimal.z01`、`rootfs-minimal.z02` 和 `rootfs-minimal.zip`，
+然后打开最后的 `.zip` 文件，解压得到可直接刷入的 `.img`。
 
 ## 本地构建
 

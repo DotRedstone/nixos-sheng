@@ -1,5 +1,7 @@
 # Xiaomi Pad 6S Pro (sheng) Mobile NixOS v0.1.1
 
+[English](release-notes.md) | [简体中文](release-notes_zh.md)
+
 This maintenance release fixes unexpected GNOME brightness changes on the
 Xiaomi Pad 6S Pro 12.4 (`sheng`).
 Read the known issues before flashing.
@@ -46,32 +48,33 @@ Read the known issues before flashing.
 ## Flashing
 
 The release contains one boot image plus minimal and GNOME rootfs variants.
-Images smaller than GitHub's 2 GiB per-asset limit are uploaded as directly
-flashable `.img` files. Larger raw images are uploaded as numbered
-`.img.part-*` files and only need to be joined before flashing. Asset names
-include `nixos`, the release version, and the kernel version.
+Rootfs images are uploaded as split ZIP archives for Windows-friendly
+extraction. Download every volume for the chosen variant, such as `.z01`,
+`.z02`, and the final `.zip`, then open the `.zip` file with Bandizip, 7-Zip,
+WinRAR, or another split-ZIP compatible tool. The extracted `.img` is directly
+flashable. Asset names include `nixos`, the release version, and the kernel
+version.
 
 For first-time dual-boot partitioning and installation, follow
-the [dual-boot installation guide](https://github.com/DotRedstone/nixos-xiaomi-sheng/blob/sheng/docs/install-dualboot.md).
+the [dual-boot installation guide](https://github.com/DotRedstone/nixos-xiaomi-sheng/blob/sheng/docs/install-dualboot_en.md).
 
 ```sh
-cat nixos-sheng-*-rootfs-minimal.img.part-* > nixos-sheng-rootfs.img
 fastboot flash boot_b nixos-sheng-*-boot.img
-fastboot flash linux nixos-sheng-rootfs.img
+fastboot flash linux nixos-sheng-*-rootfs-minimal.img
 fastboot --set-active=b
 fastboot reboot
 ```
 
 Choose `rootfs-gnome` instead of `rootfs-minimal` only when you want the
-repository-provided GNOME desktop. If a variant is provided as a single
-`.img`, flash that file directly without the `cat` command.
+repository-provided GNOME desktop. The `.img` file is produced by extracting
+the downloaded split ZIP archive.
 
 Checksum verification is optional but recommended. Filter the checksum list to
 the variant you downloaded so missing files from the other variant are not
 reported as failures:
 
 ```sh
-grep -E 'boot\.img|rootfs-minimal\.img\.part-' sha256sums.txt | sha256sum -c -
+grep -E 'boot\.img|rootfs-minimal\.(z[0-9]+|zip)$' sha256sums.txt | sha256sum -c -
 ```
 
 Replace `rootfs-minimal` with `rootfs-gnome` when using the GNOME image.

@@ -350,7 +350,7 @@ dmesg | grep -Ei 'adsp|cdsp|firmware|charger_pd|pd_running|ucsi|typec|ath12k|mhi
 | 修改范围                                                                                      | Actions 构建目标  | Release 附件               |
 | ----------------------------------------------------------------------------------------- | ------------- | ------------------------ |
 | kernel config / kernel patch / DTS / DTB / initrd / cmdline                               | boot image    | `sheng-boot-*.img`       |
-| firmware / systemd / udev / packages / desktop / rootfs layout / kernel modules in rootfs | rootfs image  | `sheng-rootfs-*.img.zst` |
+| firmware / systemd / udev / packages / desktop / rootfs layout / kernel modules in rootfs | rootfs image  | split ZIP rootfs archive |
 | 同时影响 boot 和 rootfs                                                                        | boot + rootfs | 两者都上传                    |
 | 仅文档                                                                                       | 不构建刷机包        | 不发布 release              |
 
@@ -383,7 +383,7 @@ tag 推送：
 Release 至少包含：
 
 * boot 镜像，如果本版本需要刷 `boot_b`
-* rootfs 镜像，如果本版本需要刷 `linux`
+* rootfs 镜像分卷 ZIP，如果本版本需要刷 `linux`
 * `sha256sums.txt`（用户校验步骤可选）
 * 简要刷机说明
 * Known issues
@@ -392,7 +392,8 @@ Release 至少包含：
 
 ```text
 nixos-sheng-v0.1.0-kernel-7.0.0-boot.img
-nixos-sheng-v0.1.0-kernel-7.0.0-rootfs-minimal.img
+nixos-sheng-v0.1.0-kernel-7.0.0-rootfs-minimal.z01
+nixos-sheng-v0.1.0-kernel-7.0.0-rootfs-minimal.zip
 sha256sums.txt
 ```
 
@@ -400,8 +401,13 @@ GNOME 或其它大桌面环境不要默认塞进 minimal 镜像。
 如果提供 GNOME 测试镜像，使用单独附件：
 
 ```text
-nixos-sheng-v0.1.N-kernel-7.0.0-rootfs-gnome.img
+nixos-sheng-v0.1.N-kernel-7.0.0-rootfs-gnome.z01
+nixos-sheng-v0.1.N-kernel-7.0.0-rootfs-gnome.zip
 ```
+
+rootfs release 附件应使用 Windows 图形解压工具友好的 split ZIP。用户下载同一
+rootfs 版本的所有 `.z01` / `.z02` / `.zip` 分卷后，打开最后的 `.zip` 解压出
+可直接刷写的 `.img`。
 
 ### Release notes 必须包含
 
