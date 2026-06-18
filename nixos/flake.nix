@@ -71,11 +71,12 @@
           # the normal package output; this only disables build-time checks.
           doCheck = false;
         });
-        SDL3 = prev.SDL3.overrideAttrs (old: {
+        sdl3 = prev.sdl3.overrideAttrs (old: {
           # The aarch64 GitHub runner can time out in SDL3's testrwlock when
           # cache fallback forces a source build. Keep runtime output unchanged.
           doCheck = false;
         });
+        SDL3 = final.sdl3;
       };
       pkgs = import nixpkgs {
         inherit system;
