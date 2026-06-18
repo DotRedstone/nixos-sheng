@@ -76,9 +76,11 @@ in
       Type = "exec";
       ExecStartPre = pkgs.writeShellScript "pd-mapper-prep" ''
         mkdir -p /run/pd-mapper-firmware
-        # Mirror the directory structure and decompress ZSTD JSON files
+        rm -rf /run/pd-mapper-firmware/qcom
+
+        # Mirror only the sheng firmware subtree needed by ADSP/CDSP services.
         cd /run/current-system/firmware
-        find -L ./qcom -name "*.zst" | while read file; do
+        find -L ./qcom/sm8550/sheng -name "*.zst" | while read file; do
           mkdir -p "/run/pd-mapper-firmware/$(dirname "$file")"
           zstd -d -f "$file" -o "/run/pd-mapper-firmware/''${file%.zst}"
         done
