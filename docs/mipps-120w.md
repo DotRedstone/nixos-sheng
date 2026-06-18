@@ -15,6 +15,13 @@ The authentication service only attempts the Xiaomi private flow when the
 charger reports Xiaomi SVID `0x2717`. Other chargers continue using standard
 PD/PPS negotiation.
 
+The service is intentionally retried after attach. On sheng, the first USB-C
+uevent can arrive before the battery manager has updated `real_type`,
+`adapter_svid`, and `pdo2`. In that window the charger may still look like
+`SDP`, or `pdo2` may read as `00000000`. The wrapper waits for a Xiaomi SVID,
+a PD/PPS `real_type`, and a non-empty PDO before running the MiPPS handshake,
+then retries on later USB power-supply changes.
+
 ## Verified result
 
 The integration was verified on sheng with a compatible Xiaomi 120 W charger
@@ -82,6 +89,13 @@ validation requires:
 - Increased measured voltage and current.
 - Stable battery and charger temperatures.
 - Confirmation with an external USB-C power meter.
+
+If fast charging is not active, check the service journal first. A log like
+`real_type=SDP adapter_svid=10007 pdo2=00000000` means the Xiaomi charger was
+detected but PD/PPS source PDOs were not ready yet; unplugging should no longer
+be required in the steady state, because later `power_supply` changes retrigger
+the service. If the values stay stuck at `SDP` and `pdo2=00000000`, the failure
+is below userspace in the Type-C/PD negotiation state.
 
 ## Risk and rollback
 
