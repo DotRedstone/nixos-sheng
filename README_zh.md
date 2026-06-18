@@ -4,7 +4,25 @@
 
 Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的 Mobile NixOS 移植项目。
 
+![设备](https://img.shields.io/badge/device-Xiaomi%20Pad%206S%20Pro%2012.4-blue)
+![内核](https://img.shields.io/badge/kernel-sheng--7.0-blueviolet)
+![NixOS](https://img.shields.io/badge/NixOS-Mobile%20NixOS-5277c3)
+![许可证](https://img.shields.io/badge/license-MIT%20%2B%20third--party%20terms-orange)
+
 本仓库仅提供 NixOS 设备移植。当前维护的刷机路径是基于 Mobile NixOS 的 Android 启动流程：编译一个 `boot.img` 刷入非活动（inactive）的 Android slot，以及一个由 Mobile NixOS 生成的 ext4 rootfs 镜像刷入专门分配的 `linux` 分区。
+
+如果这个项目帮到了你，或者你只是想看到 NixOS 在移动设备上变得更真实，
+欢迎给仓库点一个 star。它能帮助更多 sheng 用户找到这个移植项目，也能让深夜
+调试 boot image 的人稍微感受到一点人间温度。
+
+## 项目亮点
+
+- 面向 Xiaomi Pad 6S Pro 12.4 (`sheng`) 的 Mobile NixOS 启动流程
+- 可刷入 Android `boot_b` 的 boot 镜像，以及专用 `linux` 分区 rootfs 镜像
+- 面向私人 dotfiles 仓库的桌面无关公开 flake 构造器
+- 可选 GNOME 镜像，集成触屏键盘、自动旋转和盖板开合处理
+- 可通过音量键和电源键操作的 stage-1 NixOS 世代菜单
+- Wi-Fi、USB-C role/OTG、SSC 传感器、RAW 相机抓取与 MiPPS 快充认证已可用
 
 ## 当前状态
 
@@ -289,7 +307,17 @@ scripts/inspect-bootimg.sh out/mobile-bootimg
 - 密码：`1`
 - root 密码：`123456`
 
-## 警告
+## 免责声明
 
-这是一个底层的设备移植项目。刷入 boot 镜像、更改活动插槽以及写入分区都有可能导致平板变砖或丢失数据。请备份所有内容，并假设每条命令都是危险的，直到在您自己的设备上验证通过。
+本项目是实验性 Mobile NixOS 移植。正常按照文档操作通常不会导致问题，但刷机、
+分区和 slot 切换仍然具有风险。操作前请备份数据，并确认你理解每一条命令。
+
+本项目不对以下情况负责：
+
+- 因个人误操作、跳过文档步骤、刷错分区等原因导致设备无法启动或分区数据异常
+- 因沉迷折腾 NixOS、反复调试 boot image、上课还在研究 flake 导致期末挂科
+- 因沉迷 rice、反复调整透明终端、窗口圆角和状态栏间距导致没时间找女朋友
+
+但如果你因此感受到了原子系统的优雅，从此远离 Debian，避免成为小男娘，请感谢本项目。
+
 本项目的源代码、说明文档、镜像和其他产物均不提供担保。

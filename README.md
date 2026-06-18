@@ -5,10 +5,30 @@
 Mobile NixOS port for the Xiaomi Pad 6S Pro 12.4 (`sheng`,
 Qualcomm SM8550).
 
+![Device](https://img.shields.io/badge/device-Xiaomi%20Pad%206S%20Pro%2012.4-blue)
+![Kernel](https://img.shields.io/badge/kernel-sheng--7.0-blueviolet)
+![NixOS](https://img.shields.io/badge/NixOS-Mobile%20NixOS-5277c3)
+![License](https://img.shields.io/badge/license-MIT%20%2B%20third--party%20terms-orange)
+
 This repository is a NixOS-only device port. The maintained flashing path is
 the Mobile NixOS Android boot flow: a `boot.img` for the inactive Android slot
 and a Mobile NixOS generated ext4 rootfs image for the dedicated `linux`
 partition.
+
+If this project helps you, or if you simply want to see NixOS become more real
+on mobile devices, please consider giving the repository a star. It helps other
+sheng users find the port and makes the late-night boot-image archaeology feel
+a little less lonely.
+
+## Highlights
+
+- Mobile NixOS boot flow for Xiaomi Pad 6S Pro 12.4 (`sheng`)
+- Flashable Android `boot_b` image plus dedicated `linux` rootfs image
+- Desktop-neutral public flake constructor for private dotfiles repositories
+- Optional GNOME image with touch keyboard, rotation, and cover handling
+- Stage-1 NixOS generation menu controlled by volume and power keys
+- Working Wi-Fi, USB-C role/OTG, SSC sensors, RAW camera capture, and MiPPS
+  fast-charging authentication
 
 ## Status
 
@@ -324,10 +344,25 @@ If left blank or unmodified in Actions, the test image will fall back to the pre
 - password: `1`
 - root password: `123456`
 
-## Warning
+## Disclaimer
 
-This is a low-level device-porting project. Flashing boot images, changing the
-active slot, and writing partitions can brick the tablet or destroy data. Back
-up everything and assume every command is dangerous until proven on your own
-device. Source code, instructions, images, and other artifacts are provided
-without warranty.
+This is an experimental Mobile NixOS port. Following the documentation should
+keep the process predictable, but flashing, partitioning, and slot switching
+still carry real risk. Back up your data and make sure you understand every
+command before running it.
+
+This project is not responsible for:
+
+- devices failing to boot or partitions becoming inconsistent due to user
+  error, skipped documentation steps, or flashing the wrong partition
+- failing your finals because you spent too much time debugging boot images,
+  reading flakes in class, or falling too deep into the NixOS rabbit hole
+- having no time to find a girlfriend because you kept tuning transparent
+  terminals, window corner radius, and status-bar spacing
+
+If this project helps you feel the elegance of atomic systems, escape
+hand-crafted Debian rootfs rituals, and avoid the Debian-to-femboy pipeline,
+please thank this project.
+
+Source code, instructions, images, and other artifacts are provided without
+warranty.
