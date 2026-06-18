@@ -13,6 +13,11 @@ FILESYSTEM_UUID="${FILESYSTEM_UUID:-ee8d3593-59b1-480e-a3b6-4fefb17ee7d8}"
 TIMESTAMP="$(date +"%Y%m%d_%H%M%S")"
 OUT_DIR="${OUT_DIR:-out}"
 OUT_LINK="${OUT_DIR}/nixos-sheng-${ROOTFS_FLAKE_ATTR}"
+if [ -n "${NIX_BUILD_FLAGS:-}" ]; then
+    read -r -a NIX_BUILD_FLAGS_ARRAY <<< "${NIX_BUILD_FLAGS}"
+else
+    NIX_BUILD_FLAGS_ARRAY=(--fallback)
+fi
 
 if [ -n "${ROOTFS_BACKEND:-}" ] && [ "${ROOTFS_BACKEND}" != "mobile" ]; then
     echo "ROOTFS_BACKEND=${ROOTFS_BACKEND} is no longer supported."
@@ -46,7 +51,8 @@ ROOTFS_IMG="nixos-sheng-${ROOTFS_VARIANT}-${TIMESTAMP}.img"
 echo "==> Building Mobile NixOS generated rootfs image: ${ROOTFS_FLAKE_ATTR}"
 nix --extra-experimental-features "nix-command flakes" \
     build "./nixos#${ROOTFS_FLAKE_ATTR}" \
-    --out-link "${OUT_LINK}"
+    --out-link "${OUT_LINK}" \
+    "${NIX_BUILD_FLAGS_ARRAY[@]}"
 
 ROOTFS_DIR="$(readlink -f "${OUT_LINK}")"
 ROOTFS_SOURCE="$(

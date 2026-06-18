@@ -90,7 +90,8 @@ jobs:
 
           nix --extra-experimental-features "nix-command flakes" \
             build "./nixos#nixosConfigurations.${configuration}.config.system.build.toplevel" \
-            --no-link
+            --no-link \
+            --fallback
 
       - name: Build image
         run: |
