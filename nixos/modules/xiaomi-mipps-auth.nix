@@ -41,6 +41,27 @@ let
           && [ "$(read_node "$root" fastchg_mode 2>/dev/null || true)" = "1" ]
       }
 
+      is_xiaomi_svid() {
+        case "$1" in
+          0x2717|2717|10007) return 0 ;;
+          *) return 1 ;;
+        esac
+      }
+
+      is_empty_svid() {
+        case "''${1:-}" in
+          ""|0|0000|0x0000) return 0 ;;
+          *) return 1 ;;
+        esac
+      }
+
+      is_empty_pdo() {
+        case "''${1:-}" in
+          ""|00000000*) return 0 ;;
+          *) return 1 ;;
+        esac
+      }
+
       root="$(find_xiaomi_dir || true)"
       if [ -z "$root" ]; then
         echo "MiPPS auth skipped: request_vdm_cmd sysfs node not found"
@@ -62,22 +83,29 @@ let
         pdo2="$(read_node "$root" pdo2 2>/dev/null || true)"
         echo "MiPPS auth attempt $attempt/$max_attempts: real_type=''${real_type:-unknown} adapter_svid=''${adapter_svid:-unknown} pdo2=''${pdo2:-unknown}"
 
+        if ! is_xiaomi_svid "$adapter_svid"; then
+          if is_empty_svid "$adapter_svid"; then
+            sleep "$sleep_seconds"
+            continue
+          fi
+          echo "MiPPS auth skipped: non-Xiaomi adapter_svid=$adapter_svid"
+          exit 0
+        fi
+
+        if [ "$real_type" != "PD" ] && [ "$real_type" != "PD_PPS" ]; then
+          sleep "$sleep_seconds"
+          continue
+        fi
+
+        if is_empty_pdo "$pdo2"; then
+          sleep "$sleep_seconds"
+          continue
+        fi
+
         xiaomi-mipps-auth --sysfs "$root" --timeout 3 || true
 
         if is_complete "$root"; then
           echo "MiPPS auth active after attempt $attempt"
-          exit 0
-        fi
-
-        adapter_svid="$(read_node "$root" adapter_svid 2>/dev/null || true)"
-        if [ -n "$adapter_svid" ] \
-          && [ "$adapter_svid" != "0" ] \
-          && [ "$adapter_svid" != "0x0000" ] \
-          && [ "$adapter_svid" != "0000" ] \
-          && [ "$adapter_svid" != "0x2717" ] \
-          && [ "$adapter_svid" != "2717" ] \
-          && [ "$adapter_svid" != "10007" ]; then
-          echo "MiPPS auth skipped: non-Xiaomi adapter_svid=$adapter_svid"
           exit 0
         fi
 
