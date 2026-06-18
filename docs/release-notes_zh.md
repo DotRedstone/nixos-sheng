@@ -54,7 +54,7 @@ split ZIP 的工具打开 `.zip` 文件。解压得到的 `.img` 可以直接刷
 `nixos`、版本号和内核版本。
 
 首次分区和双系统安装请参考
-[双系统安装指南](https://github.com/DotRedstone/nixos-xiaomi-sheng/blob/sheng/docs/install-dualboot.md)。
+[双系统安装指南](https://github.com/DotRedstone/nixos-xiaomi-sheng/blob/sheng/docs/install-dualboot_zh.md)。
 
 ```sh
 fastboot flash boot_b nixos-sheng-*-boot.img
@@ -88,7 +88,7 @@ Qualcomm 或其他组件厂商不存在隶属或背书关系。源码、说明�
 
 rootfs 镜像内的文件系统可能小于专用 `linux` 分区。若要把剩余空间用于 NixOS 世代，
 请在刷写后参考
-[linux 文件系统扩容指南](https://github.com/DotRedstone/nixos-xiaomi-sheng/blob/sheng/docs/linux-partition-resize.md)，
+[linux 文件系统扩容指南](https://github.com/DotRedstone/nixos-xiaomi-sheng/blob/sheng/docs/linux-partition-resize_zh.md)，
 从 TWRP 或其他救援环境扩容。
 
 ## 回滚

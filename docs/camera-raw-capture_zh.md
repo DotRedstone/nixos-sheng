@@ -1,21 +1,20 @@
-# Sheng camera RAW capture
+# Sheng 相机 RAW 抓取
 
 [English](camera-raw-capture.md) | [简体中文](camera-raw-capture_zh.md)
 
-The sheng camera sensors and Qualcomm CAMSS pipeline can capture RAW frames
-without a userspace camera stack.
+sheng 的相机传感器和 Qualcomm CAMSS 管线已经可以在没有完整用户态相机栈的
+情况下抓取 RAW 帧。
 
-Verified sensors:
+已验证传感器：
 
-- Rear Samsung S5KJN1: `4080x3060` packed RAW10
-- Front OmniVision OV32D40: `3264x2448` packed RAW10
+- 后摄 Samsung S5KJN1：`4080x3060` packed RAW10
+- 前摄 OmniVision OV32D40：`3264x2448` packed RAW10
 
-This verifies the sensor, CSI PHY, CSID, VFE, and V4L2 capture path. It does
-not provide automatic exposure, white balance, denoising, JPEG output, or a
-desktop camera application. Those require a suitable libcamera pipeline and
-userspace integration.
+这验证了 sensor、CSI PHY、CSID、VFE 和 V4L2 capture 路径。它不提供自动曝光、
+白平衡、降噪、JPEG 输出或桌面相机应用；这些仍需要合适的 libcamera pipeline
+和用户态集成。
 
-## Rear camera
+## 后摄
 
 ```sh
 media-ctl -r
@@ -38,9 +37,9 @@ v4l2-ctl -d /dev/video9 \
   --stream-mmap=4 --stream-count=1 --stream-to=/tmp/s5kjn1.raw
 ```
 
-Expected frame size: `15618240` bytes.
+预期帧大小：`15618240` 字节。
 
-## Front camera
+## 前摄
 
 ```sh
 media-ctl -r
@@ -63,9 +62,9 @@ v4l2-ctl -d /dev/video13 \
   --stream-mmap=4 --stream-count=1 --stream-to=/tmp/ov32d40.raw
 ```
 
-Expected frame size: `9987840` bytes.
+预期帧大小：`9987840` 字节。
 
-Reset configurable media links after testing:
+测试后重置可配置的 media link：
 
 ```sh
 media-ctl -r

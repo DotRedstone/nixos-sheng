@@ -1,5 +1,7 @@
 # Release readiness
 
+[English](release-readiness.md) | [简体中文](release-readiness_zh.md)
+
 This document records the latest release-candidate validation. It does not
 replace `TODO.md`; it lists only release blockers and high-signal results.
 
@@ -71,8 +73,8 @@ replace `TODO.md`; it lists only release blockers and high-signal results.
   2.0 GiB to about 1.4-1.6 GiB in the GNOME image.
 - The v0.1.2 release body documents split ZIP rootfs archives for Windows
   extraction tools and keeps checksum verification optional.
-- English and Simplified Chinese installation and release-note pages are
-  present and cross-linked.
+- Public Markdown docs now follow the default-English and `_zh` Simplified
+  Chinese convention and are cross-linked.
 - Boot, minimal rootfs, and GNOME rootfs release artifacts must be rebuilt from
   the same v0.1.2 release commit before publication.
 

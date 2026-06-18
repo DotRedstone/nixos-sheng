@@ -1,26 +1,36 @@
-# Xiaomi Pad 6S Pro 12.4 (sheng) Sensors 用户态适配方案
+# Xiaomi Pad 6S Pro 12.4 (`sheng`) Sensor User-Space Integration
 
-## 当前结论
+[English](sensors-ssc-userland.md) | [简体中文](sensors-ssc-userland_zh.md)
 
-sheng 的传感器链路已经通过 Qualcomm SSC 用户态方案跑通。实机验证可用：
+## Current Status
 
-- accelerometer，加速度计
-- proximity，距离传感器
-- ambient light，光感
-- compass，指南针
-- `iio-sensor-proxy.service` 开机后保持 `active (running)`
+The sheng sensor path works through Qualcomm SSC user space. Real-device
+validation confirms:
 
-当前实现不是内核 IIO sysfs 方案，因此 `/sys/bus/iio/devices` 下面仍不会出现 `iio:device*`。这不影响 `iio-sensor-proxy` 通过 D-Bus 给桌面和应用提供传感器数据。
+- accelerometer
+- proximity sensor
+- ambient light sensor
+- compass
+- `iio-sensor-proxy.service` remains `active (running)` after boot
 
-GNOME profile 默认关闭 `ambient-enabled` 和 `idle-dim`。SSC 光感仍会通过
-`iio-sensor-proxy` 暴露给应用和诊断工具，但 GNOME 不会根据有波动的 lux 数值
-自动改写背光，也不会在闲置时临时降低亮度。用户仍可手动调节亮度。
+This is not a kernel IIO sysfs implementation. `/sys/bus/iio/devices` is still
+expected to have no `iio:device*` entries. That does not prevent
+`iio-sensor-proxy` from exposing sensor data to the desktop and applications
+through D-Bus.
 
-## 路线判断
+The GNOME profile disables `ambient-enabled` and `idle-dim` by default. The SSC
+ambient-light sensor remains available through `iio-sensor-proxy` for
+applications and diagnostics, but GNOME does not automatically rewrite
+backlight values from fluctuating lux readings or dim the display while idle.
+Users can still adjust brightness manually.
 
-sheng 的传感器不是普通 Linux AP 侧 I2C/SPI 设备路径。不要在 DTS 中强行编造 `icm42607`、`qmc6308`、`stk36c61` 等物理设备节点，也不要把“没有 `/sys/bus/iio/devices/iio:device*`”直接等同于传感器失败。
+## Architecture Decision
 
-当前可工作的路径是：
+sheng sensors do not follow the simple Linux AP-side I2C/SPI device model. Do
+not invent DTS nodes such as `icm42607`, `qmc6308`, or `stk36c61`, and do not
+treat the absence of `/sys/bus/iio/devices/iio:device*` as sensor failure.
+
+The working path is:
 
 ```text
 ADSP / sensor_pd
@@ -31,26 +41,33 @@ ADSP / sensor_pd
 -> D-Bus: net.hadess.SensorProxy
 ```
 
-`CONFIG_QCOM_SSC_BLOCK_BUS=y` 只提供 SSC/FastRPC/QMI 通信能力，不会自动把 QMI sensor 注册成 kernel IIO 设备。Debian 用户态方案也是通过 `libssc` 直接读取 SSC，再由 `iio-sensor-proxy` 暴露给上层。
+`CONFIG_QCOM_SSC_BLOCK_BUS=y` only provides SSC/FastRPC/QMI communication. It
+does not automatically register QMI sensors as kernel IIO devices. The Debian
+user-space approach also reads SSC through `libssc` and exposes the result
+through `iio-sensor-proxy`.
 
-## 关键实现点
+## Integration Points
 
-本仓库通过 `nixos/hardware/xiaomi-sheng/sensors/default.nix` 集成传感器用户态链路：
+`nixos/hardware/xiaomi-sheng/sensors/default.nix` integrates the user-space
+sensor stack:
 
-- 打包 `fastrpc`、`libssc`、`pd-mapper`、`qrtr`、`sheng-sensors-file`
-- 为 `iio-sensor-proxy` 启用 `-Dssc-support=enabled`
-- 启动 `adsprpcd.service`
-- 启动 `adsprpcd-sensorspd.service`
-- 给 `fastrpc-adsp` udev 设备标记：
+- packages `fastrpc`, `libssc`, `pd-mapper`, `qrtr`, and
+  `sheng-sensors-file`
+- builds `iio-sensor-proxy` with `-Dssc-support=enabled`
+- starts `adsprpcd.service`
+- starts `adsprpcd-sensorspd.service`
+- marks the `fastrpc-adsp` udev device with
   `ssc-accel ssc-proximity ssc-light ssc-compass`
-- 为 `ACCEL_MOUNT_MATRIX` 设置 sheng 横屏原生面板对应的方向矩阵，避免 GNOME 自动旋转结果偏移 90°
-- 在启动 `iio-sensor-proxy` 前等待 SSC 可查询，避免开机太早导致代理退出
+- sets `ACCEL_MOUNT_MATRIX` for the sheng landscape-native panel orientation
+- waits for SSC to become queryable before starting `iio-sensor-proxy`
 
-上游 `iio-sensor-proxy` 默认只给 `fastrpc-adsp` 启用 `ssc-light ssc-compass`，不会默认启用 `ssc-accel` 和 `ssc-proximity`。sheng 需要显式补充 udev 规则，否则加速度计和距离传感器不会被 `monitor-sensor` 看到。
+Upstream `iio-sensor-proxy` only enables `ssc-light ssc-compass` for
+`fastrpc-adsp` by default. sheng needs explicit udev properties for
+accelerometer and proximity support.
 
-## 验证结果
+## Verified Result
 
-实机验证时，`monitor-sensor` 输出已确认：
+`monitor-sensor` reports:
 
 ```text
 === Has accelerometer
@@ -59,14 +76,14 @@ ADSP / sensor_pd
 === Has compass
 ```
 
-`ssccli` 也可直接读取：
+Direct `ssccli` reads also work:
 
 - `ssccli --sensor accelerometer`
 - `ssccli --sensor magnetometer`
 - `ssccli --sensor proximity`
 - `ssccli --sensor light`
 
-## 验证命令
+## Verification Commands
 
 ```sh
 echo '=== system ==='
@@ -102,37 +119,45 @@ journalctl -b -u adsprpcd -u pd-mapper -u adsprpcd-sensorspd -u iio-sensor-proxy
   --no-pager -o short-monotonic | tail -300
 ```
 
-## 已知限制
+## Known Limitations
 
-- `/sys/bus/iio/devices/iio:device*` 仍为空。当前方案走 SSC 用户态和 D-Bus，不创建 kernel IIO sysfs 设备。
-- proximity 会出现 `Failed to unpack Xiaomi Davinci proximity measurement message` 日志，但 `monitor-sensor --proximity` 仍能看到 FAR/near 状态。
-- gyroscope 尚未作为单独的 `monitor-sensor` 能力暴露。当前 compass 来自 SSC rotation vector / magnetometer 路线，加速度计可用于屏幕方向判断。
-- `sheng-devauth.service` 目前会因 `/dev/nanosic_auth` 缺失失败。该服务更偏键盘/触控笔认证链路，不是当前传感器可用性的必要条件。
+- `/sys/bus/iio/devices/iio:device*` remains empty. The current stack uses SSC
+  user space and D-Bus instead of kernel IIO sysfs devices.
+- Proximity may log `Failed to unpack Xiaomi Davinci proximity measurement
+  message`, while `monitor-sensor --proximity` still reports FAR/near state.
+- The gyroscope is not exposed as a separate `monitor-sensor` capability yet.
+  Compass data currently comes through the SSC rotation-vector / magnetometer
+  path, and the accelerometer is enough for display orientation.
+- `sheng-devauth.service` currently fails when `/dev/nanosic_auth` is missing.
+  That service is for keyboard/stylus authentication and is not required for
+  the current sensor path.
 
-## 常见失败判断
+## Troubleshooting
 
-如果 `iio-sensor-proxy` 退出并显示：
+If `iio-sensor-proxy` exits with:
 
 ```text
 No sensors or missing kernel drivers for the sensors. Exiting
 ```
 
-优先检查：
+Check these first:
 
-1. `/dev/fastrpc-adsp` 是否存在。
-2. `adsprpcd-sensorspd.service` 是否运行。
-3. `ssccli --sensor light --timeout 5` 是否能读到数据。
-4. `fastrpc-adsp` 的 udev 属性是否包含：
-   `ssc-accel ssc-proximity ssc-light ssc-compass`
-5. `/usr/share/qcom/sm8550/Xiaomi/sheng` 和 `/vendor/etc/sensors` 相关 registry/config 是否存在。
+1. `/dev/fastrpc-adsp` exists.
+2. `adsprpcd-sensorspd.service` is running.
+3. `ssccli --sensor light --timeout 5` can read data.
+4. `fastrpc-adsp` udev properties include
+   `ssc-accel ssc-proximity ssc-light ssc-compass`.
+5. `/usr/share/qcom/sm8550/Xiaomi/sheng` and `/vendor/etc/sensors`
+   registry/config files exist.
 
-## 后续方向
+## Future Work
 
-当前建议把 sensors 状态标记为“用户态可用”。如果后续需要满足严格的 kernel IIO sysfs 标准，需要另开任务研究：
+The recommended status is "user-space working". If strict kernel IIO sysfs
+support becomes necessary, track it as a separate task:
 
-- 是否存在可复用的 QMI/SSC 到 IIO 的内核桥接驱动
-- 是否值得为 sheng 编写 kernel IIO bridge
-- 是否要把 gyro 单独映射到上层可消费的接口
-- proximity Xiaomi Davinci payload 解包是否需要补 `libssc`
+- investigate reusable QMI/SSC-to-IIO kernel bridge drivers
+- decide whether a sheng-specific kernel IIO bridge is worth writing
+- expose the gyroscope as a separate upper-layer capability
+- improve `libssc` decoding for the Xiaomi Davinci proximity payload
 
-这些是后续增强，不阻塞当前传感器在桌面侧使用。
+These are enhancements and do not block current desktop sensor use.

@@ -267,7 +267,7 @@ For the full dependency chain, offline rootfs checks, runtime verification comma
 - [docs/sheng-firmware-and-usbc.md](docs/sheng-firmware-and-usbc.md)
 - [docs/sensors-ssc-userland.md](docs/sensors-ssc-userland.md)
 - [docs/nixos-rebuild.md](docs/nixos-rebuild.md)
-- [docs/install-dualboot_en.md](docs/install-dualboot_en.md)
+- [docs/install-dualboot.md](docs/install-dualboot.md)
 - [docs/linux-partition-resize.md](docs/linux-partition-resize.md)
 - [docs/boot-generation-menu.md](docs/boot-generation-menu.md)
 - [docs/camera-raw-capture.md](docs/camera-raw-capture.md)

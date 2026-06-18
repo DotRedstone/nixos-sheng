@@ -60,7 +60,7 @@ flashable. Asset names include `nixos`, the release version, and the kernel
 version.
 
 For first-time dual-boot partitioning and installation, follow
-the [dual-boot installation guide](https://github.com/DotRedstone/nixos-xiaomi-sheng/blob/sheng/docs/install-dualboot_en.md).
+the [dual-boot installation guide](https://github.com/DotRedstone/nixos-xiaomi-sheng/blob/sheng/docs/install-dualboot.md).
 
 ```sh
 fastboot flash boot_b nixos-sheng-*-boot.img

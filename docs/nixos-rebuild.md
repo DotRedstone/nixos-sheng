@@ -1,5 +1,7 @@
 # Updating the installed NixOS system
 
+[English](nixos-rebuild.md) | [简体中文](nixos-rebuild_zh.md)
+
 The flashed Android `boot_b` image is the fixed boot foundation for sheng. It
 contains the kernel, DTB, Mobile NixOS stage-1 initrd, and boot command line.
 Normal NixOS generations only update stage-2 on the writable `linux` partition.

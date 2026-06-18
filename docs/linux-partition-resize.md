@@ -1,5 +1,7 @@
 # Expanding the linux filesystem
 
+[English](linux-partition-resize.md) | [简体中文](linux-partition-resize_zh.md)
+
 The dedicated `linux` partition may be much larger than the ext4 filesystem
 inside a flashed rootfs image. NixOS generations need enough free filesystem
 space even when the partition table already reserves sufficient space.

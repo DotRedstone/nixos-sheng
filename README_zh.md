@@ -76,7 +76,7 @@ linux 分区
 - 使用 **电源键** 确认启动。
 - 30秒无操作自动启动默认世代。
 
-这使得你在移动设备上也能享受到完整的 NixOS 原子化升级与“无限后悔药”回滚体验！详细文档请参阅 [`docs/boot-generation-menu.md`](docs/boot-generation-menu.md)。
+这使得你在移动设备上也能享受到完整的 NixOS 原子化升级与“无限后悔药”回滚体验！详细文档请参阅 [`docs/boot-generation-menu_zh.md`](docs/boot-generation-menu_zh.md)。
 
 ## 仓库结构
 
@@ -222,10 +222,10 @@ fastboot flash linux out/mobile-rootfs/rootfs.img
 完成首次刷机后，普通 stage-2 配置可以直接在平板上通过
 `nixos-rebuild` 构建、测试、切换和回滚。kernel、DTS、stage-1 initrd
 和 boot cmdline 仍需要单独构建并刷入 `boot_b`。安全操作流程见
-[`docs/nixos-rebuild.md`](docs/nixos-rebuild.md)。
+[`docs/nixos-rebuild_zh.md`](docs/nixos-rebuild_zh.md)。
 
 生成的 rootfs 文件系统可能小于专用 `linux` 分区。创建多个世代前应先离线扩容，
-具体步骤见 [`docs/linux-partition-resize.md`](docs/linux-partition-resize.md)。
+具体步骤见 [`docs/linux-partition-resize_zh.md`](docs/linux-partition-resize_zh.md)。
 
 ## 固件、传感器与 USB-C
 
@@ -235,16 +235,16 @@ sheng 上的 USB-C 主机模式和各类传感器均强依赖于完整的 Qualco
 当前传感器走 Qualcomm SSC 用户态路径。`iio-sensor-proxy` 已能通过 D-Bus 暴露加速度计、距离传感器、光感和指南针数据。该方案不会创建 kernel IIO sysfs 节点，因此当前 `/sys/bus/iio/devices` 为空属于预期现象。
 
 有关完整的依赖链、离线 rootfs 检查、运行时验证命令以及常见的故障特征，请参阅：
-- [docs/sheng-firmware-and-usbc.md](docs/sheng-firmware-and-usbc.md)
-- [docs/sensors-ssc-userland.md](docs/sensors-ssc-userland.md)
-- [docs/nixos-rebuild.md](docs/nixos-rebuild.md)
-- [docs/install-dualboot.md](docs/install-dualboot.md)
-- [docs/linux-partition-resize.md](docs/linux-partition-resize.md)
-- [docs/boot-generation-menu.md](docs/boot-generation-menu.md)
-- [docs/camera-raw-capture.md](docs/camera-raw-capture.md)
-- [docs/mipps-120w.md](docs/mipps-120w.md)
-- [docs/release-readiness.md](docs/release-readiness.md)
-- [docs/release-notes.md](docs/release-notes.md)
+- [docs/sheng-firmware-and-usbc_zh.md](docs/sheng-firmware-and-usbc_zh.md)
+- [docs/sensors-ssc-userland_zh.md](docs/sensors-ssc-userland_zh.md)
+- [docs/nixos-rebuild_zh.md](docs/nixos-rebuild_zh.md)
+- [docs/install-dualboot_zh.md](docs/install-dualboot_zh.md)
+- [docs/linux-partition-resize_zh.md](docs/linux-partition-resize_zh.md)
+- [docs/boot-generation-menu_zh.md](docs/boot-generation-menu_zh.md)
+- [docs/camera-raw-capture_zh.md](docs/camera-raw-capture_zh.md)
+- [docs/mipps-120w_zh.md](docs/mipps-120w_zh.md)
+- [docs/release-readiness_zh.md](docs/release-readiness_zh.md)
+- [docs/release-notes_zh.md](docs/release-notes_zh.md)
 
 ## 许可证与第三方材料
 

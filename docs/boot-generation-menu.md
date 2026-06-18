@@ -1,5 +1,7 @@
 # Sheng boot generation menu
 
+[English](boot-generation-menu.md) | [简体中文](boot-generation-menu_zh.md)
+
 Sheng uses a fixed Android `boot_b` image and selectable NixOS stage-2
 generations from the writable `linux` partition.
 
