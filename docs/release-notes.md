@@ -1,21 +1,25 @@
-# Xiaomi Pad 6S Pro (sheng) Mobile NixOS v0.1.1
+# Xiaomi Pad 6S Pro (sheng) Mobile NixOS v0.1.2
 
 [English](release-notes.md) | [简体中文](release-notes_zh.md)
 
-This maintenance release fixes unexpected GNOME brightness changes on the
-Xiaomi Pad 6S Pro 12.4 (`sheng`).
+This maintenance release improves Xiaomi 120W MiPPS charging reliability,
+reduces avoidable `pd-mapper` memory usage, and changes rootfs release assets
+to Windows-friendly split ZIP archives for Xiaomi Pad 6S Pro 12.4 (`sheng`).
 Read the known issues before flashing.
 
-## Changes since v0.1.0
+## Changes since v0.1.1
 
-- Disable GNOME ambient-light automatic brightness changes.
-- Disable GNOME idle dimming.
-- Re-enable ZRAM with the Zstandard compressor.
-- Restore commonly needed kernel capabilities for containers, desktop tools,
-  and filesystems: BPF, io_uring, FUSE, OverlayFS, SquashFS, EROFS, NFS, and
-  CIFS. Unprivileged BPF remains disabled by default.
-- Clarify flashing, checksum verification, and public-release documentation.
-- Add repository license and third-party/proprietary-material notices.
+- Retry Xiaomi MiPPS fast-charging authentication so fast charging is more
+  likely to activate without repeated unplug/replug attempts.
+- Avoid blocking MiPPS authentication when the charging device node is not
+  ready yet.
+- Limit `pd-mapper` firmware preparation to the sheng SM8550 firmware subtree.
+  This avoids decompressing unrelated Qualcomm platform firmware into `/run`
+  and reduces idle memory use by roughly 500 MiB on tested systems.
+- Publish rootfs images as split ZIP archives (`.z01`, `.z02`, `.zip`) that can
+  be opened directly with Bandizip, 7-Zip, WinRAR, and similar tools.
+- Clarify charging diagnostics, flashing instructions, checksum verification,
+  rights-holder review, and warranty/disclaimer language.
 
 ## Working
 

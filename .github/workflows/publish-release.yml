@@ -16,13 +16,13 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: "Tag name for the release (e.g., v0.1.0)"
+        description: "Tag name for the release (e.g., v0.1.2)"
         required: true
-        default: "v0.1.0"
+        default: "v0.1.2"
       release_name:
         description: "Release name"
         required: true
-        default: "NixOS Sheng v0.1.0 (kernel 7.0.0)"
+        default: "NixOS Sheng v0.1.2 (kernel 7.0.0)"
       kernel_run_id:
         description: "Run ID for the kernel build (leave empty for latest)"
         required: false

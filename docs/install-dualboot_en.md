@@ -103,9 +103,9 @@ Release rootfs images are provided as split ZIP archives for Windows-friendly
 extraction. Download every volume for one variant. For example:
 
 ```text
-nixos-sheng-v0.1.1-kernel-7.0.0-rootfs-minimal.z01
-nixos-sheng-v0.1.1-kernel-7.0.0-rootfs-minimal.z02
-nixos-sheng-v0.1.1-kernel-7.0.0-rootfs-minimal.zip
+nixos-sheng-v0.1.2-kernel-7.0.0-rootfs-minimal.z01
+nixos-sheng-v0.1.2-kernel-7.0.0-rootfs-minimal.z02
+nixos-sheng-v0.1.2-kernel-7.0.0-rootfs-minimal.zip
 ```
 
 Put all volumes in the same folder, then open the final `.zip` file with

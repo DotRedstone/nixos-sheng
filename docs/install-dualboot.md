@@ -95,9 +95,9 @@ Release rootfs 会以分卷 ZIP 发布，方便 Windows 用户直接使用 Bandi
 7-Zip、WinRAR 等图形解压工具。请下载同一个 rootfs 版本的所有分卷，例如：
 
 ```text
-nixos-sheng-v0.1.1-kernel-7.0.0-rootfs-minimal.z01
-nixos-sheng-v0.1.1-kernel-7.0.0-rootfs-minimal.z02
-nixos-sheng-v0.1.1-kernel-7.0.0-rootfs-minimal.zip
+nixos-sheng-v0.1.2-kernel-7.0.0-rootfs-minimal.z01
+nixos-sheng-v0.1.2-kernel-7.0.0-rootfs-minimal.z02
+nixos-sheng-v0.1.2-kernel-7.0.0-rootfs-minimal.zip
 ```
 
 把所有分卷放在同一个文件夹，打开最后的 `.zip` 文件并解压，得到可直接刷入的

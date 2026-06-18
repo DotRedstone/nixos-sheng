@@ -61,6 +61,21 @@ replace `TODO.md`; it lists only release blockers and high-signal results.
 - Rootfs release artifacts must be uploaded as Windows-friendly split ZIP
   archives, with checksums covering every uploaded volume.
 
+## v0.1.2 release candidate
+
+- Xiaomi MiPPS fast-charging authentication now retries and avoids blocking
+  when the charging device node is not ready.
+- `pd-mapper` now decompresses only `qcom/sm8550/sheng` firmware into `/run`.
+  Runtime validation on 2026-06-19 showed `/run/pd-mapper-firmware` dropping
+  from about 576 MiB to about 46-58 MiB, with idle memory dropping from about
+  2.0 GiB to about 1.4-1.6 GiB in the GNOME image.
+- The v0.1.2 release body documents split ZIP rootfs archives for Windows
+  extraction tools and keeps checksum verification optional.
+- English and Simplified Chinese installation and release-note pages are
+  present and cross-linked.
+- Boot, minimal rootfs, and GNOME rootfs release artifacts must be rebuilt from
+  the same v0.1.2 release commit before publication.
+
 ## Future improvements
 
 - Expand the ext4 filesystem offline to the full `linux` partition, then

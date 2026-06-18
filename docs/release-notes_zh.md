@@ -1,19 +1,20 @@
-# Xiaomi Pad 6S Pro（sheng）Mobile NixOS v0.1.1
+# Xiaomi Pad 6S Pro（sheng）Mobile NixOS v0.1.2
 
 [English](release-notes.md) | [简体中文](release-notes_zh.md)
 
-这个维护版本修复 Xiaomi Pad 6S Pro 12.4（`sheng`）上 GNOME 亮度异常变化的问题。
-刷写前请阅读已知问题。
+这个维护版本改进 Xiaomi Pad 6S Pro 12.4（`sheng`）上的小米 120W MiPPS
+快充可靠性，降低不必要的 `pd-mapper` 内存占用，并将 rootfs release 产物改为
+Windows 图形解压工具更友好的分卷 ZIP。刷写前请阅读已知问题。
 
-## 相比 v0.1.0 的变化
+## 相比 v0.1.1 的变化
 
-- 禁用 GNOME 环境光自动亮度调整。
-- 禁用 GNOME 空闲变暗。
-- 重新启用使用 Zstandard 压缩器的 ZRAM。
-- 恢复容器、桌面工具和文件系统常用的内核能力：BPF、io_uring、FUSE、
-  OverlayFS、SquashFS、EROFS、NFS 和 CIFS。非特权 BPF 默认仍关闭。
-- 澄清刷写、校验和公开发布文档。
-- 添加仓库许可证和第三方/专有材料声明。
+- 重试小米 MiPPS 快充认证，减少反复拔插才能激活快充的概率。
+- 在充电设备节点尚未就绪时避免阻塞 MiPPS 认证。
+- 将 `pd-mapper` 固件准备限制到 sheng 的 SM8550 固件子树，避免把无关
+  Qualcomm 平台固件解压到 `/run`。实测空闲内存占用减少约 500MiB。
+- rootfs 镜像改为分卷 ZIP（`.z01`、`.z02`、`.zip`），可直接用 Bandizip、
+  7-Zip、WinRAR 等工具打开。
+- 澄清快充诊断、刷写说明、校验方式、权利人复核与免责声明。
 
 ## 当前可用
 
