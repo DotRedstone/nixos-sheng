@@ -31,7 +31,7 @@ flake 暴露了与可刷 rootfs 镜像相同的 Mobile NixOS 求值：
 
 ```nix
 nixosConfigurations.sheng =
-  xiaomi-sheng.lib.aarch64-linux.mkShengSystem [
+  nixos-sheng.lib.aarch64-linux.mkShengSystem [
     ./hosts/sheng/configuration.nix
   ];
 ```
@@ -46,8 +46,8 @@ dotfiles 仓库中。只有明确想使用本仓库 GNOME profile 时才使用
 在平板上克隆仓库并只构建、不激活：
 
 ```sh
-git clone https://github.com/DotRedstone/nixos-xiaomi-sheng
-cd nixos-xiaomi-sheng
+git clone https://github.com/DotRedstone/nixos-sheng
+cd nixos-sheng
 
 sudo nixos-rebuild build --flake ./nixos#sheng
 ```

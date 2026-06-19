@@ -33,7 +33,7 @@ For a private dotfiles repository, use the public Mobile NixOS constructor:
 
 ```nix
 nixosConfigurations.sheng =
-  xiaomi-sheng.lib.aarch64-linux.mkShengSystem [
+  nixos-sheng.lib.aarch64-linux.mkShengSystem [
     ./hosts/sheng/configuration.nix
   ];
 ```
@@ -49,8 +49,8 @@ repository GNOME profile is explicitly wanted.
 Clone the repository on the tablet and build without activating it:
 
 ```sh
-git clone https://github.com/DotRedstone/nixos-xiaomi-sheng
-cd nixos-xiaomi-sheng
+git clone https://github.com/DotRedstone/nixos-sheng
+cd nixos-sheng
 
 sudo nixos-rebuild build --flake ./nixos#sheng
 ```

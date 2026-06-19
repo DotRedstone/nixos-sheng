@@ -1,6 +1,6 @@
 [🇬🇧 English](README.md) | [🇨🇳 简体中文](README_zh.md)
 
-# nixos-xiaomi-sheng
+# nixos-sheng
 
 Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的 Mobile NixOS 移植项目。
 
@@ -27,7 +27,7 @@ Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的 Mobile NixOS 移植项目�
 ## 当前状态
 
 首个公开版本可从
-[GitHub Releases](https://github.com/DotRedstone/nixos-xiaomi-sheng/releases/latest)
+[GitHub Releases](https://github.com/DotRedstone/nixos-sheng/releases/latest)
 下载。部分硬件仍未完全支持，刷写前请阅读下方状态表和已知问题。
 
 | 领域 | 状态 | 备注 |
@@ -130,17 +130,17 @@ linux 分区
 
 个人用户、凭据、应用、Home Manager 配置，以及 hostname、locale、时区等个人设置
 应放在独立的 dotfiles flake 中。下游 flake 应调用
-`xiaomi-sheng.lib.aarch64-linux.mkShengSystem`，不要尝试将 Mobile NixOS
+`nixos-sheng.lib.aarch64-linux.mkShengSystem`，不要尝试将 Mobile NixOS
 设备模块导入普通的 `nixpkgs.lib.nixosSystem` 求值。
 
 ```nix
 {
-  inputs.xiaomi-sheng.url =
-    "github:DotRedstone/nixos-xiaomi-sheng?dir=nixos";
+  inputs.nixos-sheng.url =
+    "github:DotRedstone/nixos-sheng?dir=nixos";
 
-  outputs = { self, xiaomi-sheng, ... }@inputs: {
+  outputs = { self, nixos-sheng, ... }@inputs: {
     nixosConfigurations.sheng =
-      xiaomi-sheng.lib.aarch64-linux.mkShengSystem [
+      nixos-sheng.lib.aarch64-linux.mkShengSystem [
         { _module.args.inputs = inputs; }
         ./hosts/sheng/configuration.nix
       ];

@@ -1,6 +1,6 @@
 [🇬🇧 English](README.md) | [🇨🇳 简体中文](README_zh.md)
 
-# nixos-xiaomi-sheng
+# nixos-sheng
 
 Mobile NixOS port for the Xiaomi Pad 6S Pro 12.4 (`sheng`,
 Qualcomm SM8550).
@@ -33,7 +33,7 @@ a little less lonely.
 ## Status
 
 The first public release is available from
-[GitHub Releases](https://github.com/DotRedstone/nixos-xiaomi-sheng/releases/latest).
+[GitHub Releases](https://github.com/DotRedstone/nixos-sheng/releases/latest).
 Some hardware remains partially supported; review the status table and known
 issues before flashing.
 
@@ -143,17 +143,17 @@ user.
 Personal users, credentials, applications, Home Manager configuration, and
 private settings such as hostname, locale, and time zone belong in a separate
 dotfiles flake. Downstream flakes should use
-`xiaomi-sheng.lib.aarch64-linux.mkShengSystem` rather than importing a Mobile
+`nixos-sheng.lib.aarch64-linux.mkShengSystem` rather than importing a Mobile
 NixOS module into an ordinary `nixpkgs.lib.nixosSystem` evaluation.
 
 ```nix
 {
-  inputs.xiaomi-sheng.url =
-    "github:DotRedstone/nixos-xiaomi-sheng?dir=nixos";
+  inputs.nixos-sheng.url =
+    "github:DotRedstone/nixos-sheng?dir=nixos";
 
-  outputs = { self, xiaomi-sheng, ... }@inputs: {
+  outputs = { self, nixos-sheng, ... }@inputs: {
     nixosConfigurations.sheng =
-      xiaomi-sheng.lib.aarch64-linux.mkShengSystem [
+      nixos-sheng.lib.aarch64-linux.mkShengSystem [
         { _module.args.inputs = inputs; }
         ./hosts/sheng/configuration.nix
       ];

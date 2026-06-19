@@ -19,8 +19,8 @@
   programs.bash = {
     enable = true;
     shellAliases = {
-      nrs = "sudo nixos-rebuild switch --flake /home/${vars.username}/nixos-xiaomi-sheng/nixos#sheng";
-      hms = "home-manager switch --flake /home/${vars.username}/nixos-xiaomi-sheng/nixos#${vars.username}@sheng";
+      nrs = "sudo nixos-rebuild switch --flake /home/${vars.username}/nixos-sheng/nixos#sheng";
+      hms = "home-manager switch --flake /home/${vars.username}/nixos-sheng/nixos#${vars.username}@sheng";
     };
   };
 

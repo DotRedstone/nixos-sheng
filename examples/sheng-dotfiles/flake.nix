@@ -7,16 +7,16 @@
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    xiaomi-sheng.url = "github:DotRedstone/nixos-xiaomi-sheng?dir=nixos";
+    nixos-sheng.url = "github:DotRedstone/nixos-sheng?dir=nixos";
   };
 
-  outputs = { nixpkgs, home-manager, xiaomi-sheng, ... }@inputs:
+  outputs = { nixpkgs, home-manager, nixos-sheng, ... }@inputs:
     let
       system = "aarch64-linux";
     in
     {
       nixosConfigurations.sheng =
-        xiaomi-sheng.lib.${system}.mkShengSystem [
+        nixos-sheng.lib.${system}.mkShengSystem [
           { _module.args.inputs = inputs; }
           ./hosts/sheng/configuration.nix
         ];
