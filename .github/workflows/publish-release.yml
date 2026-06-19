@@ -72,6 +72,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release-artifacts
+          : > release-artifacts/rootfs-runs.env
           expected_sha="${{ github.sha }}"
           requested_kernel_run="${{ steps.release_info.outputs.kernel_run }}"
           if [ -n "$requested_kernel_run" ]; then
@@ -129,10 +130,19 @@ jobs:
               exit 1
             }
             echo "Downloading $flavor rootfs from run $ROOTFS_RUN"
-            gh run download "$ROOTFS_RUN" --dir "release-artifacts/rootfs-$flavor"
+            case "$flavor" in
+              minimal)
+                echo "MINIMAL_ROOTFS_RUN=$ROOTFS_RUN" >> release-artifacts/rootfs-runs.env
+                ;;
+              gnome)
+                echo "GNOME_ROOTFS_RUN=$ROOTFS_RUN" >> release-artifacts/rootfs-runs.env
+                ;;
+            esac
           done
 
       - name: Prepare directly flashable files
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
@@ -160,14 +170,26 @@ jobs:
           # 7-Zip, and similar tools can open the final .zip volume and extract
           # the directly flashable .img.
           max_zip_part_size="1900m"
+          . release-artifacts/rootfs-runs.env
           for flavor in minimal gnome; do
-            rootfs_img="$(find "release-artifacts/rootfs-$flavor" -type f -name '*.img' -print -quit)"
+            if [ "$flavor" = "minimal" ]; then
+              ROOTFS_RUN="$MINIMAL_ROOTFS_RUN"
+            else
+              ROOTFS_RUN="$GNOME_ROOTFS_RUN"
+            fi
+            rootfs_dir="release-artifacts/rootfs-$flavor"
+            rm -rf "$rootfs_dir"
+            mkdir -p "$rootfs_dir"
+            echo "Downloading $flavor rootfs from run $ROOTFS_RUN"
+            gh run download "$ROOTFS_RUN" --dir "$rootfs_dir"
+            rootfs_img="$(find "$rootfs_dir" -type f -name '*.img' -print -quit)"
             test -n "$rootfs_img" || {
               echo "No $flavor rootfs image found"
               exit 1
             }
             output="release-upload/${prefix}-rootfs-${flavor}.img"
-            cp "$rootfs_img" "$output"
+            mv "$rootfs_img" "$output"
+            rm -rf "$rootfs_dir"
             set +e
             e2fsck -fy "$output"
             fsck_status=$?
