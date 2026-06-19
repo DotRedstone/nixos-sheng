@@ -31,16 +31,15 @@ Volume +/-: select    Power: boot
   a delayed key-release event.
 - Power or an external keyboard's Enter key confirms the selection.
 - The highlighted entry boots automatically after 30 seconds.
-- The menu uses a 16x32 console font and repaints the full visible tty viewport
-  with space-filled rows when visible state changes. This avoids stale rows,
-  coordinate drift, periodic flicker, and early fbcon lower-screen ghosting.
+- The menu uses a 16x32 console font and padded full redraws when visible state
+  changes, avoiding stale rows, coordinate drift, and periodic screen flicker.
 - Console input echo and VT keyboard translation are disabled while the menu is
   active, preventing physical volume keys from printing escape sequences over
   the menu.
 - Kernel console logging is temporarily suppressed while the menu is active,
   preventing asynchronous driver logs from overwriting it.
-- Each generation row and the blank area below the menu are overwritten before
-  redraw to avoid inverse-video remnants and stale framebuffer contents.
+- Each generation row is cleared before redraw to avoid inverse-video remnants
+  after moving the selection.
 - The menu always keeps using the kernel, DTB, stage-1 initrd, and command line
   from the flashed `boot_b`.
 
