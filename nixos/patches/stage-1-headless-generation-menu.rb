@@ -81,57 +81,42 @@ module ShengHeadlessGenerationMenu
     $logger.warn("Could not restore kernel console log level: #{error}")
   end
 
-  def menu_line(row, text = "")
-    "\e[#{row};1H#{text}\e[0m\e[K"
-  end
+  def render(generations, selected, remaining: nil)
+    labels = generations.empty? ? ["NixOS - Default"] : generations.map { |generation| generation.label() }
 
-  def generation_line(label, index, selected)
-    padded_label = label.ljust(70)
-    if index == selected
-      "\e[1m\e[32m  > #{padded_label}"
-    else
-      "    #{padded_label}"
+    # \e[H moves to top-left. We use space padding instead of \e[2K to completely eliminate flicker.
+    # \e[2K clears the line to black before drawing, causing a visible flash. Space padding overwrites seamlessly.
+    out = "\e[H"
+    out += "                                                                                \n"
+    out += "  \e[1m\e[36m=== NixOS Boot Menu ===\e[0m                                                       \n"
+    out += "                                                                                \n"
+
+    labels.each_with_index do |label, index|
+      padded_label = label.ljust(70)
+      if index == selected
+        out += "\e[1m\e[32m  > #{padded_label}\e[0m\n"
+      else
+        out += "    #{padded_label}\n"
+      end
     end
-  end
 
-  def status_line(remaining)
+    out += "                                                                                \n"
+    out += "  [Vol +/-] Navigate   [Power] Select                                           \n"
+    out += "                                                                                \n"
+
     if remaining
       msg = "  Autoboot in #{remaining} seconds. Press any key to stop."
-      msg.sub(remaining.to_s, "\e[1m#{remaining}\e[0m")
+      # Embolden just the number, but calculate padding correctly
+      # We just pad the raw string and then insert the color codes
+      padded_msg = msg.ljust(80).sub(remaining.to_s, "\e[1m#{remaining}\e[0m")
+      out += "#{padded_msg}\n"
     else
-      "  Autoboot stopped. Waiting for selection..."
-    end
-  end
-
-  def render(generations, selected, previous_selected: nil, remaining: nil, previous_remaining: nil)
-    labels = generations.empty? ? ["NixOS - Default"] : generations.map { |generation| generation.label() }
-    help_row = 5 + labels.length
-    status_row = help_row + 2
-    full_redraw = previous_selected.nil?
-
-    # Use absolute cursor positioning instead of streaming newline-delimited
-    # rows. fbcon can scroll if a redraw lands near the bottom of its logical
-    # tty, which duplicates the menu tail below the intended viewport.
-    out = full_redraw ? "\e[1;1H\e[J" : ""
-
-    if full_redraw
-      out += menu_line(2, "  \e[1m\e[36m=== NixOS Boot Menu ===")
-      labels.each_with_index do |label, index|
-        out += menu_line(4 + index, generation_line(label, index, selected))
-      end
-      out += menu_line(help_row, "  [Vol +/-] Navigate   [Power] Select")
-    elsif previous_selected != selected
-      if previous_selected && previous_selected >= 0 && previous_selected < labels.length
-        out += menu_line(4 + previous_selected, generation_line(labels[previous_selected], previous_selected, selected))
-      end
-      out += menu_line(4 + selected, generation_line(labels[selected], selected, selected))
+      msg = "  Autoboot stopped. Waiting for selection..."
+      out += "#{msg.ljust(80)}\n"
     end
 
-    if full_redraw || previous_remaining != remaining
-      out += menu_line(status_row, status_line(remaining))
-    end
-
-    out += "\e[1;1H"
+    # Clear anything below our menu just in case, this won't flicker because the area is already empty
+    out += "\e[J"
     console.write(out)
     console.flush
   end
@@ -162,13 +147,7 @@ module ShengHeadlessGenerationMenu
       needs_redraw = (selected != last_selected) || (remaining != last_remaining)
 
       if needs_redraw
-        render(
-          generations,
-          selected,
-          previous_selected: last_selected,
-          remaining: remaining,
-          previous_remaining: last_remaining
-        )
+        render(generations, selected, remaining: remaining)
         last_selected = selected
         last_remaining = remaining
       end
