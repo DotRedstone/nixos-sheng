@@ -73,6 +73,11 @@ jobs:
           set -euo pipefail
           mkdir -p release-artifacts
           expected_sha="${{ github.sha }}"
+          requested_kernel_run="${{ steps.release_info.outputs.kernel_run }}"
+          if [ -n "$requested_kernel_run" ]; then
+            expected_sha="$(gh run view "$requested_kernel_run" --json headSha -q .headSha)"
+          fi
+          echo "Expected artifact SHA: $expected_sha"
 
           find_run_with_artifact() {
             workflow="$1"
@@ -181,7 +186,7 @@ jobs:
               image_name="$(basename "$output")"
               archive_name="${image_name%.img}.zip"
               echo "Creating split ZIP archive for $image_name"
-              zip -9 -s "$max_zip_part_size" -- "$archive_name" "$image_name"
+              zip -9 -s "$max_zip_part_size" "$archive_name" "$image_name"
               rm "$image_name"
             )
           done
