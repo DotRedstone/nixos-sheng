@@ -29,6 +29,9 @@ module ShengHeadlessGenerationMenu
 
   def pressed?(keys)
     Evdev.keys_held(keys)
+  rescue Errno::ENOENT, Errno::ENODEV, IOError, SystemCallError => error
+    $logger.warn("Ignoring stale sheng generation menu input device: #{error}")
+    false
   end
 
   def requested?()
@@ -234,7 +237,7 @@ module ShengHeadlessGenerationMenu
 
       volume_up_was_pressed = volume_up_pressed
       volume_down_was_pressed = volume_down_pressed
-      sleep(0.01)
+      sleep(0.003)
     end
 
     set_console_echo(true)
