@@ -81,42 +81,41 @@ module ShengHeadlessGenerationMenu
     $logger.warn("Could not restore kernel console log level: #{error}")
   end
 
+  def menu_line(row, text = "")
+    "\e[#{row};1H#{text}\e[0m\e[K"
+  end
+
   def render(generations, selected, remaining: nil)
     labels = generations.empty? ? ["NixOS - Default"] : generations.map { |generation| generation.label() }
 
-    # \e[H moves to top-left. We use space padding instead of \e[2K to completely eliminate flicker.
-    # \e[2K clears the line to black before drawing, causing a visible flash. Space padding overwrites seamlessly.
-    out = "\e[H"
-    out += "                                                                                \n"
-    out += "  \e[1m\e[36m=== NixOS Boot Menu ===\e[0m                                                       \n"
-    out += "                                                                                \n"
+    # Use absolute cursor positioning instead of streaming newline-delimited
+    # rows. fbcon can scroll if a redraw lands near the bottom of its logical
+    # tty, which duplicates the menu tail below the intended viewport.
+    out = "\e[1;1H\e[J"
+    out += menu_line(2, "  \e[1m\e[36m=== NixOS Boot Menu ===")
 
     labels.each_with_index do |label, index|
+      row = 4 + index
       padded_label = label.ljust(70)
       if index == selected
-        out += "\e[1m\e[32m  > #{padded_label}\e[0m\n"
+        out += menu_line(row, "\e[1m\e[32m  > #{padded_label}")
       else
-        out += "    #{padded_label}\n"
+        out += menu_line(row, "    #{padded_label}")
       end
     end
 
-    out += "                                                                                \n"
-    out += "  [Vol +/-] Navigate   [Power] Select                                           \n"
-    out += "                                                                                \n"
+    help_row = 5 + labels.length
+    out += menu_line(help_row, "  [Vol +/-] Navigate   [Power] Select")
 
     if remaining
       msg = "  Autoboot in #{remaining} seconds. Press any key to stop."
-      # Embolden just the number, but calculate padding correctly
-      # We just pad the raw string and then insert the color codes
-      padded_msg = msg.ljust(80).sub(remaining.to_s, "\e[1m#{remaining}\e[0m")
-      out += "#{padded_msg}\n"
+      out += menu_line(help_row + 2, msg.sub(remaining.to_s, "\e[1m#{remaining}\e[0m"))
     else
       msg = "  Autoboot stopped. Waiting for selection..."
-      out += "#{msg.ljust(80)}\n"
+      out += menu_line(help_row + 2, msg)
     end
 
-    # Clear anything below our menu just in case, this won't flicker because the area is already empty
-    out += "\e[J"
+    out += "\e[1;1H"
     console.write(out)
     console.flush
   end
