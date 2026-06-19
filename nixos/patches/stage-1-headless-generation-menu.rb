@@ -81,43 +81,60 @@ module ShengHeadlessGenerationMenu
     $logger.warn("Could not restore kernel console log level: #{error}")
   end
 
+  def console_size()
+    width, height = File.read("/sys/class/graphics/fb0/virtual_size").strip.split(",").map(&:to_i)
+    columns = width / 16
+    rows = height / 32
+    rows = 40 if rows.nil? || rows <= 0
+    columns = 80 if columns.nil? || columns <= 0
+    [rows, columns]
+  rescue
+    [40, 80]
+  end
+
+  def visible_line(text, columns)
+    visible_length = text.gsub(/\e\[[0-9;?]*[A-Za-z]/, "").length
+    "#{text}\e[0m#{' ' * [columns - visible_length, 0].max}"
+  end
+
   def render(generations, selected, remaining: nil)
     labels = generations.empty? ? ["NixOS - Default"] : generations.map { |generation| generation.label() }
+    rows, columns = console_size()
+    blank_line = " " * columns
 
-    # \e[H moves to top-left. We use space padding instead of \e[2K to completely eliminate flicker.
-    # \e[2K clears the line to black before drawing, causing a visible flash. Space padding overwrites seamlessly.
-    out = "\e[H"
-    out += "                                                                                \n"
-    out += "  \e[1m\e[36m=== NixOS Boot Menu ===\e[0m                                                       \n"
-    out += "                                                                                \n"
+    # Repaint the whole visible console with spaces instead of relying on ED/J.
+    # On sheng's early fbcon, erase-to-end can occasionally leave stale scanout
+    # contents below the menu until the panel refreshes again.
+    lines = Array.new(rows, blank_line)
+    lines[1] = visible_line("  \e[1m\e[36m=== NixOS Boot Menu ===", columns)
 
     labels.each_with_index do |label, index|
-      padded_label = label.ljust(70)
+      line_index = 3 + index
+      break if line_index >= rows
+
+      max_label_width = [columns - 6, 10].max
+      padded_label = label[0, max_label_width].ljust(max_label_width)
       if index == selected
-        out += "\e[1m\e[32m  > #{padded_label}\e[0m\n"
+        lines[line_index] = visible_line("\e[1m\e[32m  > #{padded_label}", columns)
       else
-        out += "    #{padded_label}\n"
+        lines[line_index] = visible_line("    #{padded_label}", columns)
       end
     end
 
-    out += "                                                                                \n"
-    out += "  [Vol +/-] Navigate   [Power] Select                                           \n"
-    out += "                                                                                \n"
+    help_index = [4 + labels.length, rows - 3].min
+    lines[help_index] = visible_line("  [Vol +/-] Navigate   [Power] Select", columns)
 
     if remaining
       msg = "  Autoboot in #{remaining} seconds. Press any key to stop."
-      # Embolden just the number, but calculate padding correctly
-      # We just pad the raw string and then insert the color codes
-      padded_msg = msg.ljust(80).sub(remaining.to_s, "\e[1m#{remaining}\e[0m")
-      out += "#{padded_msg}\n"
+      lines[[help_index + 2, rows - 1].min] =
+        visible_line(msg.sub(remaining.to_s, "\e[1m#{remaining}\e[0m"), columns)
     else
       msg = "  Autoboot stopped. Waiting for selection..."
-      out += "#{msg.ljust(80)}\n"
+      lines[[help_index + 2, rows - 1].min] = visible_line(msg, columns)
     end
 
-    # Clear anything below our menu just in case, this won't flicker because the area is already empty
-    out += "\e[J"
-    console.write(out)
+    console.write("\e[H\e[0m")
+    console.write(lines.join("\n"))
     console.flush
   end
 
@@ -131,7 +148,7 @@ module ShengHeadlessGenerationMenu
     set_console_keyboard(false)
     suppress_console_logs()
     wait_for_release(VOLUME_UP + VOLUME_DOWN + CONFIRM)
-    console.write("\e[?25l\e[2J\e[H")
+    console.write("\e[?25l\e[0m\e[H\e[2J\e[3J")
     console.flush
     last_selected = nil
     last_remaining = nil
