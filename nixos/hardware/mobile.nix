@@ -19,11 +19,6 @@ let
     mkdir -p $out/lib/firmware
     cp -r ${pkgs.sheng-firmware}/lib/firmware/qcom $out/lib/firmware/
   '';
-  generationMenuFont = pkgs.runCommand "sheng-generation-menu-font.psf.gz" { } ''
-    font="$(find ${pkgs.terminus_font}/share/consolefonts -name 'ter-v32n.psf.gz' -print -quit)"
-    test -n "$font"
-    cp "$font" "$out"
-  '';
   closureInfo = pkgs.buildPackages.closureInfo {
     rootPaths = config.system.build.toplevel;
   };
@@ -150,13 +145,6 @@ in
 
     extraUtils = [
       pkgs.kbd
-    ];
-
-    contents = [
-      {
-        object = generationMenuFont;
-        symlink = "/etc/sheng-generation-menu-font.psf.gz";
-      }
     ];
 
     shell.shellOnFail = true;
