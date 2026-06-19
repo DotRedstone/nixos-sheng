@@ -25,8 +25,41 @@ module ShengHeadlessGenerationMenu
     (config()["timeout"] || 30).to_i
   end
 
+  def held_keys(keys)
+    states = {}
+    keys.each { |key| states[key] = false }
+
+    Dir.glob("/dev/input/event*").each do |dev_path|
+      begin
+        File.open(dev_path, "r") do |dev|
+          fd = dev.fileno
+          evdev = Evdev::FFI.libevdev_new()
+
+          if Evdev::FFI.libevdev_set_fd(evdev, fd) == 0
+            buf = Evdev::FFI::Int.malloc(0)
+            keys.each do |key_name|
+              Evdev::FFI.libevdev_fetch_event_value(
+                evdev,
+                Linux::InputEventCodes::EV_KEY,
+                Linux::InputEventCodes.const_get(key_name),
+                buf
+              )
+              states[key_name] = true if buf.value == 1
+            end
+          end
+
+          Evdev::FFI.libevdev_free(evdev)
+        end
+      rescue Errno::ENOENT, Errno::ENODEV, IOError, SystemCallError => error
+        $logger.warn("Ignoring stale sheng generation menu input device #{dev_path}: #{error}")
+      end
+    end
+
+    states
+  end
+
   def pressed?(keys)
-    Evdev.keys_held(keys)
+    held_keys(keys).values.any?
   end
 
   def requested?()
@@ -156,6 +189,7 @@ module ShengHeadlessGenerationMenu
     up_last_repeat = 0.0
     down_pressed_time = 0.0
     down_last_repeat = 0.0
+    all_keys = (VOLUME_UP + VOLUME_DOWN + CONFIRM).uniq
 
     loop do
       remaining = countdown_active ? [deadline - Time.now.to_i, 0].max : nil
@@ -173,8 +207,10 @@ module ShengHeadlessGenerationMenu
         last_remaining = remaining
       end
 
-      volume_up_pressed = pressed?(VOLUME_UP)
-      volume_down_pressed = pressed?(VOLUME_DOWN)
+      key_state = held_keys(all_keys)
+      volume_up_pressed = VOLUME_UP.any? { |key| key_state[key] }
+      volume_down_pressed = VOLUME_DOWN.any? { |key| key_state[key] }
+      confirm_pressed = CONFIRM.any? { |key| key_state[key] }
 
       action_up = false
       action_down = false
@@ -210,7 +246,7 @@ module ShengHeadlessGenerationMenu
         countdown_active = false
         menu_length = generations.empty? ? 1 : generations.length
         selected = (selected + 1) % menu_length
-      elsif pressed?(CONFIRM)
+      elsif confirm_pressed
         wait_for_release(CONFIRM)
         break
       elsif countdown_active && Time.now.to_i >= deadline
