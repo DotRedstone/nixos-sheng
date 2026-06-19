@@ -292,8 +292,6 @@ For the full dependency chain, offline rootfs checks, runtime verification comma
 - [docs/boot-generation-menu.md](docs/boot-generation-menu.md)
 - [docs/camera-raw-capture.md](docs/camera-raw-capture.md)
 - [docs/mipps-120w.md](docs/mipps-120w.md)
-- [docs/release-readiness.md](docs/release-readiness.md)
-- [docs/release-notes.md](docs/release-notes.md)
 
 ## License and third-party material
 

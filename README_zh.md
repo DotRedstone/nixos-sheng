@@ -261,8 +261,6 @@ sheng 上的 USB-C 主机模式和各类传感器均强依赖于完整的 Qualco
 - [docs/boot-generation-menu_zh.md](docs/boot-generation-menu_zh.md)
 - [docs/camera-raw-capture_zh.md](docs/camera-raw-capture_zh.md)
 - [docs/mipps-120w_zh.md](docs/mipps-120w_zh.md)
-- [docs/release-readiness_zh.md](docs/release-readiness_zh.md)
-- [docs/release-notes_zh.md](docs/release-notes_zh.md)
 
 ## 许可证与第三方材料
 

@@ -219,6 +219,16 @@ jobs:
           sha256sum * > sha256sums.txt
           cd ..
 
+          cat > release-body.md <<EOF
+          # ${{ steps.release_info.outputs.name }}
+
+          This release contains the boot image, minimal rootfs, optional GNOME
+          rootfs, checksums, license, and third-party notices for Xiaomi Pad 6S
+          Pro 12.4 (sheng).
+
+          Release notes are maintained directly on the GitHub Release page.
+          EOF
+
       - name: Create Combined Release
         uses: softprops/action-gh-release@v2
         with:
@@ -227,4 +237,4 @@ jobs:
           files: release-upload/*
           draft: false
           prerelease: false
-          body_path: docs/release-notes.md
+          body_path: release-body.md
