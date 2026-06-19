@@ -12,6 +12,8 @@ module ShengHeadlessGenerationMenu
   CONFIRM = [:KEY_POWER, :KEY_ENTER]
   REQUEST_PATH = "/mnt/var/lib/sheng-boot-menu/requested"
   FONT_PATH = "/etc/sheng-generation-menu-font.psf.gz"
+  MENU_CONSOLE_PATH = "/dev/tty1"
+  FALLBACK_CONSOLE_PATH = "/dev/tty0"
 
   def config()
     Configuration["sheng_generation_menu"] || {}
@@ -41,29 +43,41 @@ module ShengHeadlessGenerationMenu
     sleep(0.1) while pressed?(keys)
   end
 
+  def console_path()
+    @console_path || FALLBACK_CONSOLE_PATH
+  end
+
   def console()
     @console ||= begin
-      File.open("/dev/tty0", "w")
+      File.open(console_path(), "w")
     rescue
       $stderr
     end
   end
 
+  def activate_console()
+    System.run("chvt", "1")
+    @console_path = MENU_CONSOLE_PATH
+  rescue System::CommandError => error
+    @console_path = FALLBACK_CONSOLE_PATH
+    $logger.warn("Could not switch to sheng generation menu console: #{error}")
+  end
+
   def load_font()
-    System.run("setfont", "-C", "/dev/tty0", FONT_PATH)
+    System.run("setfont", "-C", console_path(), FONT_PATH)
   rescue System::CommandError => error
     $logger.warn("Could not load sheng generation menu font: #{error}")
   end
 
   def set_console_echo(enabled)
-    System.run("stty", "-F", "/dev/tty0", enabled ? "echo" : "-echo")
+    System.run("stty", "-F", console_path(), enabled ? "echo" : "-echo")
   rescue System::CommandError => error
     $logger.warn("Could not update sheng generation menu console echo: #{error}")
   end
 
   def set_console_keyboard(enabled)
     mode = enabled ? "-u" : "-d"
-    System.run("kbd_mode", "-f", mode, "-C", "/dev/tty0")
+    System.run("kbd_mode", "-f", mode, "-C", console_path())
   rescue System::CommandError => error
     $logger.warn("Could not update sheng generation menu keyboard mode: #{error}")
   end
@@ -112,7 +126,7 @@ module ShengHeadlessGenerationMenu
     # Use absolute cursor positioning instead of streaming newline-delimited
     # rows. fbcon can scroll if a redraw lands near the bottom of its logical
     # tty, which duplicates the menu tail below the intended viewport.
-    out = full_redraw ? "\e[1;1H\e[J" : ""
+    out = full_redraw ? "\e[0m\e[r\e[?7l\e[1;1H\e[J" : "\e[0m\e[r\e[?7l"
 
     if full_redraw
       out += menu_line(2, "  \e[1m\e[36m=== NixOS Boot Menu ===")
@@ -141,6 +155,7 @@ module ShengHeadlessGenerationMenu
     selected = 0
     deadline = Time.now.to_i + timeout()
     countdown_active = true
+    activate_console()
     load_font()
     set_console_echo(false)
     set_console_keyboard(false)
@@ -225,7 +240,7 @@ module ShengHeadlessGenerationMenu
     set_console_echo(true)
     set_console_keyboard(true)
     restore_console_logs()
-    console.write("\e[?25h\nBooting selected generation...\n")
+    console.write("\e[?7h\e[?25h\nBooting selected generation...\n")
     console.flush
 
     if generations.empty?
