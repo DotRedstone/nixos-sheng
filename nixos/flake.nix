@@ -71,6 +71,11 @@
           # the normal package output; this only disables build-time checks.
           doCheck = false;
         });
+        libadwaita = prev.libadwaita.overrideAttrs (old: {
+          # Fallback source builds on GitHub's aarch64 runner can abort in
+          # libadwaita's graphical tests. Runtime output is unchanged.
+          doCheck = false;
+        });
         sdl3 = prev.sdl3.overrideAttrs (old: {
           # The aarch64 GitHub runner can time out in SDL3's testrwlock when
           # cache fallback forces a source build. Keep runtime output unchanged.
