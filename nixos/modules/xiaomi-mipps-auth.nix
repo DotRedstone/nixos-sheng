@@ -55,14 +55,35 @@ let
         esac
       }
 
+      is_pd_ready() {
+        case "$1" in
+          PD|PPS|USB_PD|USB_PD_PPS|PD_PPS) return 0 ;;
+          *) return 1 ;;
+        esac
+      }
+
+      is_nonempty_pdo() {
+        case "''${1:-}" in
+          ""|0|00000000|0x00000000) return 1 ;;
+          *) return 0 ;;
+        esac
+      }
+
+      has_typec_partner() {
+        for path in /sys/class/typec/port*-partner; do
+          [ -e "$path" ] && return 0
+        done
+        return 1
+      }
+
       root="$(find_xiaomi_dir || true)"
       if [ -z "$root" ]; then
-        echo "MiPPS auth skipped: request_vdm_cmd sysfs node not found"
-        exit 0
+        echo "MiPPS auth waiting: request_vdm_cmd sysfs node not found"
+        exit 1
       fi
 
-      max_attempts=10
-      sleep_seconds=1
+      max_attempts=60
+      sleep_seconds=2
 
       for attempt in $(seq 1 "$max_attempts"); do
         if is_complete "$root"; then
@@ -76,23 +97,40 @@ let
         pdo2="$(read_node "$root" pdo2 2>/dev/null || true)"
         echo "MiPPS auth attempt $attempt/$max_attempts: real_type=''${real_type:-unknown} adapter_svid=''${adapter_svid:-unknown} pdo2=''${pdo2:-unknown}"
 
-        # xiaomi-mipps-auth performs Type-C attach/role nudging before checking
-        # the Xiaomi SVID. Do not wait for adapter_svid here, because on sheng
-        # that can leave the charger stuck as SDP/generic PD forever.
-        xiaomi-mipps-auth --sysfs "$root" --timeout 3 || true
-
-        if is_complete "$root"; then
-          echo "MiPPS auth active after attempt $attempt"
-          exit 0
+        if ! has_typec_partner; then
+          echo "MiPPS auth waiting: Type-C partner not present"
+          sleep "$sleep_seconds"
+          continue
         fi
 
-        adapter_svid="$(read_node "$root" adapter_svid 2>/dev/null || true)"
+        if ! is_pd_ready "$real_type"; then
+          # The helper also nudges Type-C attach/role state on sheng. Keep the
+          # early state non-terminal instead of permanently exiting on SDP.
+          xiaomi-mipps-auth --sysfs "$root" --timeout 3 || true
+          sleep "$sleep_seconds"
+          continue
+        fi
+
         if ! is_xiaomi_svid "$adapter_svid"; then
           if is_empty_svid "$adapter_svid"; then
+            echo "MiPPS auth waiting: Xiaomi SVID not exposed yet"
             sleep "$sleep_seconds"
             continue
           fi
           echo "MiPPS auth skipped: non-Xiaomi adapter_svid=$adapter_svid"
+          exit 0
+        fi
+
+        if ! is_nonempty_pdo "$pdo2"; then
+          echo "MiPPS auth waiting: PD/PPS PDO not exposed yet"
+          sleep "$sleep_seconds"
+          continue
+        fi
+
+        xiaomi-mipps-auth --sysfs "$root" --timeout 6 || true
+
+        if is_complete "$root"; then
+          echo "MiPPS auth active after attempt $attempt"
           exit 0
         fi
 
@@ -106,7 +144,7 @@ let
         printf '%s=' "$name"
         read_node "$root" "$name" || true
       done
-      exit 0
+      exit 1
     '';
   };
 in
@@ -127,7 +165,9 @@ in
       serviceConfig = {
         Type = "oneshot";
         ExecStart = "${pkgs.util-linux}/bin/flock -n -E 0 /run/xiaomi-mipps-auth.lock ${retryPackage}/bin/xiaomi-mipps-auth-retry";
-        TimeoutStartSec = 45;
+        Restart = "on-failure";
+        RestartSec = 10;
+        TimeoutStartSec = 180;
       };
     };
 

@@ -140,16 +140,28 @@ in
   systemd.services.iio-sensor-proxy = {
     after = [ "adsprpcd-sensorspd.service" "systemd-udev-settle.service" ];
     wants = [ "adsprpcd-sensorspd.service" ];
-    serviceConfig.ExecStartPre = pkgs.writeShellScript "wait-for-sheng-ssc" ''
-      for _ in $(seq 1 10); do
-        if ${libssc}/bin/ssccli --sensor light --timeout 1 >/dev/null 2>&1; then
-          exit 0
-        fi
-        sleep 1
-      done
+    unitConfig = {
+      StartLimitIntervalSec = 300;
+      StartLimitBurst = 20;
+    };
+    serviceConfig = {
+      ExecStartPre = pkgs.writeShellScript "wait-for-sheng-ssc" ''
+        for attempt in $(seq 1 45); do
+          if ${libssc}/bin/ssccli --sensor light --timeout 2 >/dev/null 2>&1; then
+            echo "sheng SSC is queryable after attempt $attempt"
+            exit 0
+          fi
+          echo "waiting for sheng SSC service ($attempt/45)"
+          sleep 1
+        done
 
-      exit 0
-    '';
+        echo "sheng SSC service did not become queryable in time" >&2
+        exit 1
+      '';
+      Restart = "on-failure";
+      RestartSec = 5;
+      TimeoutStartSec = 180;
+    };
   };
 
   # 8. 平板模式 + 霍尔传感器息屏服务
