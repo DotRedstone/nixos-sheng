@@ -147,6 +147,105 @@
     enable = true;
     alsa.enable = true;
     pulse.enable = true;
+    extraConfig = {
+      pipewire."91-sheng-audio-quality" = {
+        "context.properties" = {
+          "default.clock.rate" = 48000;
+          "default.clock.allowed-rates" = [ 48000 96000 ];
+        };
+      };
+      client."91-sheng-audio-quality" = {
+        "stream.properties" = {
+          "resample.quality" = 10;
+          "channelmix.normalize" = false;
+        };
+      };
+      pipewire-pulse."91-sheng-audio-quality" = {
+        "stream.properties" = {
+          "resample.quality" = 10;
+          "channelmix.normalize" = false;
+        };
+      };
+    };
+    wireplumber.extraConfig."92-sheng-speaker-eq" = {
+      "wireplumber.profiles" = {
+        main = {
+          "filter.sink.sheng-speaker-eq" = "required";
+        };
+      };
+      "wireplumber.components" = [
+        {
+          name = "libpipewire-module-filter-chain";
+          type = "pw-module";
+          arguments = {
+            "node.name" = "filter.sink.sheng-speaker-eq";
+            "node.description" = "Sheng Speaker Enhanced";
+            "media.name" = "Sheng Speaker Enhanced";
+            "filter.graph" = {
+              nodes = [
+                {
+                  type = "builtin";
+                  name = "warmth";
+                  label = "bq_lowshelf";
+                  control = {
+                    Freq = 180.0;
+                    Q = 0.8;
+                    Gain = 1.5;
+                  };
+                }
+                {
+                  type = "builtin";
+                  name = "mud_cut";
+                  label = "bq_peaking";
+                  control = {
+                    Freq = 520.0;
+                    Q = 1.0;
+                    Gain = -1.4;
+                  };
+                }
+                {
+                  type = "builtin";
+                  name = "presence_tame";
+                  label = "bq_peaking";
+                  control = {
+                    Freq = 3600.0;
+                    Q = 1.1;
+                    Gain = -0.9;
+                  };
+                }
+                {
+                  type = "builtin";
+                  name = "air";
+                  label = "bq_highshelf";
+                  control = {
+                    Freq = 8500.0;
+                    Q = 0.7;
+                    Gain = 0.7;
+                  };
+                }
+              ];
+              links = [
+                { output = "warmth:Out"; input = "mud_cut:In"; }
+                { output = "mud_cut:Out"; input = "presence_tame:In"; }
+                { output = "presence_tame:Out"; input = "air:In"; }
+              ];
+            };
+            "audio.channels" = 2;
+            "audio.position" = [ "FL" "FR" ];
+            "capture.props" = {
+              "media.class" = "Audio/Sink";
+              "filter.smart" = true;
+              "filter.smart.name" = "filter.sink.sheng-speaker-eq";
+            };
+            "playback.props" = {
+              "node.passive" = true;
+              "media.role" = "DSP";
+            };
+          };
+          provides = "filter.sink.sheng-speaker-eq";
+        }
+      ];
+    };
   };
 
   boot.loader.grub.enable = false;
