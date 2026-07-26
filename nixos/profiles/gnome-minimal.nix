@@ -112,6 +112,11 @@ in
         screen-keyboard-enabled = true;
       };
 
+      settings."org/gnome/desktop/default-applications/terminal" = {
+        exec = "kgx";
+        exec-arg = "-e";
+      };
+
       settings."org/gnome/settings-daemon/plugins/power" = {
         # SSC ambient-light readings are useful for diagnostics but currently
         # fluctuate enough to make GNOME's automatic brightness distracting.

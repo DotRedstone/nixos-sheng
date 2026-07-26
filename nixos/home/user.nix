@@ -24,13 +24,6 @@
     };
   };
 
-  dconf.settings = {
-    "org/gnome/desktop/default-applications/terminal" = {
-      exec = "kgx";
-      exec-arg = "-e";
-    };
-  };
-
   home.packages = with pkgs; [
     gjs-osk
     gnome-console
