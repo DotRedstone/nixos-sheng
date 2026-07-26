@@ -83,6 +83,7 @@ let
       fi
 
       max_attempts=60
+      non_pd_grace_attempts=6
       sleep_seconds=2
 
       for attempt in $(seq 1 "$max_attempts"); do
@@ -98,15 +99,20 @@ let
         echo "MiPPS auth attempt $attempt/$max_attempts: real_type=''${real_type:-unknown} adapter_svid=''${adapter_svid:-unknown} pdo2=''${pdo2:-unknown}"
 
         if ! has_typec_partner; then
-          echo "MiPPS auth waiting: Type-C partner not present"
-          sleep "$sleep_seconds"
-          continue
+          echo "MiPPS auth skipped: Type-C partner not present"
+          exit 0
         fi
 
         if ! is_pd_ready "$real_type"; then
           # The helper also nudges Type-C attach/role state on sheng. Keep the
-          # early state non-terminal instead of permanently exiting on SDP.
+          # first few early samples non-terminal instead of racing SDP during
+          # attach. If it remains SDP/unknown, this is likely ADB or a
+          # non-PD adapter; exit cleanly and let udev retry on the next change.
           xiaomi-mipps-auth --sysfs "$root" --timeout 3 || true
+          if [ "$attempt" -ge "$non_pd_grace_attempts" ]; then
+            echo "MiPPS auth skipped: PD/PPS not ready after $attempt attempts (real_type=''${real_type:-unknown})"
+            exit 0
+          fi
           sleep "$sleep_seconds"
           continue
         fi
