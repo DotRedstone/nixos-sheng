@@ -84,6 +84,7 @@ let
 
       max_attempts=60
       non_pd_grace_attempts=6
+      empty_svid_grace_attempts=15
       sleep_seconds=2
 
       for attempt in $(seq 1 "$max_attempts"); do
@@ -119,6 +120,10 @@ let
 
         if ! is_xiaomi_svid "$adapter_svid"; then
           if is_empty_svid "$adapter_svid"; then
+            if [ "$attempt" -ge "$empty_svid_grace_attempts" ]; then
+              echo "MiPPS auth skipped: Xiaomi SVID not exposed after $attempt attempts; treating this as a standard PD adapter"
+              exit 0
+            fi
             echo "MiPPS auth waiting: Xiaomi SVID not exposed yet"
             sleep "$sleep_seconds"
             continue
