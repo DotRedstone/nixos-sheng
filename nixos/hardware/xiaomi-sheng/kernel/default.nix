@@ -23,6 +23,14 @@ mobile-nixos.kernel-builder-clang {
     ./0001-disable-dp0-sheng.patch
     ./0002-ucsi-glink-debug-retry.patch
     ./0005-ucsi-fix-port-unregister-race.patch
+    (pkgs.fetchurl {
+      url = "https://github.com/torvalds/linux/commit/e85eb5feca8e254905ffa6c57a3c99c89a674a0f.patch";
+      hash = "sha256-PzOtnd2djyHTMVLDl/WGkcDRqOMRfY5pwT/CrUqSB1I=";
+    })
+    (pkgs.fetchurl {
+      url = "https://github.com/torvalds/linux/commit/07ebe87915d8accdaba20c4f88c5ae430fe62fbb.patch";
+      hash = "sha256-9u8LVe61BR++Hv/F/K+v1Hmenp9J4vhycso9D5wVmFs=";
+    })
     ./0003-pdr-pd-mapper-debug.patch
     ./0004-pdr-add-sheng-sensor-pd-lookup.patch
     (pkgs.fetchurl {
