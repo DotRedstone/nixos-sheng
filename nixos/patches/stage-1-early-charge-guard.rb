@@ -7,6 +7,10 @@
 module ShengEarlyChargeGuard
   extend self
 
+  # Sheng reports this after a battery brownout followed by USB insertion.
+  # The low byte is Qualcomm PON HARD_RESET (bit 0) | USB_CHG (bit 4).
+  SHENG_USB_HARD_RESET_REASON = "bootinfo.pureason=0x800011"
+
   def config()
     Configuration["sheng_early_charge_guard"] || {}
   end
@@ -25,6 +29,9 @@ module ShengEarlyChargeGuard
 
   def charger_mode?()
     return true if System.cmdline().include?("androidboot.mode=charger")
+    return true if System.cmdline().any? do |argument|
+      argument.downcase == SHENG_USB_HARD_RESET_REASON
+    end
     return false unless File.exist?("/proc/bootconfig")
 
     File.read("/proc/bootconfig").each_line.any? do |line|
