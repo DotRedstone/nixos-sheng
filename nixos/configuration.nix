@@ -254,6 +254,9 @@
   boot.extraModprobeConfig = ''
     options cfg80211 ieee80211_regdom=CN
   '';
+  # FastRPC is built into the boot image. The userspace-only rebuild flow may
+  # retain an older fastrpc.ko in the rootfs module tree; never load it twice.
+  boot.blacklistedKernelModules = [ "fastrpc" ];
 
   boot.kernelParams = [
     "console=tty0"

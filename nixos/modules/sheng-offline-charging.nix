@@ -16,7 +16,9 @@ let
       charger_mode=true
     # Sheng exposes HARD_RESET | USB_CHG after a dead-battery USB power-on,
     # but its ABL does not add the standard androidboot.mode=charger flag.
-    elif ${pkgs.gnugrep}/bin/grep -qiw 'bootinfo.pureason=0x800011' /proc/cmdline; then
+    elif ${pkgs.gnugrep}/bin/grep -Eqi \
+      '(^|[[:space:]])bootinfo\.pureason=0x0*8000?11([[:space:]]|$)' \
+      /proc/cmdline; then
       charger_mode=true
     elif [ -r /proc/bootconfig ] && \
       ${pkgs.gnugrep}/bin/grep -Eq \
