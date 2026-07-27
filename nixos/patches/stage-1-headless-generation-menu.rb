@@ -682,12 +682,10 @@ class Tasks::SwitchRoot
     return @selected_generation if @selected_generation
 
     ShengEarlyChargeGuard.wait_if_critical()
-    generations = NixOSGeneration.generations()
     explicit_request = ShengHeadlessGenerationMenu.requested?()
-    multiple_generations = generations.length > 1
     wants_menu =
       !ShengEarlyChargeGuard.charger_mode?() &&
-      (explicit_request || multiple_generations)
+      explicit_request
 
     if wants_menu &&
        ShengHeadlessStage1.enabled? &&
