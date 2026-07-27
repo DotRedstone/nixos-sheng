@@ -10,6 +10,8 @@ let
   headlessStage1Task = pkgs.writeTextDir "zz-sheng-headless-stage1.rb" (
     (builtins.readFile ../patches/stage-1-headless-no-gui.rb)
     + "\n"
+    + (builtins.readFile ../patches/stage-1-early-charge-guard.rb)
+    + "\n"
     + (builtins.readFile ../patches/stage-1-headless-generation-menu.rb)
   );
   udevTolerantTask = pkgs.writeTextDir "zz-sheng-udev-tolerant.rb" (
@@ -133,6 +135,11 @@ in
       sheng_generation_menu = {
         enable = true;
         timeout = 30;
+      };
+      sheng_early_charge_guard = {
+        enable = true;
+        critical_capacity = 2;
+        boot_capacity = 5;
       };
     };
 
