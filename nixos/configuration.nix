@@ -262,6 +262,8 @@
     "logo.nologo"
     "loglevel=4"
     "systemd.show_status=true"
+    "systemd.mask=adsprpcd-sensorspd.service"
+    "systemd.mask=iio-sensor-proxy.service"
     "udev.log_level=info"
     "rd.udev.log_level=info"
     "vt.global_cursor_default=1"
