@@ -13,6 +13,55 @@ let
   qrtr = pkgs.callPackage ./qrtr.nix { };
   pd-mapper = pkgs.callPackage ./pd-mapper.nix { inherit qrtr; };
   sheng-devauth = pkgs.callPackage ./devauth.nix { };
+  wait-for-adsp-fastrpc = pkgs.writeShellScript "wait-for-adsp-fastrpc" ''
+    set -eu
+
+    fastrpc_ready() {
+      [ -e /dev/fastrpc-adsp ] || [ -e /dev/fastrpc-adsp-secure ]
+    }
+
+    remoteproc_ready() {
+      saw_adsp=0
+      for proc in /sys/class/remoteproc/remoteproc*; do
+        [ -e "$proc/name" ] || continue
+        name="$(cat "$proc/name" 2>/dev/null || true)"
+        case "$name" in
+          *adsp*|*ADSP*)
+            saw_adsp=1
+            state="$(cat "$proc/state" 2>/dev/null || true)"
+            case "$state" in
+              running|attached) return 0 ;;
+            esac
+            ;;
+        esac
+      done
+
+      # Older kernels may expose the fastrpc node before a useful remoteproc
+      # name. Do not block forever in that case; the stable node check below
+      # still filters the earliest udev race.
+      [ "$saw_adsp" -eq 0 ]
+    }
+
+    stable=0
+    for attempt in $(seq 1 60); do
+      if fastrpc_ready && remoteproc_ready; then
+        stable=$((stable + 1))
+      else
+        stable=0
+      fi
+
+      if [ "$stable" -ge 3 ]; then
+        echo "ADSP FastRPC is stable after attempt $attempt"
+        exit 0
+      fi
+
+      echo "waiting for ADSP FastRPC to settle ($attempt/60)"
+      sleep 1
+    done
+
+    echo "ADSP FastRPC did not settle in time" >&2
+    exit 1
+  '';
 
 in
 {
@@ -52,10 +101,12 @@ in
   systemd.services.adsprpcd = {
     description = "aDSP RPC root daemon";
     wantedBy = [ "multi-user.target" ];
-    after = [ "systemd-tmpfiles-setup.service" ];
+    after = [ "systemd-tmpfiles-setup.service" "systemd-udev-settle.service" ];
+    wants = [ "systemd-udev-settle.service" ];
     unitConfig.ConditionPathExists = "|/dev/fastrpc-adsp";
     serviceConfig = {
       Type = "exec";
+      ExecStartPre = wait-for-adsp-fastrpc;
       ExecStart = "${fastrpc}/bin/adsprpcd";
       Restart = "on-failure";
       RestartSec = "5";
@@ -95,7 +146,8 @@ in
   systemd.services.sheng-devauth = {
     description = "Xiaomi Proprietary Sensor and Keyboard Authentication Daemon";
     wantedBy = [ "multi-user.target" ];
-    after = [ "adsprpcd.service" "systemd-modules-load.service" ];
+    after = [ "adsprpcd.service" "pd-mapper.service" "systemd-modules-load.service" ];
+    requires = [ "adsprpcd.service" "pd-mapper.service" ];
     before = [ "adsprpcd-sensorspd.service" ];
     serviceConfig = {
       Type = "simple";
