@@ -76,7 +76,7 @@ in
     })
   ];
 
-  # 2. Provide the user-space daemon and registry files in system path
+  # 2. Provide the user-space daemon and sensor files in the system path.
   environment.systemPackages = [
     fastrpc
     sheng-sensors-file
@@ -85,23 +85,50 @@ in
     sheng-devauth
   ];
 
-  # 2b. sns_reg_config hardcodes paths to /usr/share/qcom/..., but NixOS uses read-only store paths.
-  #     We must make it writable because ADSP sensor registry writes a temp.json cache to this dir.
-  #     Copy the static files to /var/lib/qcom and symlink /usr/share/qcom to it.
+  # The stock Android config references socinfo files that mainline Linux does
+  # not expose. Use the Linux-specific config shipped with the sensor files.
+  environment.etc = {
+    "sensors/config".source = "${pkgs.sheng-firmware}/etc/sensors/config";
+    "sensors/hals.conf".source = "${pkgs.sheng-firmware}/etc/sensors/hals.conf";
+    "sensors/sns_reg_config".source =
+      "${sheng-sensors-file}/share/qcom/sm8550/Xiaomi/sheng/vendor/etc/sensors/sns_reg_config";
+  };
+
+  # ADSP writes temp.json and generated registry data next to these files.
+  # Recreate the small working tree on every boot so an interrupted copy or
+  # failed sensor startup cannot leave persistent zero-length files behind.
   systemd.tmpfiles.rules = [
-    "C /var/lib/qcom - - - - ${sheng-sensors-file}/share/qcom"
-    "z /var/lib/qcom 0755 root root - -"
     "d /usr/share 0755 root root -"
     "L+ /usr/share/qcom - - - - /var/lib/qcom"
     "d /usr/lib 0755 root root -"
     "L+ /usr/lib/firmware - - - - /lib/firmware"
   ];
 
+  systemd.services.sheng-sensor-files = {
+    description = "Prepare writable sheng sensor registry files";
+    wantedBy = [ "multi-user.target" ];
+    before = [ "adsprpcd.service" "adsprpcd-sensorspd.service" ];
+    path = [ pkgs.coreutils ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      rm -rf /var/lib/qcom.new
+      mkdir -p /var/lib/qcom.new
+      cp -a ${sheng-sensors-file}/share/qcom/. /var/lib/qcom.new/
+      chmod -R u+rwX /var/lib/qcom.new
+      rm -rf /var/lib/qcom
+      mv /var/lib/qcom.new /var/lib/qcom
+    '';
+  };
+
   # 3. Define the root adsprpcd service
   systemd.services.adsprpcd = {
     description = "aDSP RPC root daemon";
     wantedBy = [ "multi-user.target" ];
-    after = [ "systemd-tmpfiles-setup.service" "systemd-udev-settle.service" ];
+    after = [ "sheng-sensor-files.service" "systemd-tmpfiles-setup.service" "systemd-udev-settle.service" ];
+    requires = [ "sheng-sensor-files.service" ];
     wants = [ "systemd-udev-settle.service" ];
     unitConfig.ConditionPathExists = "|/dev/fastrpc-adsp";
     serviceConfig = {
@@ -161,8 +188,8 @@ in
   systemd.services.adsprpcd-sensorspd = {
     description = "sensorspd aDSP RPC daemon";
     wantedBy = [ "multi-user.target" ];
-    after = [ "adsprpcd.service" "pd-mapper.service" "sheng-devauth.service" "systemd-tmpfiles-setup.service" ];
-    requires = [ "adsprpcd.service" "pd-mapper.service" ];
+    after = [ "sheng-sensor-files.service" "adsprpcd.service" "pd-mapper.service" "sheng-devauth.service" "systemd-tmpfiles-setup.service" ];
+    requires = [ "sheng-sensor-files.service" "adsprpcd.service" "pd-mapper.service" ];
     before = [ "iio-sensor-proxy.service" ];
 
     # Run only if the fastrpc node exists

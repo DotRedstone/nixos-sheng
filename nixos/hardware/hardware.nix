@@ -30,8 +30,6 @@
   hardware.firmware = [ pkgs.sheng-firmware ];
   hardware.wirelessRegulatoryDatabase = true;
 
-  environment.etc."sensors".source = "${pkgs.sheng-firmware}/etc/sensors";
-
   systemd.tmpfiles.rules = [
     "d /vendor 0755 root root -"
     "d /vendor/etc 0755 root root -"
