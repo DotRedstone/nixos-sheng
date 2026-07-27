@@ -105,11 +105,9 @@ let
         fi
 
         if ! is_pd_ready "$real_type"; then
-          # The helper also nudges Type-C attach/role state on sheng. Keep the
-          # first few early samples non-terminal instead of racing SDP during
-          # attach. If it remains SDP/unknown, this is likely ADB or a
-          # non-PD adapter; exit cleanly and let udev retry on the next change.
-          xiaomi-mipps-auth --sysfs "$root" --timeout 3 || true
+          # Do not run the authentication helper until PD/PPS is ready. It
+          # requests a Type-C data-role swap, which can block for several
+          # seconds and disturb a normal USB data connection.
           if [ "$attempt" -ge "$non_pd_grace_attempts" ]; then
             echo "MiPPS auth skipped: PD/PPS not ready after $attempt attempts (real_type=''${real_type:-unknown})"
             exit 0
