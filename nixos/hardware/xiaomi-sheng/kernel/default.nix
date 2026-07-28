@@ -45,6 +45,7 @@ mobile-nixos.kernel-builder-clang {
     ./0007-sm8550-cdsp-on-demand.patch
     ./0008-battmgr-xiaomi-usb-adapter-type-icl.patch
     ./0009-ucsi-rdo-current-max-fallback.patch
+    ./0010-battmgr-xiaomi-battery-current-sign.patch
     (pkgs.fetchurl {
       url = "https://github.com/ianchb/sm8550-mainline/commit/b6c3859efdec4e7f51a77e7ae835c1425eb104c5.patch";
       hash = "sha256-GYYDCSYybKU4d8ohZHMh0vEgdT+anUeU5fnskAeT2pI=";
