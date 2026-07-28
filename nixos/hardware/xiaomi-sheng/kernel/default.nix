@@ -28,11 +28,21 @@ mobile-nixos.kernel-builder-clang {
       hash = "sha256-PzOtnd2djyHTMVLDl/WGkcDRqOMRfY5pwT/CrUqSB1I=";
     })
     (pkgs.fetchurl {
+      url = "https://github.com/torvalds/linux/commit/464c6ad2aa16.patch";
+      hash = "sha256-1btdu86Hp/FytwPq2L2bXAUgn7FweYugA9jzu4cihho=";
+    })
+    (pkgs.fetchurl {
+      url = "https://github.com/torvalds/linux/commit/5401fb4fe10f.patch";
+      hash = "sha256-8aw/xu6UnQStmhUMp+obC6wtfpcAlMc9jzLlLRNHfeA=";
+    })
+    (pkgs.fetchurl {
       url = "https://github.com/torvalds/linux/commit/07ebe87915d8accdaba20c4f88c5ae430fe62fbb.patch";
       hash = "sha256-9u8LVe61BR++Hv/F/K+v1Hmenp9J4vhycso9D5wVmFs=";
     })
     ./0003-pdr-pd-mapper-debug.patch
     ./0004-pdr-add-sheng-sensor-pd-lookup.patch
+    ./0006-pdr-avoid-register-listener-deadlock.patch
+    ./0007-sm8550-cdsp-on-demand.patch
     (pkgs.fetchurl {
       url = "https://github.com/ianchb/sm8550-mainline/commit/b6c3859efdec4e7f51a77e7ae835c1425eb104c5.patch";
       hash = "sha256-GYYDCSYybKU4d8ohZHMh0vEgdT+anUeU5fnskAeT2pI=";
