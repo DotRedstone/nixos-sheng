@@ -124,17 +124,38 @@
   };
 
   systemd.services.sheng-camera-modules = {
-    description = "Load sheng camera/media modules";
+    description = "Load and stabilize sheng camera/media modules";
     wantedBy = [ "multi-user.target" ];
     after = [ "systemd-modules-load.service" ];
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
+      Restart = "on-failure";
+      RestartSec = "2s";
     };
     script = ''
       for module in i2c_qcom_cci qcom_camss s5kjn1_sheng ov32d40; do
         ${pkgs.kmod}/bin/modprobe "$module" || true
       done
+
+      # Repeated CAMSS runtime ICC votes can time out in RPMh and block the
+      # shared UFS interconnect path. Keep CAMSS active after it binds.
+      camss_power=/sys/bus/platform/devices/acb7000.isp/power
+      attempt=0
+      while [ "$attempt" -lt 100 ]; do
+        attempt=$((attempt + 1))
+        if [ -w "$camss_power/control" ]; then
+          echo on > "$camss_power/control"
+          read -r runtime_status < "$camss_power/runtime_status"
+          if [ "$runtime_status" = active ]; then
+            exit 0
+          fi
+        fi
+        ${pkgs.coreutils}/bin/sleep 0.1
+      done
+
+      echo "CAMSS runtime power did not become active" >&2
+      exit 1
     '';
   };
 
