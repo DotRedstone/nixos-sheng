@@ -179,6 +179,12 @@ in
   system.modulesTree = lib.mkForce (
     lib.optional (!stage2Only) kernelModulesTree
   );
+  system.systemBuilderCommands = lib.mkIf stage2Only (lib.mkAfter ''
+    # Stage-2 rebuilds reuse the kernel and modules already installed by the
+    # flashable rootfs instead of adding the kernel build to their closure.
+    ln -sfn /lib/modules "$out/kernel-modules"
+    ln -sfn ${config.hardware.firmware}/lib/firmware "$out/firmware"
+  '');
 
   documentation.enable = false;
 
