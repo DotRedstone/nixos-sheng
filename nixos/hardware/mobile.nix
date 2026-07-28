@@ -185,10 +185,10 @@ in
     ln -sfn /lib/modules "$out/kernel-modules"
     ln -sfn ${config.hardware.firmware}/lib/firmware "$out/firmware"
   '');
-  environment.etc."modules-load.d/sheng-stage2.conf".text =
-    lib.mkIf stage2Only (
-      lib.concatStringsSep "\n" config.boot.kernelModules + "\n"
-    );
+  environment.etc = lib.mkIf stage2Only {
+    "modules-load.d/sheng-stage2.conf".text =
+      lib.concatStringsSep "\n" config.boot.kernelModules + "\n";
+  };
 
   documentation.enable = false;
 
