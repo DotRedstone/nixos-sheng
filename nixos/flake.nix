@@ -43,6 +43,7 @@
             hash = "sha256-bzXdR53WNKHsUIUvqXFsnagabAevk7vymQ97vYKfDf0=";
           };
           mesonFlags = (old.mesonFlags or [ ]) ++ [
+            "-Dlibdw=disabled"
             "-Dpipelines=simple,uvcvideo"
           ];
         });
