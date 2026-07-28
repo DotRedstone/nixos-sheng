@@ -43,8 +43,13 @@
             hash = "sha256-bzXdR53WNKHsUIUvqXFsnagabAevk7vymQ97vYKfDf0=";
           };
           mesonFlags = (old.mesonFlags or [ ]) ++ [
+            "-Dapps-output-dng=disabled"
+            "-Dcam-jpeg=disabled"
+            "-Dcam-output-kms=disabled"
+            "-Dcam-output-sdl2=disabled"
             "-Dlibdw=disabled"
             "-Dpipelines=simple,uvcvideo"
+            "-Dsoftisp-gpu=disabled"
           ];
         });
         gadget-tool = prev.gadget-tool.overrideAttrs (old: {
