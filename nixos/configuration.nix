@@ -190,6 +190,15 @@
               nodes = [
                 {
                   type = "builtin";
+                  name = "preamp";
+                  label = "linear";
+                  control = {
+                    Mult = 0.8;
+                    Add = 0.0;
+                  };
+                }
+                {
+                  type = "builtin";
                   name = "warmth";
                   label = "bq_lowshelf";
                   control = {
@@ -230,6 +239,7 @@
                 }
               ];
               links = [
+                { output = "preamp:Out"; input = "warmth:In"; }
                 { output = "warmth:Out"; input = "mud_cut:In"; }
                 { output = "mud_cut:Out"; input = "presence_tame:In"; }
                 { output = "presence_tame:Out"; input = "air:In"; }
@@ -241,6 +251,9 @@
               "media.class" = "Audio/Sink";
               "filter.smart" = true;
               "filter.smart.name" = "filter.sink.sheng-speaker-eq";
+              "filter.smart.target" = {
+                "node.name" = "alsa_output.platform-sound.HiFi__Speaker__sink";
+              };
             };
             "playback.props" = {
               "node.passive" = true;
