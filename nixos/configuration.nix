@@ -124,6 +124,7 @@
     kmod
     libssc
     libinput
+    libcamera-sheng
     util-linux
     gitMinimal # Required for nixos-rebuild to process git+file:// flakes via sudo
   ];
@@ -131,6 +132,8 @@
   environment.variables.ALSA_CONFIG_UCM2 = "/run/current-system/sw/share/alsa/ucm2";
   systemd.user.settings.Manager.DefaultEnvironment =
     "ALSA_CONFIG_UCM2=/run/current-system/sw/share/alsa/ucm2";
+  systemd.user.services.pipewire.environment.LD_LIBRARY_PATH =
+    lib.makeLibraryPath [ pkgs.libcamera-sheng ];
 
   systemd.packages = [ pkgs.iio-sensor-proxy ];
   services.dbus.packages = [ pkgs.iio-sensor-proxy ];

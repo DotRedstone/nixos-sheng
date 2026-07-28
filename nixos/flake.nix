@@ -36,7 +36,7 @@
         libinput = prev.libinput.override {
           luaSupport = false;
         };
-        libcamera = prev.libcamera.overrideAttrs (old: {
+        libcamera-sheng = prev.libcamera.overrideAttrs (old: {
           version = "0.7.2";
           src = final.fetchurl {
             url = "https://gitlab.freedesktop.org/camera/libcamera/-/archive/v0.7.2/libcamera-v0.7.2.tar.bz2";
