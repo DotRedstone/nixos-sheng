@@ -1,0 +1,131 @@
+From: DotRedstone <dotredstone@users.noreply.github.com>
+Subject: [PATCH] power: supply: qcom_battmgr: restore Xiaomi USB adapter
+ type and ICL
+
+Xiaomi's SM8550 battery firmware exposes the charger-facing USB type as
+USB_ADAP_TYPE rather than USB_TYPE.  Reading the latter reports SDP even
+after UCSI has established a PD contract, which leaves userspace with an
+inconsistent view of the connection.
+
+The vendor driver also permits INPUT_CURRENT_LIMIT writes for SDP, CDP,
+and PD connections.  Restore that interface so a policy client can align
+the PMIC input limit with the current already negotiated by UCSI.
+
+---
+ drivers/power/supply/qcom_battmgr.c | 73 ++++++++++++++++++++++++++++++-
+ 1 file changed, 72 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/power/supply/qcom_battmgr.c b/drivers/power/supply/qcom_battmgr.c
+index 111111111111..222222222222 100644
+--- a/drivers/power/supply/qcom_battmgr.c
++++ b/drivers/power/supply/qcom_battmgr.c
+@@ -989,6 +989,9 @@ static int qcom_battmgr_usb_sm8350_update(struct qcom_battmgr *battmgr,
+ 
+ 	prop = sm8350_usb_prop_map[psp];
+ 
++	if (battmgr->variant == XIAOMI_BATTMGR_SM8550 &&
++	    psp == POWER_SUPPLY_PROP_USB_TYPE)
++		prop = USB_ADAP_TYPE;
+ 	mutex_lock(&battmgr->lock);
+ 	ret = qcom_battmgr_request_property(battmgr, BATTMGR_USB_PROPERTY_GET, prop, 0);
+ 	mutex_unlock(&battmgr->lock);
+@@ -1045,6 +1048,59 @@ static int qcom_battmgr_usb_get_property(struct power_supply *psy,
+ 	return 0;
+ }
+ 
++static int qcom_battmgr_usb_set_property(struct power_supply *psy,
++					 enum power_supply_property psp,
++					 const union power_supply_propval *val)
++{
++	struct qcom_battmgr *battmgr = power_supply_get_drvdata(psy);
++	int ret;
++
++	if (battmgr->variant != XIAOMI_BATTMGR_SM8550)
++		return -EOPNOTSUPP;
++
++	if (!battmgr->service_up)
++		return -EAGAIN;
++
++	if (psp != POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT)
++		return -EINVAL;
++
++	/*
++	 * Match Xiaomi's vendor driver: only data-capable USB and standard PD
++	 * connections may override ICL.  Proprietary charger policy remains
++	 * under the Xiaomi/MiPPS firmware interface.
++	 */
++	ret = qcom_battmgr_usb_sm8350_update(battmgr,
++					     POWER_SUPPLY_PROP_USB_TYPE);
++	if (ret)
++		return ret;
++
++	switch (battmgr->usb.usb_type) {
++	case POWER_SUPPLY_USB_TYPE_SDP:
++	case POWER_SUPPLY_USB_TYPE_CDP:
++	case POWER_SUPPLY_USB_TYPE_PD:
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	mutex_lock(&battmgr->lock);
++	ret = qcom_battmgr_request_property(battmgr, BATTMGR_USB_PROPERTY_SET,
++					    USB_INPUT_CURR_LIMIT,
++					    val->intval);
++	mutex_unlock(&battmgr->lock);
++
++	return ret;
++}
++
++static int qcom_battmgr_usb_is_writeable(struct power_supply *psy,
++					  enum power_supply_property psp)
++{
++	struct qcom_battmgr *battmgr = power_supply_get_drvdata(psy);
++
++	return battmgr->variant == XIAOMI_BATTMGR_SM8550 &&
++	       psp == POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT;
++}
++
+ static const enum power_supply_property sc8280xp_usb_props[] = {
+ 	POWER_SUPPLY_PROP_ONLINE,
+ };
+@@ -1083,6 +1134,8 @@ static const struct power_supply_desc sm8350_usb_psy_desc = {
+ 	.properties = sm8350_usb_props,
+ 	.num_properties = ARRAY_SIZE(sm8350_usb_props),
+ 	.get_property = qcom_battmgr_usb_get_property,
++	.set_property = qcom_battmgr_usb_set_property,
++	.property_is_writeable = qcom_battmgr_usb_is_writeable,
+ 	.usb_types = BIT(POWER_SUPPLY_USB_TYPE_UNKNOWN) |
+ 		     BIT(POWER_SUPPLY_USB_TYPE_SDP)     |
+ 		     BIT(POWER_SUPPLY_USB_TYPE_DCP)     |
+@@ -1526,7 +1579,8 @@ static void qcom_battmgr_message_callback(struct qcom_battmgr *battmgr,
+ 		case USB_INPUT_CURR_LIMIT:
+ 			battmgr->usb.current_limit = le32_to_cpu(resp->intval.value);
+ 			break;
+-		case USB_TYPE:
++		case USB_TYPE:
++		case USB_ADAP_TYPE:
+ 			battmgr->usb.usb_type = le32_to_cpu(resp->intval.value);
+ 			break;
+ 		default:
+@@ -1534,6 +1588,18 @@ static void qcom_battmgr_message_callback(struct qcom_battmgr *battmgr,
+ 			break;
+ 		}
+ 		break;
++	case BATTMGR_USB_PROPERTY_SET:
++		property = le32_to_cpu(resp->intval.property);
++		if (payload_len != sizeof(resp->intval)) {
++			dev_warn(battmgr->dev,
++				 "invalid payload length for %#x request: %zd\n",
++				 property, payload_len);
++			battmgr->error = -ENODATA;
++			return;
++		}
++
++		battmgr->error = le32_to_cpu(resp->intval.result);
++		break;
+ 	case BATTMGR_WLS_PROPERTY_GET:
+ 		property = le32_to_cpu(resp->intval.property);
+ 		if (payload_len != sizeof(resp->intval)) {
+-- 
+2.50.1

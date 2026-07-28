@@ -76,6 +76,48 @@ let
         return 1
       }
 
+      sync_standard_pd_current() {
+        local battmgr="/sys/class/power_supply/qcom-battmgr-usb"
+        local ucsi=""
+        local negotiated=""
+        local current_limit=""
+        local target=""
+
+        [ -w "$battmgr/input_current_limit" ] || {
+          echo "Standard PD current sync skipped: battery manager ICL is not writable"
+          return 0
+        }
+
+        for path in /sys/class/power_supply/ucsi-source-psy-*; do
+          [ -r "$path/online" ] || continue
+          [ "$(read_node "$path" online 2>/dev/null || true)" = "1" ] || continue
+          ucsi="$path"
+          break
+        done
+
+        [ -n "$ucsi" ] || {
+          echo "Standard PD current sync skipped: active UCSI source not found"
+          return 0
+        }
+
+        negotiated="$(read_node "$ucsi" current_now 2>/dev/null || true)"
+        current_limit="$(read_node "$battmgr" input_current_limit 2>/dev/null || true)"
+        case "$negotiated:$current_limit" in
+          *[!0-9:]*|:*) echo "Standard PD current sync skipped: invalid current data"; return 0 ;;
+        esac
+
+        target="$negotiated"
+        [ "$target" -le 3000000 ] || target=3000000
+        if [ "$target" -le "$current_limit" ]; then
+          echo "Standard PD current sync unchanged: negotiated=''${negotiated}uA limit=''${current_limit}uA"
+          return 0
+        fi
+
+        printf '%s\n' "$target" > "$battmgr/input_current_limit"
+        current_limit="$(read_node "$battmgr" input_current_limit 2>/dev/null || true)"
+        echo "Standard PD current sync applied: negotiated=''${negotiated}uA limit=''${current_limit:-unknown}uA"
+      }
+
       root="$(find_xiaomi_dir || true)"
       if [ -z "$root" ]; then
         echo "MiPPS auth waiting: request_vdm_cmd sysfs node not found"
@@ -120,6 +162,7 @@ let
           if is_empty_svid "$adapter_svid"; then
             if [ "$attempt" -ge "$empty_svid_grace_attempts" ]; then
               echo "MiPPS auth skipped: Xiaomi SVID not exposed after $attempt attempts; treating this as a standard PD adapter"
+              sync_standard_pd_current
               exit 0
             fi
             echo "MiPPS auth waiting: Xiaomi SVID not exposed yet"
@@ -127,6 +170,7 @@ let
             continue
           fi
           echo "MiPPS auth skipped: non-Xiaomi adapter_svid=$adapter_svid"
+          sync_standard_pd_current
           exit 0
         fi
 

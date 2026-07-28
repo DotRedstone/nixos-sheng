@@ -43,6 +43,7 @@ mobile-nixos.kernel-builder-clang {
     ./0004-pdr-add-sheng-sensor-pd-lookup.patch
     ./0006-pdr-avoid-register-listener-deadlock.patch
     ./0007-sm8550-cdsp-on-demand.patch
+    ./0008-battmgr-xiaomi-usb-adapter-type-icl.patch
     (pkgs.fetchurl {
       url = "https://github.com/ianchb/sm8550-mainline/commit/b6c3859efdec4e7f51a77e7ae835c1425eb104c5.patch";
       hash = "sha256-GYYDCSYybKU4d8ohZHMh0vEgdT+anUeU5fnskAeT2pI=";
