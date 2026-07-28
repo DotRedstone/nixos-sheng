@@ -93,7 +93,7 @@
       RemainAfterExit = true;
     };
     script = ''
-      for module in spi_qcom_geni nt36532e_spi; do
+      for module in spi_geni_qcom nt36532e_ts; do
         ${pkgs.kmod}/bin/modprobe "$module" || true
       done
     '';
@@ -111,12 +111,11 @@
       for module in \
         soundwire_qcom \
         snd_soc_qcom_common \
-        snd_soc_qdsp6 \
-        snd_soc_q6apm \
-        snd_soc_q6prm \
+        snd_q6dsp_common \
+        snd_q6apm \
+        q6prm \
         snd_soc_wcd938x \
         snd_soc_wcd938x_sdw \
-        snd_soc_cs35l43 \
         snd_soc_cs35l43_i2c
       do
         ${pkgs.kmod}/bin/modprobe "$module" || true
@@ -148,7 +147,7 @@
       RemainAfterExit = true;
     };
     script = ''
-      for module in leds_qcom_flash leds_qcom_lpg leds_pwm leds_pwm_multicolor; do
+      for module in leds_qcom_flash leds_qcom_lpg; do
         ${pkgs.kmod}/bin/modprobe "$module" || true
       done
     '';
