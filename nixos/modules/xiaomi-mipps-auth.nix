@@ -92,9 +92,11 @@ let
       sync_standard_pd_current() {
         local battmgr="/sys/class/power_supply/qcom-battmgr-usb"
         local ucsi=""
+        local advertised=""
         local negotiated=""
         local current_limit=""
         local target=""
+        local target_source=""
 
         [ -w "$battmgr/input_current_limit" ] || {
           echo "Standard PD current sync skipped: battery manager ICL is not writable"
@@ -113,28 +115,35 @@ let
           return 0
         }
 
+        advertised="$(read_node "$ucsi" current_max 2>/dev/null || true)"
         negotiated="$(read_node "$ucsi" current_now 2>/dev/null || true)"
         current_limit="$(read_node "$battmgr" input_current_limit 2>/dev/null || true)"
-        case "$negotiated:$current_limit" in
-          *[!0-9:]*|:*|*:) echo "Standard PD current sync skipped: invalid current data"; return 0 ;;
+        case "$advertised:$negotiated:$current_limit" in
+          *[!0-9:]*|*::*|:*|*:) echo "Standard PD current sync skipped: invalid current data"; return 0 ;;
         esac
 
-        target="$negotiated"
+        if [ "$advertised" -gt 0 ]; then
+          target="$advertised"
+          target_source="advertised"
+        else
+          target="$negotiated"
+          target_source="negotiated"
+        fi
         [ "$target" -le 3000000 ] || target=3000000
         if [ "$target" -le "$current_limit" ]; then
-          echo "Standard PD current sync unchanged: negotiated=''${negotiated}uA limit=''${current_limit}uA"
+          echo "Standard PD current sync unchanged: advertised=''${advertised}uA negotiated=''${negotiated}uA limit=''${current_limit}uA"
           return 0
         fi
 
         printf '%s\n' "$target" > "$battmgr/input_current_limit"
         current_limit="$(read_node "$battmgr" input_current_limit 2>/dev/null || true)"
         case "$current_limit" in
-          ""|*[!0-9]*) echo "Standard PD current sync requested ''${target}uA; readback unavailable"; return 0 ;;
+          ""|*[!0-9]*) echo "Standard PD current sync requested ''${target}uA from $target_source current; readback unavailable"; return 0 ;;
         esac
         if [ "$current_limit" -ge "$target" ]; then
-          echo "Standard PD current sync applied: negotiated=''${negotiated}uA limit=''${current_limit}uA"
+          echo "Standard PD current sync applied: advertised=''${advertised}uA negotiated=''${negotiated}uA limit=''${current_limit}uA"
         else
-          echo "Standard PD current sync requested ''${target}uA, but charger firmware retained ''${current_limit}uA"
+          echo "Standard PD current sync requested ''${target}uA from $target_source current, but charger firmware retained ''${current_limit}uA"
         fi
       }
 
@@ -147,6 +156,7 @@ let
       max_attempts=60
       non_pd_grace_attempts=6
       empty_svid_grace_attempts=15
+      stale_svid_grace_attempts=6
       sleep_seconds=2
 
       for attempt in $(seq 1 "$max_attempts"); do
@@ -220,6 +230,14 @@ let
         fi
 
         if ! is_nonempty_pdo "$pdo2"; then
+          # Xiaomi identity/authentication values survive some detach events.
+          # A configured USB data link with no charger PDO is a standard PD
+          # host connection, not the previously attached Xiaomi charger.
+          if has_active_usb_data_link && [ "$attempt" -ge "$stale_svid_grace_attempts" ]; then
+            echo "MiPPS auth skipped: stale Xiaomi SVID with no PDO on an active USB data link; treating this as standard PD"
+            sync_standard_pd_current
+            exit 0
+          fi
           echo "MiPPS auth waiting: PD/PPS PDO not exposed yet"
           sleep "$sleep_seconds"
           continue

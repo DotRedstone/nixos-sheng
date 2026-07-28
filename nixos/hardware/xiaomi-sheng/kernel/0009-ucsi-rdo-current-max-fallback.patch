@@ -1,0 +1,32 @@
+From: DotRedstone <dotredstone@users.noreply.github.com>
+Subject: [PATCH] usb: typec: ucsi: fall back to RDO current without PDO details
+
+The Qualcomm PMIC UCSI implementation used by Xiaomi Sheng reports the
+active RDO but does not advertise UCSI_CAP_PDO_DETAILS.  The UCSI power
+supply consequently reports current_now correctly while current_max is
+always zero.
+
+Use the maximum current requested in the active RDO when source PDOs are
+not available.  This keeps the power-supply view useful without
+inventing capabilities beyond the negotiated contract.
+
+---
+ drivers/usb/typec/ucsi/psy.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/usb/typec/ucsi/psy.c b/drivers/usb/typec/ucsi/psy.c
+index 111111111111..222222222222 100644
+--- a/drivers/usb/typec/ucsi/psy.c
++++ b/drivers/usb/typec/ucsi/psy.c
+@@ -158,6 +158,9 @@ static int ucsi_psy_get_current_max(struct ucsi_connector *con,
+ 			max_current = (pdo_current > max_current) ? pdo_current
+ 								  : max_current;
+ 		}
++		if (!max_current && con->rdo)
++			max_current = rdo_max_current(con->rdo) * 1000;
++
+ 		val->intval = max_current;
+ 		break;
+ 	case UCSI_CONSTAT_PWR_OPMODE_TYPEC1_5:
+--
+2.50.1
