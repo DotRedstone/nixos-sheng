@@ -15,19 +15,32 @@ module ShengHeadlessGenerationMenu
   FALLBACK_CONSOLE_PATH = "/dev/tty0"
   FB_PATH = "/dev/fb0"
   FB_SYSFS = "/sys/class/graphics/fb0"
-  MENU_X = 96
-  MENU_Y = 96
+  OUTER_MARGIN = 72
+  PANEL_MIN_WIDTH = 720
+  PANEL_MAX_WIDTH = 2200
+  PANEL_PADDING = 48
+  PANEL_BORDER = 3
   FONT_SCALE = 4
-  ROW_HEIGHT = 40
-  TITLE_HEIGHT = 40
-  HEADER_GAP = 38
-  FOOTER_GAP = 44
-  BG = [0, 0, 0]
-  SELECT_BG = [0, 48, 0]
-  TITLE_FG = [0, 220, 220]
-  SELECT_FG = [0, 255, 0]
-  NORMAL_FG = [220, 220, 220]
-  STATUS_FG = [210, 210, 210]
+  TITLE_FONT_SCALE = 6
+  SUBTITLE_FONT_SCALE = 3
+  HEADER_HEIGHT = 144
+  ROW_HEIGHT = 64
+  ROW_GAP = 10
+  FOOTER_HEIGHT = 146
+  SCROLLBAR_WIDTH = 8
+  SCROLLBAR_GAP = 28
+  BG = [7, 10, 15]
+  PANEL_BG = [15, 20, 28]
+  PANEL_BORDER_COLOR = [52, 66, 82]
+  ROW_BG = [20, 27, 36]
+  SELECT_BG = [25, 74, 89]
+  ACCENT = [77, 197, 220]
+  TITLE_FG = [241, 247, 250]
+  SELECT_FG = [247, 250, 252]
+  NORMAL_FG = [193, 204, 214]
+  MUTED_FG = [124, 141, 158]
+  STATUS_FG = [232, 184, 87]
+  BOOT_FG = [100, 220, 150]
   EV_KEY = 1
   KEY_VOLUMEUP = 115
   KEY_VOLUMEDOWN = 114
@@ -420,11 +433,10 @@ module ShengHeadlessGenerationMenu
     FONT[char.upcase] || FONT["?"]
   end
 
-  def text_pixels(text, width, height, fg, bg)
+  def text_pixels(text, width, height, fg, bg, scale = FONT_SCALE)
     framebuffer_info()
     fg_pixel = pixel(fg)
     bg_pixel = pixel(bg)
-    scale = FONT_SCALE
     lines = Array.new(height) { bg_pixel * width }
     chars = text.to_s.upcase.each_char.to_a
     max_chars = [width / (6 * scale), 0].max
@@ -458,7 +470,7 @@ module ShengHeadlessGenerationMenu
     lines
   end
 
-  def draw_text_box(x, y, width, height, text, fg, bg)
+  def draw_text_box(x, y, width, height, text, fg, bg, scale: FONT_SCALE)
     framebuffer_info()
     return if width <= 0 || height <= 0
 
@@ -468,26 +480,50 @@ module ShengHeadlessGenerationMenu
     height = clamp(height, 0, @fb_height - y)
     return if width <= 0 || height <= 0
 
-    lines = text_pixels(text, width, height, fg, bg)
+    lines = text_pixels(text, width, height, fg, bg, scale)
     lines.each_with_index do |line, index|
       framebuffer.sysseek((y + index) * @fb_stride + x * @fb_bytes, IO::SEEK_SET)
       framebuffer.syswrite(line)
     end
   end
 
-  def menu_width()
+  def panel_width()
     framebuffer_info()
-    clamp(@fb_width - MENU_X * 2, 320, 1900)
+    min_width = [PANEL_MIN_WIDTH, @fb_width].min
+    max_width = [PANEL_MAX_WIDTH, @fb_width].min
+    clamp(@fb_width - OUTER_MARGIN * 2, min_width, max_width)
   end
 
-  def menu_height(visible_count)
-    TITLE_HEIGHT + HEADER_GAP + visible_count * ROW_HEIGHT + FOOTER_GAP + ROW_HEIGHT * 2
+  def panel_x()
+    framebuffer_info()
+    (@fb_width - panel_width()) / 2
+  end
+
+  def rows_height(visible_count)
+    visible_count * ROW_HEIGHT + [visible_count - 1, 0].max * ROW_GAP
+  end
+
+  def panel_height(visible_count)
+    HEADER_HEIGHT + rows_height(visible_count) + FOOTER_HEIGHT
+  end
+
+  def panel_y(visible_count)
+    framebuffer_info()
+    [(@fb_height - panel_height(visible_count)) / 2, 24].max
+  end
+
+  def content_x()
+    panel_x() + PANEL_PADDING
+  end
+
+  def content_width()
+    panel_width() - PANEL_PADDING * 2
   end
 
   def max_visible_generations()
     framebuffer_info()
-    available = @fb_height - MENU_Y - TITLE_HEIGHT - HEADER_GAP - FOOTER_GAP - ROW_HEIGHT * 3
-    clamp(available / ROW_HEIGHT, 1, 24)
+    available = @fb_height - OUTER_MARGIN * 2 - HEADER_HEIGHT - FOOTER_HEIGHT
+    clamp((available + ROW_GAP) / (ROW_HEIGHT + ROW_GAP), 1, 18)
   end
 
   def visible_range(count, selected)
@@ -504,28 +540,72 @@ module ShengHeadlessGenerationMenu
   end
 
   def generation_row_text(label, index, selected)
-    prefix = index == selected ? "> " : "  "
-    "#{prefix}#{label}"
+    prefix = index == selected ? ">" : " "
+    number = (index + 1).to_s
+    number = "0#{number}" if number.length < 2
+    "#{prefix} #{number}   #{label}"
   end
 
   def status_line(remaining)
     if remaining
-      "AUTOBOOT IN #{remaining} SECONDS. PRESS ANY KEY TO STOP."
+      "AUTOMATIC BOOT IN #{remaining}S"
     else
-      "AUTOBOOT STOPPED. WAITING FOR SELECTION..."
+      "AUTOMATIC BOOT PAUSED"
     end
   end
 
-  def draw_generation_row(labels, index, selected, start)
-    row_y = MENU_Y + TITLE_HEIGHT + HEADER_GAP + (index - start) * ROW_HEIGHT
-    bg = index == selected ? SELECT_BG : BG
+  def draw_panel(x, y, width, height)
+    draw_rect(x, y, width, height, PANEL_BG)
+    draw_rect(x, y, width, PANEL_BORDER, PANEL_BORDER_COLOR)
+    draw_rect(x, y + height - PANEL_BORDER, width, PANEL_BORDER, PANEL_BORDER_COLOR)
+    draw_rect(x, y, PANEL_BORDER, height, PANEL_BORDER_COLOR)
+    draw_rect(x + width - PANEL_BORDER, y, PANEL_BORDER, height, PANEL_BORDER_COLOR)
+    draw_rect(x, y, width, 6, ACCENT)
+  end
+
+  def row_width(scrollable)
+    content_width() - (scrollable ? SCROLLBAR_GAP : 0)
+  end
+
+  def draw_generation_row(labels, index, selected, start, visible_count)
+    row_y = panel_y(visible_count) + HEADER_HEIGHT +
+      (index - start) * (ROW_HEIGHT + ROW_GAP)
+    is_selected = index == selected
+    bg = is_selected ? SELECT_BG : ROW_BG
     fg = index == selected ? SELECT_FG : NORMAL_FG
-    draw_text_box(MENU_X, row_y - 6, menu_width(), ROW_HEIGHT, generation_row_text(labels[index], index, selected), fg, bg)
+    width = row_width(labels.length > visible_count)
+
+    draw_rect(content_x(), row_y, width, ROW_HEIGHT, bg)
+    draw_rect(content_x(), row_y, 7, ROW_HEIGHT, ACCENT) if is_selected
+    draw_text_box(
+      content_x() + 20,
+      row_y + 18,
+      width - 40,
+      32,
+      generation_row_text(labels[index], index, selected),
+      fg,
+      bg
+    )
+  end
+
+  def draw_scrollbar(count, visible_count, start_index, rows_y)
+    return unless count > visible_count
+
+    track_x = panel_x() + panel_width() - PANEL_PADDING - SCROLLBAR_WIDTH
+    track_height = rows_height(visible_count)
+    thumb_height = [track_height * visible_count / count, 48].max
+    thumb_height = [thumb_height, track_height].min
+    travel = track_height - thumb_height
+    denominator = count - visible_count
+    thumb_y = rows_y + (denominator > 0 ? travel * start_index / denominator : 0)
+
+    draw_rect(track_x, rows_y, SCROLLBAR_WIDTH, track_height, ROW_BG)
+    draw_rect(track_x, thumb_y, SCROLLBAR_WIDTH, thumb_height, ACCENT)
   end
 
   def render_framebuffer(generations, selected, previous_selected: nil, remaining: nil, previous_remaining: nil)
     framebuffer_info()
-    labels = generations.empty? ? ["NixOS - Default"] : generations.map { |generation| generation.label() }
+    labels = generations.empty? ? ["NixOS - Default"] : generations.map { |generation| generation.label().to_s }
     start_index, end_index = visible_range(labels.length, selected)
     previous_start, previous_end =
       previous_selected.nil? ? [nil, nil] : visible_range(labels.length, previous_selected)
@@ -533,25 +613,70 @@ module ShengHeadlessGenerationMenu
       previous_start != start_index ||
       previous_end != end_index
     visible_count = end_index - start_index
-    help_y = MENU_Y + TITLE_HEIGHT + HEADER_GAP + visible_count * ROW_HEIGHT + FOOTER_GAP
-    status_y = help_y + ROW_HEIGHT
+    x = panel_x()
+    y = panel_y(visible_count)
+    width = panel_width()
+    height = panel_height(visible_count)
+    rows_y = y + HEADER_HEIGHT
+    footer_y = rows_y + rows_height(visible_count)
+    help_y = footer_y + 30
+    status_y = footer_y + 82
 
     if full_redraw
       draw_rect(0, 0, @fb_width, @fb_height, BG)
-      draw_text_box(MENU_X, MENU_Y + 2, menu_width(), TITLE_HEIGHT, "NIXOS BOOT MENU", TITLE_FG, BG)
+      draw_panel(x, y, width, height)
+      draw_text_box(
+        content_x(),
+        y + 26,
+        content_width(),
+        48,
+        "NIXOS SHENG",
+        TITLE_FG,
+        PANEL_BG,
+        scale: TITLE_FONT_SCALE
+      )
+      draw_text_box(
+        content_x(),
+        y + 91,
+        content_width(),
+        28,
+        "SYSTEM GENERATION SELECTOR",
+        ACCENT,
+        PANEL_BG,
+        scale: SUBTITLE_FONT_SCALE
+      )
+      draw_rect(x + PANEL_BORDER, y + HEADER_HEIGHT - 2, width - PANEL_BORDER * 2, 2, PANEL_BORDER_COLOR)
       index = start_index
       while index < end_index
-        draw_generation_row(labels, index, selected, start_index)
+        draw_generation_row(labels, index, selected, start_index, visible_count)
         index += 1
       end
-      draw_text_box(MENU_X, help_y - 6, menu_width(), ROW_HEIGHT, "[VOL/ARROW] NAVIGATE   [POWER/ENTER] SELECT", STATUS_FG, BG)
+      draw_scrollbar(labels.length, visible_count, start_index, rows_y)
+      draw_rect(x + PANEL_BORDER, footer_y, width - PANEL_BORDER * 2, 2, PANEL_BORDER_COLOR)
+      draw_text_box(
+        content_x(),
+        help_y,
+        content_width(),
+        32,
+        "VOL +/- OR ARROWS  MOVE    POWER OR ENTER  BOOT",
+        MUTED_FG,
+        PANEL_BG
+      )
     elsif previous_selected != selected
-      draw_generation_row(labels, previous_selected, selected, start_index) if previous_selected
-      draw_generation_row(labels, selected, selected, start_index)
+      draw_generation_row(labels, previous_selected, selected, start_index, visible_count) if previous_selected
+      draw_generation_row(labels, selected, selected, start_index, visible_count)
     end
 
     if full_redraw || previous_remaining != remaining
-      draw_text_box(MENU_X, status_y - 6, menu_width(), ROW_HEIGHT, status_line(remaining), STATUS_FG, BG)
+      draw_text_box(
+        content_x(),
+        status_y,
+        content_width(),
+        32,
+        status_line(remaining),
+        remaining ? STATUS_FG : MUTED_FG,
+        PANEL_BG
+      )
     end
 
     framebuffer.flush
@@ -571,7 +696,33 @@ module ShengHeadlessGenerationMenu
 
   def render_booting()
     framebuffer_info()
-    draw_text_box(MENU_X, MENU_Y + 2, menu_width(), TITLE_HEIGHT, "BOOTING SELECTED GENERATION...", STATUS_FG, BG)
+    width = panel_width()
+    height = 300
+    x = panel_x()
+    y = [(@fb_height - height) / 2, 24].max
+
+    draw_rect(0, 0, @fb_width, @fb_height, BG)
+    draw_panel(x, y, width, height)
+    draw_text_box(
+      x + PANEL_PADDING,
+      y + 55,
+      width - PANEL_PADDING * 2,
+      48,
+      "NIXOS SHENG",
+      TITLE_FG,
+      PANEL_BG,
+      scale: TITLE_FONT_SCALE
+    )
+    draw_rect(x + PANEL_PADDING, y + 145, 8, 58, BOOT_FG)
+    draw_text_box(
+      x + PANEL_PADDING + 28,
+      y + 150,
+      width - PANEL_PADDING * 2 - 28,
+      40,
+      "STARTING SELECTED GENERATION",
+      BOOT_FG,
+      PANEL_BG
+    )
     framebuffer.flush
   rescue => error
     $logger.warn("Could not render sheng generation menu boot status: #{error}")
