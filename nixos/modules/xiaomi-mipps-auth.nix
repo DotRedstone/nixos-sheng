@@ -103,7 +103,7 @@ let
         negotiated="$(read_node "$ucsi" current_now 2>/dev/null || true)"
         current_limit="$(read_node "$battmgr" input_current_limit 2>/dev/null || true)"
         case "$negotiated:$current_limit" in
-          *[!0-9:]*|:*) echo "Standard PD current sync skipped: invalid current data"; return 0 ;;
+          *[!0-9:]*|:*|*:) echo "Standard PD current sync skipped: invalid current data"; return 0 ;;
         esac
 
         target="$negotiated"
