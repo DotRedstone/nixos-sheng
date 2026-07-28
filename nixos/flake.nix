@@ -36,6 +36,13 @@
         libinput = prev.libinput.override {
           luaSupport = false;
         };
+        libcamera = prev.libcamera.overrideAttrs {
+          version = "0.7.2";
+          src = final.fetchurl {
+            url = "https://gitlab.freedesktop.org/camera/libcamera/-/archive/v0.7.2/libcamera-v0.7.2.tar.bz2";
+            hash = "sha256-bzXdR53WNKHsUIUvqXFsnagabAevk7vymQ97vYKfDf0=";
+          };
+        };
         gadget-tool = prev.gadget-tool.overrideAttrs (old: {
           cmakeFlags = (old.cmakeFlags or []) ++ [
             "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
