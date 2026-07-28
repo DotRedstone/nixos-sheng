@@ -76,6 +76,19 @@ let
         return 1
       }
 
+      has_active_usb_data_link() {
+        local state=""
+
+        for path in /sys/class/udc/*/state; do
+          [ -r "$path" ] || continue
+          state="$(read_node "''${path%/*}" "''${path##*/}" 2>/dev/null || true)"
+          case "$state" in
+            configured|suspended) return 0 ;;
+          esac
+        done
+        return 1
+      }
+
       sync_standard_pd_current() {
         local battmgr="/sys/class/power_supply/qcom-battmgr-usb"
         local ucsi=""
@@ -167,6 +180,31 @@ let
 
         if ! is_xiaomi_svid "$adapter_svid"; then
           if is_empty_svid "$adapter_svid"; then
+            # Xiaomi SVID discovery may require the helper's Type-C data-role
+            # swap. Probe only on a charger with a real PDO and no active USB
+            # data link, so a computer connection (including ADB) is not
+            # disrupted.
+            if is_nonempty_pdo "$pdo2" && ! has_active_usb_data_link; then
+              echo "MiPPS auth probing charger identity after PDO discovery"
+              xiaomi-mipps-auth --sysfs "$root" --timeout 6 || true
+
+              if is_complete "$root"; then
+                echo "MiPPS auth active after identity probe"
+                exit 0
+              fi
+
+              adapter_svid="$(read_node "$root" adapter_svid 2>/dev/null || true)"
+              if is_xiaomi_svid "$adapter_svid"; then
+                echo "MiPPS auth discovered Xiaomi SVID after data-role swap; retrying authentication"
+                sleep "$sleep_seconds"
+                continue
+              fi
+
+              echo "MiPPS auth skipped: charger did not expose Xiaomi SVID after safe identity probe"
+              sync_standard_pd_current
+              exit 0
+            fi
+
             if [ "$attempt" -ge "$empty_svid_grace_attempts" ]; then
               echo "MiPPS auth skipped: Xiaomi SVID not exposed after $attempt attempts; treating this as a standard PD adapter"
               sync_standard_pd_current
