@@ -24,6 +24,7 @@ rootfs images:
 | Configuration | Desktop | Matching rootfs output |
 | --- | --- | --- |
 | `sheng` | Optional minimal GNOME | `mobileRootfsImageGnome` |
+| `sheng-stage2` | Minimal GNOME without rebuilding the boot kernel | On-device `nixos-rebuild` |
 | `sheng-minimal` | Desktop-neutral console platform | `mobileRootfsImage` |
 
 This is important because a separate ordinary `nixosSystem` evaluation could
@@ -52,7 +53,7 @@ Clone the repository on the tablet and build without activating it:
 git clone https://github.com/DotRedstone/nixos-sheng
 cd nixos-sheng
 
-sudo nixos-rebuild build --flake ./nixos#sheng
+sudo nixos-rebuild build --flake ./nixos#sheng-stage2
 ```
 
 The repository flake lives in the `nixos/` subdirectory. Remote flake URIs must
@@ -73,14 +74,14 @@ readlink -f /run/current-system/kernel-modules 2>/dev/null || true
 Test the new generation without making it the boot default:
 
 ```sh
-sudo nixos-rebuild test --flake ./nixos#sheng
+sudo nixos-rebuild test --flake ./nixos#sheng-stage2
 ```
 
 After checking networking, the desktop, and hardware services, make it the
 default stage-2 generation:
 
 ```sh
-sudo nixos-rebuild switch --flake ./nixos#sheng
+sudo nixos-rebuild switch --flake ./nixos#sheng-stage2
 ```
 
 ## Generations and rollback
@@ -112,8 +113,10 @@ PAGER=cat nix-env --profile /nix/var/nix/profiles/system --list-generations
 
 ## Fixed boot boundary
 
-`nixos-rebuild` does not write Android partitions. Changes to these components
-still require building and flashing `mobileAndroidBootimg` to `boot_b`:
+`sheng-stage2` neither builds nor writes the Android boot partition and keeps
+using the modules supplied by the boot image and copied to `/lib/modules`.
+Changes to these components still require building and flashing
+`mobileAndroidBootimg` to `boot_b`:
 
 - kernel or kernel configuration
 - DTS / DTB

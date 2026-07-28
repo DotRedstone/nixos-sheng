@@ -113,13 +113,18 @@
         desktop ? null,
         includeDefaultUser ? false,
         includeHomeManager ? false,
+        stage2Only ? false,
       }:
         let vars = import ./vars.nix; in
         import "${mobile-nixos}/lib/eval-with-configuration.nix" {
         inherit pkgs;
         device = ./hardware/xiaomi-sheng;
         configuration = [
-          { _module.args.vars = vars; }
+          {
+            _module.args = {
+              inherit vars stage2Only;
+            };
+          }
           ({ lib, ... }: {
             nixpkgs.overlays = lib.mkAfter [ shengOverlay ];
           })
@@ -151,6 +156,12 @@
         includeDefaultUser = true;
         includeHomeManager = true;
       };
+      mobileStage2Eval = mobileEvalFor {
+        desktop = "gnome";
+        includeDefaultUser = true;
+        includeHomeManager = true;
+        stage2Only = true;
+      };
     in
     {
       # Reuse the exact Mobile NixOS evaluations used by the flashable images.
@@ -174,6 +185,7 @@
 
       nixosConfigurations = {
         sheng = mobileGnomeEval;
+        sheng-stage2 = mobileStage2Eval;
         sheng-minimal = mobileEval;
       };
 

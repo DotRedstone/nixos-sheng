@@ -4,7 +4,7 @@
 # Scope: System
 # ---
 
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, stage2Only ? false, ... }:
 
 let
   headlessStage1Task = pkgs.writeTextDir "zz-sheng-headless-stage1.rb" (
@@ -173,9 +173,12 @@ in
 
   mobile.beautification.silentBoot = lib.mkForce false;
 
-  system.modulesTree = lib.mkForce [
-    kernelModulesTree
-  ];
+  boot.kernel.enable = lib.mkIf stage2Only (lib.mkForce false);
+  boot.bootspec.enable = lib.mkIf stage2Only (lib.mkForce false);
+  hardware.deviceTree.enable = lib.mkIf stage2Only (lib.mkForce false);
+  system.modulesTree = lib.mkForce (
+    lib.optional (!stage2Only) kernelModulesTree
+  );
 
   documentation.enable = false;
 

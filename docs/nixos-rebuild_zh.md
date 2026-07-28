@@ -22,6 +22,7 @@ flake 暴露了与可刷 rootfs 镜像相同的 Mobile NixOS 求值：
 | Configuration | 桌面 | 对应 rootfs 输出 |
 | --- | --- | --- |
 | `sheng` | 可选 minimal GNOME | `mobileRootfsImageGnome` |
+| `sheng-stage2` | minimal GNOME，不构建 boot 内核 | 设备内 `nixos-rebuild` |
 | `sheng-minimal` | 不绑定桌面的 console 平台 | `mobileRootfsImage` |
 
 这很重要，因为单独的普通 `nixosSystem` 求值可能选择不同的 kernel module tree，
@@ -49,7 +50,7 @@ dotfiles 仓库中。只有明确想使用本仓库 GNOME profile 时才使用
 git clone https://github.com/DotRedstone/nixos-sheng
 cd nixos-sheng
 
-sudo nixos-rebuild build --flake ./nixos#sheng
+sudo nixos-rebuild build --flake ./nixos#sheng-stage2
 ```
 
 仓库 flake 位于 `nixos/` 子目录中。因此远程 flake URI 必须使用 `dir=nixos`；
@@ -69,13 +70,13 @@ readlink -f /run/current-system/kernel-modules 2>/dev/null || true
 测试新世代，但不设为启动默认值：
 
 ```sh
-sudo nixos-rebuild test --flake ./nixos#sheng
+sudo nixos-rebuild test --flake ./nixos#sheng-stage2
 ```
 
 确认网络、桌面和硬件服务后，再设为默认 stage-2 世代：
 
 ```sh
-sudo nixos-rebuild switch --flake ./nixos#sheng
+sudo nixos-rebuild switch --flake ./nixos#sheng-stage2
 ```
 
 ## 世代与回滚
@@ -104,7 +105,8 @@ PAGER=cat nix-env --profile /nix/var/nix/profiles/system --list-generations
 
 ## 固定 boot 边界
 
-`nixos-rebuild` 不会写 Android 分区。以下内容变化仍需要构建
+`sheng-stage2` 不会构建或写入 Android boot 分区，并继续使用 boot 镜像提供、
+复制到 `/lib/modules` 的模块。以下内容变化仍需要构建
 `mobileAndroidBootimg` 并刷入 `boot_b`：
 
 - kernel 或 kernel configuration
