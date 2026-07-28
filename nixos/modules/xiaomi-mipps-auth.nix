@@ -115,7 +115,14 @@ let
 
         printf '%s\n' "$target" > "$battmgr/input_current_limit"
         current_limit="$(read_node "$battmgr" input_current_limit 2>/dev/null || true)"
-        echo "Standard PD current sync applied: negotiated=''${negotiated}uA limit=''${current_limit:-unknown}uA"
+        case "$current_limit" in
+          ""|*[!0-9]*) echo "Standard PD current sync requested ''${target}uA; readback unavailable"; return 0 ;;
+        esac
+        if [ "$current_limit" -ge "$target" ]; then
+          echo "Standard PD current sync applied: negotiated=''${negotiated}uA limit=''${current_limit}uA"
+        else
+          echo "Standard PD current sync requested ''${target}uA, but charger firmware retained ''${current_limit}uA"
+        fi
       }
 
       root="$(find_xiaomi_dir || true)"
