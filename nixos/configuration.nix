@@ -129,6 +129,7 @@
     gitMinimal # Required for nixos-rebuild to process git+file:// flakes via sudo
   ];
 
+  environment.pathsToLink = [ "/share/alsa" ];
   environment.variables.ALSA_CONFIG_UCM2 = "/run/current-system/sw/share/alsa/ucm2";
   systemd.user.settings.Manager.DefaultEnvironment =
     "ALSA_CONFIG_UCM2=/run/current-system/sw/share/alsa/ucm2";
