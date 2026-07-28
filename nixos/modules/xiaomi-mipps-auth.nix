@@ -172,7 +172,8 @@ in
       unitConfig.ConditionPathExistsGlob =
         "/sys/devices/platform/pmic-glink/*/xiaomi/request_vdm_cmd";
       serviceConfig = {
-        Type = "oneshot";
+        # Let boot finish while PD/SVID discovery continues in this service.
+        Type = "simple";
         ExecStart = "${pkgs.util-linux}/bin/flock -n -E 0 /run/xiaomi-mipps-auth.lock ${retryPackage}/bin/xiaomi-mipps-auth-retry";
         Restart = "on-failure";
         RestartSec = 10;
