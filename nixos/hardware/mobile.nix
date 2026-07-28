@@ -17,6 +17,9 @@ let
   udevTolerantTask = pkgs.writeTextDir "zz-sheng-udev-tolerant.rb" (
     builtins.readFile ../patches/stage-1-udev-trigger-tolerant.rb
   );
+  rootFsckTask = pkgs.writeTextDir "zz-sheng-root-fsck.rb" (
+    builtins.readFile ../patches/stage-1-root-fsck.rb
+  );
   stage1Firmware = pkgs.runCommand "sheng-stage1-firmware" { } ''
     mkdir -p $out/lib/firmware
     cp -r ${pkgs.sheng-firmware}/lib/firmware/qcom $out/lib/firmware/
@@ -147,6 +150,7 @@ in
 
     tasks = [
       headlessStage1Task
+      rootFsckTask
       udevTolerantTask
     ];
 
