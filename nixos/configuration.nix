@@ -9,6 +9,7 @@
 {
   imports = [
     ./hardware/hardware.nix
+    ./modules/sheng-boot-slot.nix
     ./modules/sheng-devauth.nix
     ./modules/sheng-offline-charging.nix
     ./modules/xiaomi-mipps-auth.nix
