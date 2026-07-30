@@ -140,8 +140,6 @@
   services.dbus.packages = [ pkgs.iio-sensor-proxy ];
   services.udev.packages = [ pkgs.iio-sensor-proxy ];
 
-  systemd.services.iio-sensor-proxy.wantedBy = [ "multi-user.target" ];
-
   services.udev.extraRules = ''
     ENV{ID_INPUT_TOUCHSCREEN}=="1", ENV{LIBINPUT_CALIBRATION_MATRIX}="1 0 0 0 1 0 0 0 1", ENV{ID_INPUT_TOUCHSCREEN_INTEGRATION}="internal"
     SUBSYSTEM=="block", ENV{DEVTYPE}=="partition", ENV{ID_PATH}=="platform-1d84000.ufshc-scsi-*", ENV{UDISKS_IGNORE}="1"

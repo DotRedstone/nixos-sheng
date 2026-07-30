@@ -27,6 +27,10 @@ module ShengEarlyChargeGuard
     (config()["boot_capacity"] || 5).to_i
   end
 
+  def max_wait_seconds()
+    [(config()["max_wait_seconds"] || 30).to_i, 0].max
+  end
+
   def charger_mode?()
     return true if System.cmdline().include?("androidboot.mode=charger")
     return true if System.cmdline().any? do |argument|
@@ -145,15 +149,28 @@ module ShengEarlyChargeGuard
     end
 
     $logger.info(
-      "Early charge guard: battery is at #{capacity}%; charging with the display off until #{boot_capacity()}%."
+      "Early charge guard: battery is at #{capacity}%; charging with the display off until #{boot_capacity()}% " \
+      "or for at most #{max_wait_seconds()} seconds."
     )
     blank_display()
     last_report = nil
     offline_checks = 0
+    elapsed = 0
+    target_reached = false
 
     loop do
       capacity = battery_capacity()
-      break if capacity && capacity >= boot_capacity()
+      if capacity && capacity >= boot_capacity()
+        target_reached = true
+        break
+      end
+
+      if elapsed >= max_wait_seconds()
+        $logger.warn(
+          "Early charge guard: pre-charge timed out at #{capacity || "unknown"}%; continuing boot so userspace charging can start."
+        )
+        break
+      end
 
       if external_power_online?()
         offline_checks = 0
@@ -171,9 +188,10 @@ module ShengEarlyChargeGuard
         last_report = capacity
       end
       sleep(5)
+      elapsed += 5
     end
 
-    $logger.info("Early charge guard: battery reached #{capacity}%; continuing boot.")
+    $logger.info("Early charge guard: battery reached #{capacity}%; continuing boot.") if target_reached
     restore_display() unless charger_mode?()
   end
 end

@@ -225,12 +225,12 @@ in
     };
     serviceConfig = {
       ExecStartPre = pkgs.writeShellScript "wait-for-sheng-ssc" ''
-        for attempt in $(seq 1 45); do
-          if ${libssc}/bin/ssccli --sensor light --timeout 2 >/dev/null 2>&1; then
+        for attempt in $(seq 1 6); do
+          if ${libssc}/bin/ssccli --sensor light --timeout 1 >/dev/null 2>&1; then
             echo "sheng SSC is queryable after attempt $attempt"
             exit 0
           fi
-          echo "waiting for sheng SSC service ($attempt/45)"
+          echo "waiting for sheng SSC service ($attempt/6)"
           sleep 1
         done
 
@@ -238,8 +238,8 @@ in
         exit 1
       '';
       Restart = "on-failure";
-      RestartSec = 5;
-      TimeoutStartSec = 180;
+      RestartSec = 10;
+      TimeoutStartSec = 20;
     };
   };
 
