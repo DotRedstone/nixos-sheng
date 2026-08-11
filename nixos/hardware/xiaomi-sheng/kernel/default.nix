@@ -19,43 +19,7 @@ mobile-nixos.kernel-builder-clang {
   modDirVersion = "7.0.0";
   src = shengKernelSrc;
   configfile = ./config.aarch64;
-  patches = [
-    ./0001-disable-dp0-sheng.patch
-    ./0002-ucsi-glink-debug-retry.patch
-    ./0005-ucsi-fix-port-unregister-race.patch
-    (pkgs.fetchurl {
-      url = "https://github.com/torvalds/linux/commit/e85eb5feca8e254905ffa6c57a3c99c89a674a0f.patch";
-      hash = "sha256-PzOtnd2djyHTMVLDl/WGkcDRqOMRfY5pwT/CrUqSB1I=";
-    })
-    (pkgs.fetchurl {
-      url = "https://github.com/torvalds/linux/commit/464c6ad2aa16.patch";
-      hash = "sha256-1btdu86Hp/FytwPq2L2bXAUgn7FweYugA9jzu4cihho=";
-    })
-    (pkgs.fetchurl {
-      url = "https://github.com/torvalds/linux/commit/5401fb4fe10f.patch";
-      hash = "sha256-8aw/xu6UnQStmhUMp+obC6wtfpcAlMc9jzLlLRNHfeA=";
-    })
-    (pkgs.fetchurl {
-      url = "https://github.com/torvalds/linux/commit/07ebe87915d8accdaba20c4f88c5ae430fe62fbb.patch";
-      hash = "sha256-9u8LVe61BR++Hv/F/K+v1Hmenp9J4vhycso9D5wVmFs=";
-    })
-    ./0003-pdr-pd-mapper-debug.patch
-    ./0004-pdr-add-sheng-sensor-pd-lookup.patch
-    ./0006-pdr-avoid-register-listener-deadlock.patch
-    ./0007-sm8550-cdsp-on-demand.patch
-    ./0008-battmgr-xiaomi-usb-adapter-type-icl.patch
-    ./0009-ucsi-rdo-current-max-fallback.patch
-    ./0010-battmgr-xiaomi-battery-current-sign.patch
-    (pkgs.fetchurl {
-      url = "https://raw.githubusercontent.com/batocera-linux/batocera.linux/ee4cad1b1c646c0dfd818c4a9b2903101dfe413d/board/batocera/qualcomm/sm8550/linux_patches/1000-add-qcom-haptics-driver.patch";
-      hash = "sha256-2s1EzbZsWvr5WLZBn1cfSaazy49K1yMwMYjIC9D9D/w=";
-    })
-    ./0011-enable-pm8550b-haptics.patch
-    (pkgs.fetchurl {
-      url = "https://github.com/ianchb/sm8550-mainline/commit/b6c3859efdec4e7f51a77e7ae835c1425eb104c5.patch";
-      hash = "sha256-GYYDCSYybKU4d8ohZHMh0vEgdT+anUeU5fnskAeT2pI=";
-    })
-  ];
+  patches = [ ];
 
   isModular = true;
   isCompressed = "gz";

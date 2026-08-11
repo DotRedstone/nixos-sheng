@@ -245,11 +245,15 @@ find /lib/firmware /usr/lib/firmware -maxdepth 10 -type f 2>/dev/null \
 dmesg | grep -Ei 'ath12k|ath11k|wcn|wlan|wifi|mhi|pci|pcie|qmi|qrtr|firmware' | tail -300
 ```
 
-### Kernel patch
+### Kernel source
 
-Do not arbitrarily delete kernel patches.
+Device kernel source, drivers, and DTS are maintained in
+`DotRedstone/linux-sheng`. This repository pins a kernel revision, owns the
+distribution kernel config, and provides Mobile NixOS integration. New device
+fixes should normally be separate commits in the kernel repository instead of
+rebuilding an in-tree patch queue here.
 
-Before deleting or cleaning up, a patch audit must be performed:
+If a temporary compatibility patch is required, audit it before removal:
 
 * What does this patch modify?
 * Is it a feature fix, fault tolerance, logging, or a historical workaround?
@@ -258,7 +262,7 @@ Before deleting or cleaning up, a patch audit must be performed:
 * What are the A/B test results?
 * What is the rollback method?
 
-Only disable or clean up one patch at a time. Do not delete multiple patches together.
+Only disable or clean up one temporary patch at a time.
 
 ## Verification Requirements
 

@@ -100,17 +100,17 @@
     "shengKernelSrc": {
       "flake": false,
       "locked": {
-        "lastModified": 1776062196,
-        "narHash": "sha256-q6d1DIKHWXhSpegVAIhhy6xb1mS9X6+euqSRoIKPR+U=",
-        "owner": "map220v",
-        "repo": "sm8550-mainline",
-        "rev": "f273227fab85e2ad8391c61c21b3556bd017a726",
+        "lastModified": 1786475108,
+        "narHash": "sha256-OPQ1a4C488suXv7oIV4ocYjqw4PnD8e1vSNUcE01QV0=",
+        "owner": "DotRedstone",
+        "repo": "linux-sheng",
+        "rev": "3ad46e68109dedfde324dbbce55dbafe7631a649",
         "type": "github"
       },
       "original": {
-        "owner": "map220v",
+        "owner": "DotRedstone",
         "ref": "sheng-7.0",
-        "repo": "sm8550-mainline",
+        "repo": "linux-sheng",
         "type": "github"
       }
     }

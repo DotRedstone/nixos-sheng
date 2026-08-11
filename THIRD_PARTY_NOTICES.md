@@ -12,7 +12,7 @@ It does not relicense third-party material.
 | Mobile NixOS | https://github.com/mobile-nixos/mobile-nixos | MIT |
 | Nixpkgs | https://github.com/NixOS/nixpkgs | Mixed; see upstream package metadata |
 | Home Manager | https://github.com/nix-community/home-manager | MIT |
-| Sheng Linux kernel | https://github.com/map220v/sm8550-mainline | GPL-2.0-only Linux kernel terms |
+| Sheng Linux kernel | https://github.com/DotRedstone/linux-sheng | GPL-2.0-only Linux kernel terms; forked from `map220v/sm8550-mainline` |
 | MiPPS authentication script | https://github.com/ianchb/xiaomi-mipps-auth | GPL-2.0-only, as declared by its source SPDX header |
 | GJS OSK | https://github.com/Vishram1123/gjs-osk | GPL-3.0 |
 | FastRPC | https://github.com/qualcomm/fastrpc | BSD-3-Clause |
@@ -21,8 +21,8 @@ It does not relicense third-party material.
 | libssc | https://codeberg.org/DylanVanAssche/libssc | Source files predominantly declare AGPL-3.0-or-later; exact vendored origin is recorded in `nixos/vendor/libssc/ORIGIN.md` |
 | Sheng sensor configuration | https://github.com/alghiffaryfa19/sheng-sensors-file | No upstream license published; treated as unfree |
 
-Kernel patches remain subject to the Linux kernel's GPL-2.0-only terms and any
-copyright notices embedded in the patched source or patch files.
+Kernel source modifications remain subject to the Linux kernel's GPL-2.0-only
+terms and any copyright notices embedded in the source.
 
 The complete corresponding project source, Nix expressions, downstream
 patches, and vendored libssc source used to build a release are available from

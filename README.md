@@ -40,7 +40,7 @@ issues before flashing.
 | Area | Status | Notes |
 | --- | --- | --- |
 | Device framework | Mobile NixOS | Device definition lives in `nixos/hardware/xiaomi-sheng` |
-| Kernel | Sheng mainline kernel | Built from `map220v/sm8550-mainline` through Nix |
+| Kernel | Sheng device kernel | Built from `DotRedstone/linux-sheng` through Nix |
 | Boot image | Bring-up | Mobile NixOS Android boot image for `boot_b` |
 | RootFS | Mobile NixOS generated rootfs | ext4 image labeled `linux` |
 | Display/desktop | Working | 3048x2032 panel, GNOME shell, gjs-osk onscreen keyboard, physical power key toggle, four-way rotation, and cover open/close display control work |
@@ -60,15 +60,17 @@ issues before flashing.
   generated rootfs support, USB gadget setup, and device-port conventions.
 - [DotRedstone/sheng-firmware-full](https://github.com/DotRedstone/sheng-firmware-full)
   provides the complete proprietary firmware, ADSP sensor communication configs, and registry.
+- [DotRedstone/linux-sheng](https://github.com/DotRedstone/linux-sheng)
+  carries the maintained device kernel, drivers, and DTS used by this project.
 - [map220v/sm8550-mainline](https://github.com/map220v/sm8550-mainline)
-  provides the Xiaomi Pad 6S Pro mainline kernel work.
+  provides the upstream Xiaomi Pad 6S Pro mainline kernel work.
 - [ianchb/xiaomi-mipps-auth](https://github.com/ianchb/xiaomi-mipps-auth)
   provides the userspace authentication daemon for the Xiaomi 120W private fast charging protocol.
 
 The kernel source is configured in `nixos/flake.nix`:
 
 ```nix
-shengKernelSrc.url = "github:map220v/sm8550-mainline/sheng-7.0";
+shengKernelSrc.url = "github:DotRedstone/linux-sheng/sheng-7.0";
 ```
 
 ## How Boot Works

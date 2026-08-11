@@ -272,11 +272,13 @@ find /lib/firmware /usr/lib/firmware -maxdepth 10 -type f 2>/dev/null \
 dmesg | grep -Ei 'ath12k|ath11k|wcn|wlan|wifi|mhi|pci|pcie|qmi|qrtr|firmware' | tail -300
 ```
 
-### Kernel patch
+### Kernel source
 
-不要随意删除 kernel patch。
+设备内核源码、驱动与 DTS 由 `DotRedstone/linux-sheng` 维护；本仓库只固定
+内核 revision、保存发行版 kernel config，并负责 Mobile NixOS 集成。新的设备
+修复应优先作为独立提交进入内核仓库，不要重新积累构建时 patch 队列。
 
-删除或清理前必须做补丁审计：
+如果确实需要临时 compatibility patch，删除或清理前必须做补丁审计：
 
 * 这个 patch 改了什么？
 * 是功能修复、容错、日志，还是历史 workaround？
@@ -285,7 +287,7 @@ dmesg | grep -Ei 'ath12k|ath11k|wcn|wlan|wifi|mhi|pci|pcie|qmi|qrtr|firmware' | 
 * A/B 测试结果是什么？
 * 回滚方式是什么？
 
-每次只禁用或清理一个 patch，不要多个一起删。
+每次只禁用或清理一个临时 patch，不要多个一起删。
 
 ## 验证要求
 

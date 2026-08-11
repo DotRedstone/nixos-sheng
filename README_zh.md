@@ -33,7 +33,7 @@ Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的 Mobile NixOS 移植项目�
 | 领域 | 状态 | 备注 |
 | --- | --- | --- |
 | 设备框架 | Mobile NixOS | 设备定义位于 `nixos/hardware/xiaomi-sheng` |
-| 内核 | Sheng mainline kernel | 通过 Nix 从 `map220v/sm8550-mainline` 构建 |
+| 内核 | Sheng 设备内核 | 通过 Nix 从 `DotRedstone/linux-sheng` 构建 |
 | 启动镜像 | Bring-up | 面向 `boot_b` 的 Mobile NixOS Android boot image |
 | RootFS | Mobile NixOS 生成的 rootfs | 面向 `linux` 分区的 ext4 镜像 |
 | 显示/桌面 | 可用 | 3048x2032 面板、GNOME shell、gjs-osk 屏幕键盘、物理电源键息屏唤醒、四向旋转与盖板开合亮灭屏均可用 |
@@ -52,15 +52,17 @@ Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的 Mobile NixOS 移植项目�
   提供设备框架、stage-1 initramfs、Android boot image 构建器、生成的 rootfs 支持、USB gadget 设置以及设备移植约定。
 - [DotRedstone/sheng-firmware-full](https://github.com/DotRedstone/sheng-firmware-full)
   提供完整的闭源固件、ADSP 传感器通信配置与注册表。
+- [DotRedstone/linux-sheng](https://github.com/DotRedstone/linux-sheng)
+  提供本项目维护的设备内核、驱动与 DTS。
 - [map220v/sm8550-mainline](https://github.com/map220v/sm8550-mainline)
-  提供 Xiaomi Pad 6S Pro 的主线内核支持。
+  提供上游 Xiaomi Pad 6S Pro 主线内核支持。
 - [ianchb/xiaomi-mipps-auth](https://github.com/ianchb/xiaomi-mipps-auth)
   提供小米 120W 私有快充协议的用户态认证守护进程。
 
 内核源码在 `nixos/flake.nix` 中配置：
 
 ```nix
-shengKernelSrc.url = "github:map220v/sm8550-mainline/sheng-7.0";
+shengKernelSrc.url = "github:DotRedstone/linux-sheng/sheng-7.0";
 ```
 
 ## 启动原理
