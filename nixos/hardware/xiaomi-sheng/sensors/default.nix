@@ -127,10 +127,8 @@ in
   systemd.services.adsprpcd = {
     description = "aDSP RPC root daemon";
     wantedBy = [ "multi-user.target" ];
-    after = [ "sheng-sensor-files.service" "systemd-tmpfiles-setup.service" "systemd-udev-settle.service" ];
+    after = [ "sheng-sensor-files.service" "systemd-tmpfiles-setup.service" ];
     requires = [ "sheng-sensor-files.service" ];
-    wants = [ "systemd-udev-settle.service" ];
-    unitConfig.ConditionPathExists = "|/dev/fastrpc-adsp";
     serviceConfig = {
       Type = "exec";
       ExecStartPre = wait-for-adsp-fastrpc;
@@ -199,9 +197,6 @@ in
     requires = [ "sheng-sensor-files.service" "adsprpcd.service" "pd-mapper.service" ];
     before = [ "iio-sensor-proxy.service" ];
 
-    # Run only if the fastrpc node exists
-    unitConfig.ConditionPathExists = "|/dev/fastrpc-adsp";
-
     serviceConfig = {
       Type = "exec";
       ExecStart = "${fastrpc}/bin/adsprpcd sensorspd";
@@ -225,7 +220,7 @@ in
   # 7. Ensure iio-sensor-proxy is enabled and starts after SSC is queryable.
   hardware.sensor.iio.enable = lib.mkDefault true;
   systemd.services.iio-sensor-proxy = {
-    after = [ "adsprpcd-sensorspd.service" "systemd-udev-settle.service" ];
+    after = [ "adsprpcd-sensorspd.service" ];
     wants = [ "adsprpcd-sensorspd.service" ];
     unitConfig = {
       StartLimitIntervalSec = 300;

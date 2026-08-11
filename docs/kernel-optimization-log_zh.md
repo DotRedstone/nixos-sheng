@@ -174,11 +174,17 @@ PS5169 的 `remove()` 通过 `i2c_get_clientdata()` 获取驱动私有结构，�
 - `/run/pd-mapper-firmware` 只包含五个 `.jsn` 与 `devauth.mbn`。
 - 开机日志不再出现对 ADSP/CDSP/VPU 大镜像的重复解压。
 
-### 10. 保留 q6apm 就绪查询，先量化音频超时
+### 10. 修正 q6apm 就绪查询的错误语义
 
-基线中 `sheng-audio-modules.service` 用时 3.517 秒，唯一对应异常是 `qcom-apm` 的 `APM_CMD_GET_SPF_STATE` 同步查询超时。驱动通用同步路径允许最多等待 5 秒，而 `q6prm` probe 随后也依赖同一查询结果判断 ADSP 是否可用。Linux 上游当前仍保留这套语义。
+基线中 `sheng-audio-modules.service` 用时 3.517 秒，唯一对应异常是 `qcom-apm` 的 `APM_CMD_GET_SPF_STATE` 同步查询超时。进一步审计发现 `q6apm_get_apm_state()` 丢弃了同步发送的返回值：`-ENOMEM` 或 `-ETIMEDOUT` 最终经 `bool` 转换会变成 true，错误放行 `q6prm`。同时 `apm_probe()` 还执行一次结果完全不用的重复查询。
 
-本轮不删除、不缩短这个查询：旧系统虽然打印超时，但声卡最终能够枚举；缺少新内核上的重复启动样本时，贸然优化可能把确定的几秒延迟变成偶发无声。基线脚本已经采集 audio unit 与内核告警，刷入后先确认新的 ADSP 启动时序是否自然消除超时，再决定是否需要驱动层修复。
+内核提交 `8475fee16` 现在正确传播查询错误，以 `> 0` 明确判断 ready，并移除 probe 中不参与任何门禁的第一次查询。`q6prm` 自己的同步查询及 `-EPROBE_DEFER` 保持不变，所有图管理命令共享的 5 秒超时也没有缩短。刷入后需要确认声卡始终枚举，并比较 audio unit 用时与 `CMD timeout` 次数。
+
+### 11. 让 FastRPC 精确等待真正接管启动门禁
+
+旧配置同时使用 `ConditionPathExists=/dev/fastrpc-adsp` 和 `ExecStartPre=wait-for-adsp-fastrpc`。systemd 在执行等待脚本之前先评估 condition；节点若恰好稍晚出现，`adsprpcd` 会被直接跳过，60 秒的 remoteproc/FastRPC 稳定检测反而永远没有机会运行。这正是启动时序偶发变化时最不希望出现的行为。
+
+本轮移除 `adsprpcd`、`adsprpcd-sensorspd` 的早期 path condition，以及正常启动链中冗余的 `systemd-udev-settle` 依赖。设备基线表明 settle 单元从未实际执行；root daemon 已有连续三次稳定检查，sensor PD 又严格依赖 root daemon、pd-mapper 与 devauth，因此具体设备状态检查比等待全局 udev 队列更准确。底层永久失败时，现有非零退出与 systemd restart 仍会负责恢复。
 
 ## 已确认健康的链路
 

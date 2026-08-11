@@ -49,6 +49,7 @@ CPU 三个 cluster 已经使用 `schedutil`，GPU 和 UFS 空闲时也能降到�
 - SSC 未可查询时让 `iio-sensor-proxy` 启动失败并由 systemd 重试，不再带着半初始化状态进入桌面。
 - MiPPS 在握手前检查 Type-C、PD/PPS、SVID 和 PDO，暂时未就绪时继续重试。
 - FastRPC 服务私有映射 `/odm/etc/sensors/config`，兼容原厂 ADSP 路径，但不污染根目录，也不把 Android persist 分区改为可写。
+- 移除 FastRPC 服务过早执行的 `ConditionPathExists`。现在节点稍晚出现时会进入明确的 remoteproc/FastRPC 稳定等待，而不是在等待脚本运行前就被 systemd 永久跳过。
 - Novatek 触控固件 WDT 自恢复后先等待 ReK 基线状态，再发送 idle/doze 命令。这个缺口在一次约 89 分钟后的真实固件复位中表现为连续 `0xBF` 命令失败。
 
 ### 驱动正确性
@@ -64,7 +65,7 @@ CPU 三个 cluster 已经使用 `schedutil`，GPU 和 UFS 空闲时也能降到�
 
 这项暂时没有直接删除：旧备注指出切回 `auto` 曾连带阻塞共享的 UFS 互连。正确验证需要在可恢复环境里同时抓 RPMh/ICC trace、循环开关相机并做 UFS I/O，不能在无人看管时拿系统盘试错。它会是下一批最值得量化的功耗优化。
 
-音频模块还有一个值得继续追踪、但本轮不宜盲改的延迟：`q6apm` 首次查询 `APM_CMD_GET_SPF_STATE` 时等待 DSP 回包并超时，旧系统因此让 `sheng-audio-modules` 用时 3.517 秒。该查询同时是 `q6prm` 的 ADSP 就绪门禁，而且 Linux 上游仍采用同样的同步语义；直接删掉或缩短可能把“启动慢”变成“声卡偶发缺失”，所以先把它记录为待测项。
+音频模块还有一个值得继续追踪的延迟：`q6apm` 首次查询 `APM_CMD_GET_SPF_STATE` 时等待 DSP 回包并超时，旧系统因此让 `sheng-audio-modules` 用时 3.517 秒。审计还发现查询错误被丢弃后，负 errno 会经 `bool` 转换反而表示“ADSP 已就绪”。本轮已修正错误传播并删除 probe 中结果无人使用的重复查询，但保留 `q6prm` 真正的同步就绪门禁；所有图管理命令共享的 5 秒超时没有被激进缩短。
 
 ## 刷入后的验证方式
 
