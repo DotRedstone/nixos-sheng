@@ -31,6 +31,10 @@
     # toggled, making every 5 GHz BSS disappear until the driver is reloaded.
     unmanaged = [ "interface-name:p2p-dev-wlp1s0" ];
   };
+  # Connectivity is managed asynchronously and no sheng boot service requires
+  # network-online.target. Waiting for carrier delayed graphical.target by
+  # roughly 18 seconds in the measured baseline.
+  systemd.services.NetworkManager-wait-online.wantedBy = lib.mkForce [ ];
   networking.useDHCP = lib.mkDefault true;
 
   time.timeZone = lib.mkDefault "Asia/Shanghai";
