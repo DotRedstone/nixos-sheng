@@ -136,6 +136,22 @@ if [ -r /sys/kernel/debug/wakeup_sources ]; then
 	awk 'NR == 1 || $6 > 0 || $7 > 0 { print }' /sys/kernel/debug/wakeup_sources
 fi
 
+section "camera-runtime-power"
+CAMSS_POWER=/sys/bus/platform/devices/acb7000.isp/power
+if [ -d "$CAMSS_POWER" ]; then
+	for item in control runtime_status runtime_active_time runtime_suspended_time; do
+		read_value "$item" "$CAMSS_POWER/$item"
+	done
+fi
+if [ -r /sys/kernel/debug/interconnect/interconnect_summary ]; then
+	grep -E 'acb7000\.isp|camera_cfg|camnoc_hf|mnoc_hf' \
+		/sys/kernel/debug/interconnect/interconnect_summary 2>/dev/null || true
+fi
+if [ -r /sys/kernel/debug/pm_genpd/pm_genpd_summary ]; then
+	grep -E 'cam_cc_titan_top_gdsc|genpd:[0-9]+:acb7000\.isp' \
+		/sys/kernel/debug/pm_genpd/pm_genpd_summary 2>/dev/null || true
+fi
+
 section "tracing"
 read_value current_tracer /sys/kernel/tracing/current_tracer
 read_value tracing_on /sys/kernel/tracing/tracing_on

@@ -43,6 +43,8 @@ adb shell 'chmod 755 /tmp/collect-hardware-baseline.sh && /tmp/collect-hardware-
 | GPU devfreq | `simple_ondemand`，220–680 MHz，空闲采样为 220 MHz |
 | UFS devfreq | `simple_ondemand`，75–300 MHz，空闲采样为 75 MHz |
 | UFS I/O scheduler | `mq-deadline`，read-ahead 2048 KiB |
+| CAMSS runtime PM | 被现有 workaround 强制为 `on/active`，开机后几乎全程 active |
+| CAMSS interconnect | idle 时仍保留 AHB 与 CAMNOC→DDR 各 2097152 kB/s 投票 |
 | ftrace | `current_tracer=nop` |
 | 温度 | SoC 约 31–36°C，PMIC 约 37°C，电池约 29.7°C |
 | ADSP | `running`，固件为 sheng 原厂 ADSP |
@@ -55,6 +57,8 @@ adb shell 'chmod 755 /tmp/collect-hardware-baseline.sh && /tmp/collect-hardware-
 三秒空闲采样中，各 CPU 的深空闲累计驻留时间约 2.96–3.03 秒。这说明现有调速器和 cpuidle 基本可用，不应在没有能耗仪数据时盲目更换 governor 或抬高最低频率。
 
 GPU 和 UFS 在采样时也都降到了最低 OPP。虽然内核启用了 dynamic ftrace，运行时 tracer 为 `nop`，调用点处于动态 NOP 状态；在驱动仍处于审计阶段时，保留诊断能力比未经基准测试就删掉 ftrace 更合理。
+
+相机链路目前是明显的剩余功耗项。`sheng-camera-modules` 为规避历史上的 CAMSS runtime ICC/RPMh 超时，把 `acb7000.isp` 永久设为 `power/control=on`。实测 Titan Top GDSC 常开，虽然各 IFE 子域和相机时钟能关闭，但空闲时仍向 AHB 和 CAMNOC→DDR 各保留 2097152 kB/s 带宽投票。上游 SM8550 CAMSS 仍使用相同的固定带宽和 runtime suspend 实现，因此不能只改一个数字或直接删除 workaround；后续应在可恢复环境中测试 `auto`、抓取 RPMh/ICC trace，并同时验证 UFS I/O 和相机反复开关。
 
 ## 第一批修改
 
