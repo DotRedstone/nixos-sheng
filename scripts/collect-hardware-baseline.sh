@@ -73,6 +73,38 @@ if command -v systemd-analyze >/dev/null 2>&1; then
 	systemd-analyze critical-chain graphical.target --no-pager 2>&1 || true
 fi
 
+section "hardware-services"
+if command -v systemctl >/dev/null 2>&1; then
+	for unit in \
+		adsprpcd.service \
+		pd-mapper.service \
+		sheng-devauth.service \
+		adsprpcd-sensorspd.service \
+		iio-sensor-proxy.service \
+		sheng-audio-modules.service \
+		sheng-camera-modules.service
+	do
+		printf '[%s]\n' "$unit"
+		systemctl show "$unit" --no-pager \
+			--property=ActiveState,SubState,Result,NRestarts,ExecMainStatus \
+			2>&1 || true
+	done
+fi
+if command -v coredumpctl >/dev/null 2>&1; then
+	printf '\n[coredumps-this-boot]\n'
+	coredumpctl list --since boot --no-pager 2>&1 || true
+fi
+if command -v journalctl >/dev/null 2>&1; then
+	printf '\n[journal-disk-usage]\n'
+	journalctl --disk-usage 2>&1 || true
+fi
+if [ -d /run/pd-mapper-firmware ]; then
+	printf '\n[pd-mapper-firmware]\n'
+	du -sk /run/pd-mapper-firmware 2>/dev/null || true
+	find /run/pd-mapper-firmware -type f -printf '%s %p\n' 2>/dev/null \
+		| sort -n || true
+fi
+
 section "cpu-frequency"
 for policy in /sys/devices/system/cpu/cpufreq/policy[0-9]*; do
 	[ -d "$policy" ] || continue

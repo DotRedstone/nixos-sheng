@@ -32,7 +32,7 @@ stage-1 菜单曾在正常启动时无条件等待，后面的服务又普遍假
 
 CPU 三个 cluster 已经使用 `schedutil`，GPU 和 UFS 空闲时也能降到最低 OPP，8 个 CPU 都能进入深空闲。因此本轮没有换 governor、锁大核或抬最低频率。那些改法容易让短跑分变好，却会直接损害平板的温度和续航。
 
-仓库中的 `scripts/collect-hardware-baseline.sh` 会一次保存启动关键链、频率、cpuidle、温度、UFS、充电、ADSP、USB-C、相机 runtime PM 和内核告警，并脱敏 Android 序列号。
+仓库中的 `scripts/collect-hardware-baseline.sh` 会一次保存启动关键链、频率、cpuidle、温度、UFS、充电、ADSP、USB-C、相机 runtime PM、硬件服务重启次数、当次启动 coredump 和内核告警，并脱敏 Android 序列号。
 
 ## 第一批实际修改
 
