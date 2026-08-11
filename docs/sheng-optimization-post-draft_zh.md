@@ -51,6 +51,7 @@ CPU 三个 cluster 已经使用 `schedutil`，GPU 和 UFS 空闲时也能降到�
 - FastRPC 服务私有映射 `/odm/etc/sensors/config`，兼容原厂 ADSP 路径，但不污染根目录，也不把 Android persist 分区改为可写。
 - 移除 FastRPC 服务过早执行的 `ConditionPathExists`。现在节点稍晚出现时会进入明确的 remoteproc/FastRPC 稳定等待，而不是在等待脚本运行前就被 systemd 永久跳过。
 - Novatek 触控固件 WDT 自恢复后先等待 ReK 基线状态，再发送 idle/doze 命令。这个缺口在一次约 89 分钟后的真实固件复位中表现为连续 `0xBF` 命令失败。
+- 按原厂 DTBO 恢复 `0xa7000000` 的 4 MiB ramoops 区域。此前内核虽启用 pstore，DTS 却没有后端，异常重启后 `/sys/fs/pstore` 永远为空；以后可以跨重启保存最后的 kernel console/pmsg。
 
 ### 驱动正确性
 

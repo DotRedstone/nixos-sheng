@@ -52,6 +52,7 @@ adb shell 'chmod 755 /tmp/collect-hardware-baseline.sh && /tmp/collect-hardware-
 | USB-C/UCSI | charger PD 约 0.87 秒出现，UCSI 约 3.23 秒注册成功 |
 | Wi-Fi | PCIe Gen2 x2，WCN7850/ath12k 正常工作 |
 | 音频 | 2 个 playback、1 个 capture，PipeWire 扬声器 EQ 正常接入 |
+| 持久崩溃日志 | 内核启用了 pstore，但 DTS 缺少 ramoops，`/sys/fs/pstore` 为空 |
 | 休眠统计 | 尚未做安全的 suspend/resume 循环测试 |
 
 三秒空闲采样中，各 CPU 的深空闲累计驻留时间约 2.96–3.03 秒。这说明现有调速器和 cpuidle 基本可用，不应在没有能耗仪数据时盲目更换 governor 或抬高最低频率。
@@ -197,6 +198,18 @@ WirePlumber 把普通 BlueZ 音频与 BlueZ MIDI 定义为独立 monitor。本�
 - 重复开关蓝牙、登录/退出桌面后 WirePlumber 不再产生 coredump。
 - 蓝牙耳机的 A2DP 播放与 HFP 输入仍正常。
 - 日志不再出现 `spa.bluez5.midi` 的 GATT 注册重试。
+
+### 13. 恢复原厂 ramoops 持久崩溃区
+
+保留的 20 次启动日志中没有 kernel panic、watchdog、remoteproc crash 或 UFS/ext4 I/O 错误，但 `/sys/fs/pstore` 始终为空。配置已经启用 `CONFIG_PSTORE_RAM`、console 和 pmsg，真正缺少的是设备树中的保留内存；因此过去的突发重启即使由内核崩溃触发，也无法跨重启留下最后现场。
+
+原厂 sheng DTBO 在所有相关变体中都把 `0xa7000000` 起始的 4 MiB 声明为 ramoops，console 与 pmsg 各 2 MiB。该区域位于 ADSP carveout 结束位置与 `0xa8000000` 内核加载地址之间，当前 `/proc/iomem` 在缺少声明时把它误并入普通 System RAM。内核提交 `1ebcb435f0f8` 按原厂地址和分区恢复该节点，固定牺牲 4 MiB 内存，换取重启后可读取的内核 console/pmsg；不引入 mtdoops 私有驱动，也不会主动制造 panic 做测试。
+
+预期验证：
+
+- 启动日志出现 ramoops/pstore 注册信息，`/proc/iomem` 单独保留 `0xa7000000-0xa73fffff`。
+- 正常重启不会生成虚假 crash 记录。
+- 若未来再次异常重启，第一时间保存 `/sys/fs/pstore/*` 后再做其他操作。
 
 ## 已确认健康的链路
 

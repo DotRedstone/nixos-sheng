@@ -105,6 +105,15 @@ if [ -d /run/pd-mapper-firmware ]; then
 		| sort -n || true
 fi
 
+section "persistent-crash-log"
+if [ -d /sys/fs/pstore ]; then
+	find /sys/fs/pstore -maxdepth 1 -type f -printf '%f %s bytes\n' \
+		2>/dev/null | sort || true
+fi
+if command -v dmesg >/dev/null 2>&1; then
+	dmesg 2>/dev/null | grep -Ei 'pstore|ramoops' | tail -30 || true
+fi
+
 section "cpu-frequency"
 for policy in /sys/devices/system/cpu/cpufreq/policy[0-9]*; do
 	[ -d "$policy" ] || continue
