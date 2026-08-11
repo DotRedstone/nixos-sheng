@@ -74,6 +74,15 @@ for policy in /sys/devices/system/cpu/cpufreq/policy[0-9]*; do
 	done
 done
 
+section "device-frequency"
+for devfreq in /sys/class/devfreq/*; do
+	[ -d "$devfreq" ] || continue
+	printf '[%s]\n' "$(basename "$devfreq")"
+	for item in name governor cur_freq min_freq max_freq available_governors available_frequencies; do
+		read_value "$item" "$devfreq/$item"
+	done
+done
+
 section "idle-residency-${INTERVAL}s"
 collect_cpuidle "$WORKDIR/cpuidle.before"
 sleep "$INTERVAL"
@@ -101,6 +110,15 @@ if command -v zramctl >/dev/null 2>&1; then
 	zramctl 2>&1 || true
 fi
 
+section "storage"
+for blockdev in /sys/block/sd[a-z]; do
+	[ -d "$blockdev" ] || continue
+	printf '[%s]\n' "$(basename "$blockdev")"
+	for item in queue/scheduler queue/read_ahead_kb queue/nr_requests queue/rotational; do
+		read_value "$item" "$blockdev/$item"
+	done
+done
+
 section "power-management"
 read_value state /sys/power/state
 read_value mem_sleep /sys/power/mem_sleep
@@ -109,6 +127,10 @@ read_value suspend_fail /sys/power/suspend_stats/fail
 if [ -r /sys/kernel/debug/wakeup_sources ]; then
 	awk 'NR == 1 || $6 > 0 || $7 > 0 { print }' /sys/kernel/debug/wakeup_sources
 fi
+
+section "tracing"
+read_value current_tracer /sys/kernel/tracing/current_tracer
+read_value tracing_on /sys/kernel/tracing/tracing_on
 
 section "power-supplies"
 for supply in /sys/class/power_supply/*; do

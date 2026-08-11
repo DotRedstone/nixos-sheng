@@ -40,6 +40,10 @@ adb shell 'chmod 755 /tmp/collect-hardware-baseline.sh && /tmp/collect-hardware-
 | systemd 失败单元 | 0 |
 | CPU 调速器 | 三个 cluster 均为 `schedutil` |
 | CPU 空闲状态 | 8 个 CPU 均能进入 `cpu-sleep-0-0` |
+| GPU devfreq | `simple_ondemand`，220–680 MHz，空闲采样为 220 MHz |
+| UFS devfreq | `simple_ondemand`，75–300 MHz，空闲采样为 75 MHz |
+| UFS I/O scheduler | `mq-deadline`，read-ahead 2048 KiB |
+| ftrace | `current_tracer=nop` |
 | 温度 | SoC 约 31–36°C，PMIC 约 37°C，电池约 29.7°C |
 | ADSP | `running`，固件为 sheng 原厂 ADSP |
 | CDSP | `offline`，按需启动，属于预期状态 |
@@ -49,6 +53,8 @@ adb shell 'chmod 755 /tmp/collect-hardware-baseline.sh && /tmp/collect-hardware-
 | 休眠统计 | 尚未做安全的 suspend/resume 循环测试 |
 
 三秒空闲采样中，各 CPU 的深空闲累计驻留时间约 2.96–3.03 秒。这说明现有调速器和 cpuidle 基本可用，不应在没有能耗仪数据时盲目更换 governor 或抬高最低频率。
+
+GPU 和 UFS 在采样时也都降到了最低 OPP。虽然内核启用了 dynamic ftrace，运行时 tracer 为 `nop`，调用点处于动态 NOP 状态；在驱动仍处于审计阶段时，保留诊断能力比未经基准测试就删掉 ftrace 更合理。
 
 ## 第一批修改
 
