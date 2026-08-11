@@ -18,7 +18,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     shengKernelSrc = {
-      url = "github:DotRedstone/linux-sheng/sheng-7.0";
+      url = "github:DotRedstone/linux-sheng/audit/sheng-hardware-optimization";
       flake = false;
     };
     shengFirmware = {
