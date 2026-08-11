@@ -53,6 +53,13 @@
 
   services.openssh.enable = lib.mkDefault true;
 
+  # Keep enough persistent history for cross-boot hardware diagnosis without
+  # letting verbose bring-up logs grow with the full root partition.
+  services.journald.extraConfig = ''
+    SystemMaxUse=512M
+    MaxRetentionSec=14day
+  '';
+
   services.getty = {
     helpLine = ''
       NixOS sheng debug console

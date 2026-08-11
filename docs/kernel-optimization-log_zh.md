@@ -152,6 +152,15 @@ PS5169 的 `remove()` 通过 `i2c_get_clientdata()` 获取驱动私有结构，�
 - `adsprpcd` 不再报告 `/odm/etc/sensors/config` 不存在。
 - SSC 传感器枚举数量与方向、光线、距离数据不回归。
 
+### 8. 限制开发期持久日志占用
+
+基线设备的 persistent journal 已占用约 891 MiB。默认上限会随 77 GiB 根分区增长，对会产生大量驱动 bring-up 日志的移动设备过于宽松。本轮保留跨重启日志，但设置 `SystemMaxUse=512M` 和最长 14 天保留期；不关闭压缩，也不通过激进 rate limit 隐藏硬件错误。
+
+预期验证：
+
+- `journalctl --disk-usage` 在日志轮转后稳定在 512 MiB 以内。
+- `journalctl --list-boots` 仍保留足够的近期冷启动记录用于回归分析。
+
 ## 已确认健康的链路
 
 ```text
