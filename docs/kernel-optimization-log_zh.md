@@ -125,6 +125,29 @@ PS5169 的 `remove()` 通过 `i2c_get_clientdata()` 获取驱动私有结构，�
 - 正常启动和 USB-C 正反插、device/host role 切换无回归。
 - 在用户在场、没有数据传输时单独测试 PS5169 unbind/bind，不再出现 kernel oops。
 
+### 6. 补齐 Novatek 固件复位后的 ReK 等待
+
+长时运行约 89 分钟后，NT36532E 触控固件曾触发一次 WDT 自恢复。驱动成功重新下载固件，但紧接着发送 `0xBF` 自定义命令时连续失败。对照正常 resume 路径后发现，WDT 和 boot update 路径都少了 `RESET_STATE_REK` 等待，可能在固件尚未完成基线重建时过早发送 idle/doze 配置。
+
+本轮让这两条恢复路径与正常 resume 保持一致：固件下载失败或未进入 ReK 状态时停止发送后续模式命令，成功时才恢复 idle baseline 和 doze 配置。没有改变触控坐标、SPI 频率或手势参数。
+
+预期验证：
+
+- 长时间亮屏、熄屏/唤醒后触控保持正常。
+- 若固件再次发生 WDT 复位，日志不再紧跟 `send cmd failed, buf[1] = 0xBF`。
+- 复位失败时保留明确错误，便于区分固件下载失败和 ReK 超时。
+
+### 7. 提供传感器 DSP 需要的 ODM 配置别名
+
+原厂 ADSP 固件启动时会通过 FastRPC 连续枚举 `/odm/etc/sensors/config`。NixOS 已经提供内容对应的 `/etc/sensors/config`，但缺少 Android 的 ODM 路径，因此每次启动出现十次 `failed to opendir`，随后才继续读取主配置目录。
+
+本轮通过 tmpfiles 创建兼容目录，并把 `/odm/etc/sensors/config` 链接到现有只读配置。不复制配置、不改变 ADSP library path，也不让 Android persist 分区可写。
+
+预期验证：
+
+- `adsprpcd` 不再报告 `/odm/etc/sensors/config` 不存在。
+- SSC 传感器枚举数量与方向、光线、距离数据不回归。
+
 ## 已确认健康的链路
 
 ```text
@@ -156,6 +179,8 @@ charger_pd
 
 - 六颗 CS35L43 的 `vpbr-enable` 布尔属性格式告警。
 - WCN power-sequencer 模块加载过晚导致的 PCIe 重复探测窗口。
+- Novatek 固件恢复路径缺少 ReK 等待。
+- ADSP 预期的 `/odm/etc/sensors/config` 兼容路径缺失。
 
 ### 有线索，但暂不猜测
 
@@ -164,6 +189,7 @@ charger_pd
 - WCN7850 的 `vddio1p2` dummy regulator：主线 power-sequencer 要求该名称，但 SM8550 参考 DTS 与 sheng 一样未提供，且现有 Wi-Fi/蓝牙链路可用。后续应先确认 SM8550 封装是否真的有独立 1.2 V IO rail。
 - PCIe 的 `vdda`/`vddpe-3v3` dummy regulator：WCN7850 是板载 endpoint，3.3 V 外设轨是否存在需要硬件依据。
 - GPU 的 `vdd`/`vddcx` dummy regulator：GPU 已由 GMU/RPMh 电源域正常拉起，不能简单把旧版驱动的通用 supply 名映射到任意 rail。
+- `/mnt/vendor/persist/sensors/cam_registry_dump.txt` 只读告警：persist 是 Android 校准分区，当前刻意以只读方式挂载。该文件是可选调试输出，不能为了消除日志把整个校准分区改为可写；如以后确实需要，应只给该路径提供独立的易失性覆盖层。
 
 ### 上游描述或日志差异
 
