@@ -102,6 +102,13 @@ in
     "L+ /usr/share/qcom - - - - /var/lib/qcom"
     "d /usr/lib 0755 root root -"
     "L+ /usr/lib/firmware - - - - /lib/firmware"
+
+    # The stock sensor DSP asks FastRPC to enumerate the Android ODM path.
+    # Expose the same CHRE config there without duplicating mutable data.
+    "d /odm 0755 root root -"
+    "d /odm/etc 0755 root root -"
+    "d /odm/etc/sensors 0755 root root -"
+    "L+ /odm/etc/sensors/config - - - - /etc/sensors/config"
   ];
 
   systemd.services.sheng-sensor-files = {
