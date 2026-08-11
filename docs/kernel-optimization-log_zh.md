@@ -25,7 +25,7 @@ adb push scripts/collect-hardware-baseline.sh /tmp/
 adb shell 'chmod 755 /tmp/collect-hardware-baseline.sh && /tmp/collect-hardware-baseline.sh 10'
 ```
 
-脚本会脱敏 Android 序列号，不采集 SSID、MAC 地址和 IP 地址。公开日志前仍应人工检查一次。
+脚本会脱敏 Android 序列号，不采集 SSID、MAC 地址和 IP 地址，并在同一份报告中保存启动总时间、最慢单元和 `graphical.target` 关键链。公开日志前仍应人工检查一次。
 
 ## 修改前基线
 

@@ -64,6 +64,14 @@ section "systemd"
 if command -v systemctl >/dev/null 2>&1; then
 	systemctl --failed --no-legend --no-pager 2>&1 || true
 fi
+if command -v systemd-analyze >/dev/null 2>&1; then
+	printf '\n[boot-time]\n'
+	systemd-analyze time 2>&1 || true
+	printf '\n[slowest-units]\n'
+	systemd-analyze blame --no-pager 2>&1 | head -30 || true
+	printf '\n[graphical-critical-chain]\n'
+	systemd-analyze critical-chain graphical.target --no-pager 2>&1 || true
+fi
 
 section "cpu-frequency"
 for policy in /sys/devices/system/cpu/cpufreq/policy[0-9]*; do
