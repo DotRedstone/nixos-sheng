@@ -42,6 +42,7 @@ CPU 三个 cluster 已经使用 `schedutil`，GPU 和 UFS 空闲时也能降到�
 - 移除没有消费者的 `NetworkManager-wait-online`，网络继续异步连接。
 - 把 WCN7850 power-sequencer 和 PCI power-control 编进内核，避免 PCIe 从约 0.2 秒开始反复 deferred probe，直到 rootfs 在约 7.7 秒加载模块。
 - 恢复 pd-mapper 正常读取 firmware-class 路径，不再用无效文件描述符制造两条假错误。
+- 将 pd-mapper 的启动解压集从整个 sheng 固件目录收窄到服务映射 JSON 和 `devauth.mbn`。旧系统每次启动在 tmpfs 生成约 46 MiB 重复固件；用设备当前固件复现后，新集合只占 180 KiB。源码审计和二进制字符串确认其余 ADSP/CDSP/VPU 镜像既不由 pd-mapper 读取，也不参与 devauth FastRPC 加载。
 
 ### 恢复能力
 
@@ -62,6 +63,8 @@ CPU 三个 cluster 已经使用 `schedutil`，GPU 和 UFS 空闲时也能降到�
 当前系统为规避历史 CAMSS/RPMh 超时，把相机子系统永久设为 runtime active。实测 Titan Top GDSC 常开，空闲时 AHB 与 CAMNOC→DDR 仍各保留 2097152 kB/s 带宽投票。各 IFE 子域和相机时钟虽然已经关闭，这个固定投票仍可能抬高片上互连和内存功耗。
 
 这项暂时没有直接删除：旧备注指出切回 `auto` 曾连带阻塞共享的 UFS 互连。正确验证需要在可恢复环境里同时抓 RPMh/ICC trace、循环开关相机并做 UFS I/O，不能在无人看管时拿系统盘试错。它会是下一批最值得量化的功耗优化。
+
+音频模块还有一个值得继续追踪、但本轮不宜盲改的延迟：`q6apm` 首次查询 `APM_CMD_GET_SPF_STATE` 时等待 DSP 回包并超时，旧系统因此让 `sheng-audio-modules` 用时 3.517 秒。该查询同时是 `q6prm` 的 ADSP 就绪门禁，而且 Linux 上游仍采用同样的同步语义；直接删掉或缩短可能把“启动慢”变成“声卡偶发缺失”，所以先把它记录为待测项。
 
 ## 刷入后的验证方式
 

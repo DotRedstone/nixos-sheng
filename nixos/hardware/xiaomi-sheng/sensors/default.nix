@@ -159,9 +159,13 @@ in
         mkdir -p /run/pd-mapper-firmware
         rm -rf /run/pd-mapper-firmware/qcom
 
-        # Mirror only the sheng firmware subtree needed by ADSP/CDSP services.
+        # pd-mapper only enumerates service-registry JSON files. Keep the
+        # devauth image too because xiaomi_devauth loads it through FastRPC;
+        # remoteproc firmware is already loaded directly from /lib/firmware.
         cd /run/current-system/firmware
-        find -L ./qcom/sm8550/sheng -name "*.zst" | while read file; do
+        find -L ./qcom/sm8550/sheng \
+          \( -name "*.jsn.zst" -o -name "devauth.mbn.zst" \) \
+          | while read file; do
           mkdir -p "/run/pd-mapper-firmware/$(dirname "$file")"
           zstd -d -f "$file" -o "/run/pd-mapper-firmware/''${file%.zst}"
         done

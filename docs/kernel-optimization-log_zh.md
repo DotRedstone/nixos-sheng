@@ -161,6 +161,25 @@ PS5169 的 `remove()` 通过 `i2c_get_clientdata()` 获取驱动私有结构，�
 - `journalctl --disk-usage` 在日志轮转后稳定在 512 MiB 以内。
 - `journalctl --list-boots` 仍保留足够的近期冷启动记录用于回归分析。
 
+### 9. 缩小 pd-mapper 的启动解压集
+
+旧系统在每次启动时把 `qcom/sm8550/sheng` 下全部 zstd 固件解压到 `/run/pd-mapper-firmware`，实测占用约 46 MiB tmpfs，其中 37 MiB 是已经由 remoteproc 从 `/lib/firmware` 加载过的 `adsp.mbn`，其余大项还有 CDSP 和 VPU 镜像。
+
+固定版本的 pd-mapper 源码只枚举 `.jsn` 和 `.jsn.xz` 服务映射。设备上的 `xiaomi_devauth` 二进制还明确包含 `%s/%s.mbn` 路径并加载 `devauth`，因此本轮保留所有 `*.jsn.zst` 和 `devauth.mbn.zst`，不再复制其余 remoteproc/GPU/VPU/IPA 镜像。用设备当前固件在 `/tmp` 复现同一解压逻辑后，易失目录从约 46 MiB 降到 180 KiB。
+
+预期验证：
+
+- `pd-mapper` 正常发布服务，`sensor_pd` 和 `charger_pd` 映射不回归。
+- `sheng-devauth` 保持运行，Nanosic 键盘认证正常。
+- `/run/pd-mapper-firmware` 只包含五个 `.jsn` 与 `devauth.mbn`。
+- 开机日志不再出现对 ADSP/CDSP/VPU 大镜像的重复解压。
+
+### 10. 保留 q6apm 就绪查询，先量化音频超时
+
+基线中 `sheng-audio-modules.service` 用时 3.517 秒，唯一对应异常是 `qcom-apm` 的 `APM_CMD_GET_SPF_STATE` 同步查询超时。驱动通用同步路径允许最多等待 5 秒，而 `q6prm` probe 随后也依赖同一查询结果判断 ADSP 是否可用。Linux 上游当前仍保留这套语义。
+
+本轮不删除、不缩短这个查询：旧系统虽然打印超时，但声卡最终能够枚举；缺少新内核上的重复启动样本时，贸然优化可能把确定的几秒延迟变成偶发无声。基线脚本已经采集 audio unit 与内核告警，刷入后先确认新的 ADSP 启动时序是否自然消除超时，再决定是否需要驱动层修复。
+
 ## 已确认健康的链路
 
 ```text
