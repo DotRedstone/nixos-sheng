@@ -114,6 +114,17 @@ CONFIG_PCI_PWRCTRL_PWRSEQ=y
 - `pd-mapper` 仍能发布 service-registry 服务，sensor PD 正常启动。
 - 日志不再出现上述两条 sysfs/file-descriptor 假错误。
 
+### 5. 修复 PS5169 解绑时的空指针风险
+
+PS5169 的 `remove()` 通过 `i2c_get_clientdata()` 获取驱动私有结构，但原 `probe()` 没有调用配对的 `i2c_set_clientdata()`。驱动常驻时不一定暴露，一旦通过 sysfs 解绑、重新绑定或设备被移除，remove 路径可能解引用空指针并导致内核崩溃。
+
+本轮在 probe 中保存私有结构。该修改不改变寄存器配置、Type-C 状态机和电源时序，只修复生命周期管理。
+
+预期验证：
+
+- 正常启动和 USB-C 正反插、device/host role 切换无回归。
+- 在用户在场、没有数据传输时单独测试 PS5169 unbind/bind，不再出现 kernel oops。
+
 ## 已确认健康的链路
 
 ```text
