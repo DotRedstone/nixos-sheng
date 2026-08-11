@@ -57,6 +57,7 @@ CPU 三个 cluster 已经使用 `schedutil`，GPU 和 UFS 空闲时也能降到�
 
 - 六颗 CS35L43 恢复原厂 DTBO 明确使用的 standby 策略，并修正布尔属性写法。
 - PS5169 probe 保存 I2C 私有数据，避免 unbind/remove 路径取到空指针。
+- 触觉驱动不再套用 185--215 Hz 的通用 LRA 窗口。sheng 原厂 DTBO 明确给出 6667 us，约为 150 Hz，小米公开的 `sheng-u-oss` 驱动也不会在启动时把它强制改成 205 Hz。这里保留精简后的 Linux FF 接口，只删除与本机执行器冲突的机型专用 workaround。
 
 这些修改都刻意避开了没有硬件依据的 regulator 映射。CS35L43、PS5169、WCN7850、PCIe 和 GPU 仍有 dummy regulator 告警，但原厂 DT 也没有给出对应 rail；随手指向一个“看起来电压差不多”的 PMIC 输出，比保留告警危险得多。
 
@@ -73,7 +74,7 @@ CPU 三个 cluster 已经使用 `schedutil`，GPU 和 UFS 空闲时也能降到�
 ## 刷入后的验证方式
 
 1. 在相近电量、充电状态和室温下做至少三次冷启动，文章只使用中位数。
-2. 检查传感器方向、光线、距离，重复登录 GNOME，确认没有 failed unit 和 coredump。
+2. 检查传感器方向、光线、距离和触觉短振/长振，重复登录 GNOME，确认没有 failed unit 和 coredump。
 3. 做扬声器播放、暂停、再次播放，确认六颗功放恢复无首帧丢失；音质使用同一 PipeWire/EQ 配置做 AB，不用主观记忆跨版本比较。
 4. 低电量下用同一充电器和线材分别测试 USB-PD/PPS、MiPPS 与电脑 C-to-C，记录协商档位和电池端功率。
 5. 用户在场时再做多轮 deep suspend/resume、PS5169 unbind/bind 和 CAMSS runtime-PM 实验。

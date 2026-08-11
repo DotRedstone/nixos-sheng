@@ -211,6 +211,21 @@ WirePlumber 把普通 BlueZ 音频与 BlueZ MIDI 定义为独立 monitor。本�
 - 正常重启不会生成虚假 crash 记录。
 - 若未来再次异常重启，第一时间保存 `/sys/fs/pstore/*` 后再做其他操作。
 
+### 14. 恢复 sheng 原厂 150 Hz 触觉频率
+
+初版 HV haptics 移植同时带入了一段面向另一类 200 Hz LRA 的 workaround：启动时只接受 185--215 Hz，三次校准仍不在范围内就强制写成 205 Hz。sheng 原厂 DTBO 的设备节点却明确使用 `qcom,lra-period-us = <6667>`，对应约 150 Hz；小米公开的 `sheng-u-oss` 驱动在 `haptics_hw_init()` 中也没有这段强制校准。两份一手来源一致，说明该通用 workaround 不适用于本机。
+
+公开源码依据：[MiCode/Xiaomi_Kernel_OpenSource `sheng-u-oss`](https://github.com/MiCode/Xiaomi_Kernel_OpenSource/blob/sheng-u-oss/drivers/input/misc/qcom-hv-haptics.c)。本轮对照提交为 `29db5d592c5b`，对应 Xiaomi Pad 6S Pro Android U 发布分支。
+
+内核提交 `11e0728a488e` 只移除了强制频率窗口，保留主线移植版的其余错误处理、FF 接口和生命周期修复，没有把 RichTap 私有 ABI、厂商异常上报和多机型条件宏重新引入。设备树中的 3600 mV、6667 us、闭环制动和 SDAM 描述继续与 sheng DTBO 一致。
+
+预期验证：
+
+- `qcom-hv-haptics` 成功注册 input force-feedback 设备。
+- 启动日志不再把约 150 Hz 判为异常并强制改成 205 Hz。
+- 短振、长振和连续触发均能停止，不出现过热、杂音或模块卸载崩溃。
+- 实机感受和强度只能在刷入后确认；源码一致性不替代执行器测试。
+
 ## 已确认健康的链路
 
 ```text
@@ -268,6 +283,8 @@ charger_pd
 systemd-analyze time
 systemd-analyze blame --no-pager | head -30
 dmesg | grep -E 'pwrseq|qcom-pcie|PCIe Gen|wcn7850|vpbr-enable|cs35l43'
+dmesg | grep -Ei 'haptics|lra|pstore|ramoops'
+grep -H . /sys/class/input/event*/device/name | grep -Ei 'haptics|vibrator'
 lsmod | grep -E 'pwrseq_qcom_wcn|pci_pwrctrl_pwrseq'
 systemctl --failed
 ```
@@ -287,7 +304,7 @@ systemctl --failed
 
 ## 后续方向
 
-1. 刷入后完成三次冷启动和扬声器播放/暂停恢复测试。
+1. 刷入后完成三次冷启动、触觉短振/长振和扬声器播放/暂停恢复测试。
 2. 在用户在场时执行多轮 deep suspend/resume，记录 wakeup source 和 ADSP/UCSI 恢复。
 3. 对比 Android live DT 与 Linux DTS 的 regulator consumer 映射，只合入能确认 rail 的 supply。
 4. 为 libcamera 缺少的 `ov02b1b`、`ov32d40` IPA tuning 建立独立校准工作，不用未经标定的“算法参数”冒充画质优化。
