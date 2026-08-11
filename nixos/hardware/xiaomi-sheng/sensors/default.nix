@@ -102,13 +102,6 @@ in
     "L+ /usr/share/qcom - - - - /var/lib/qcom"
     "d /usr/lib 0755 root root -"
     "L+ /usr/lib/firmware - - - - /lib/firmware"
-
-    # The stock sensor DSP asks FastRPC to enumerate the Android ODM path.
-    # Expose the same CHRE config there without duplicating mutable data.
-    "d /odm 0755 root root -"
-    "d /odm/etc 0755 root root -"
-    "d /odm/etc/sensors 0755 root root -"
-    "L+ /odm/etc/sensors/config - - - - /etc/sensors/config"
   ];
 
   systemd.services.sheng-sensor-files = {
@@ -144,6 +137,9 @@ in
       ExecStart = "${fastrpc}/bin/adsprpcd";
       Restart = "on-failure";
       RestartSec = "5";
+      # Keep the Android compatibility path private to FastRPC. systemd
+      # creates the destination inside the service mount namespace.
+      BindReadOnlyPaths = [ "/etc/sensors/config:/odm/etc/sensors/config" ];
       Environment = [
         "ADSP_LIBRARY_PATH=/usr/share/qcom/sm8550/Xiaomi/sheng;/run/pd-mapper-firmware;/run/pd-mapper-firmware/qcom/sm8550/sheng;/run/pd-mapper-firmware/rfsa/adsp;/run/current-system/firmware;/lib/firmware;/lib/firmware/qcom/sm8550/sheng;/run/current-system/firmware/rfsa/adsp"
       ];
@@ -207,6 +203,7 @@ in
       ExecStart = "${fastrpc}/bin/adsprpcd sensorspd";
       Restart = "on-failure";
       RestartSec = "5";
+      BindReadOnlyPaths = [ "/etc/sensors/config:/odm/etc/sensors/config" ];
       Environment = [
         "ADSP_LIBRARY_PATH=/usr/share/qcom/sm8550/Xiaomi/sheng;/run/pd-mapper-firmware;/run/pd-mapper-firmware/qcom/sm8550/sheng;/lib/firmware/qcom/sm8550/sheng"
       ];

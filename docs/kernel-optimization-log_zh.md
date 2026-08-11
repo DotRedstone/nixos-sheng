@@ -141,7 +141,7 @@ PS5169 的 `remove()` 通过 `i2c_get_clientdata()` 获取驱动私有结构，�
 
 原厂 ADSP 固件启动时会通过 FastRPC 连续枚举 `/odm/etc/sensors/config`。NixOS 已经提供内容对应的 `/etc/sensors/config`，但缺少 Android 的 ODM 路径，因此每次启动出现十次 `failed to opendir`，随后才继续读取主配置目录。
 
-本轮通过 tmpfiles 创建兼容目录，并把 `/odm/etc/sensors/config` 链接到现有只读配置。不复制配置、不改变 ADSP library path，也不让 Android persist 分区可写。
+本轮只在 `adsprpcd` 和 `adsprpcd-sensorspd` 的 systemd mount namespace 内，把 `/etc/sensors/config` 只读映射为 `/odm/etc/sensors/config`。不在全局根目录创建 Android 路径，不复制配置、不改变 ADSP library path，也不让 Android persist 分区可写。
 
 预期验证：
 
