@@ -103,6 +103,17 @@ CONFIG_PCI_PWRCTRL_PWRSEQ=y
 - 登录界面无需等待 Wi-Fi 关联。
 - 联网、自动重连和 SSH 在网络就绪后照常工作。
 
+### 4. 修正 pd-mapper 的假文件描述符错误
+
+本地 `pd-mapper` 包装曾把 firmware-class 的 sysfs 文件描述符强制替换为 `-1`，以便使用 `/run/pd-mapper-firmware`。上游函数仍会尝试读取和关闭该描述符，因此每次启动都会产生 `Cannot open sysfs path: Success` 和 `Bad file descriptor` 两条误导日志。
+
+设备上的 `/sys/module/firmware_class/parameters/path` 正常存在且当前为空。恢复上游读取逻辑后，它会自然回退到已经替换为 `/run/pd-mapper-firmware` 的默认目录，功能路径不变，也不再伪造一次打开失败。
+
+预期验证：
+
+- `pd-mapper` 仍能发布 service-registry 服务，sensor PD 正常启动。
+- 日志不再出现上述两条 sysfs/file-descriptor 假错误。
+
 ## 已确认健康的链路
 
 ```text
