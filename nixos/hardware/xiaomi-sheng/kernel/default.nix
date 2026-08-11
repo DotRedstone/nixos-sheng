@@ -47,6 +47,11 @@ mobile-nixos.kernel-builder-clang {
     ./0009-ucsi-rdo-current-max-fallback.patch
     ./0010-battmgr-xiaomi-battery-current-sign.patch
     (pkgs.fetchurl {
+      url = "https://raw.githubusercontent.com/batocera-linux/batocera.linux/ee4cad1b1c646c0dfd818c4a9b2903101dfe413d/board/batocera/qualcomm/sm8550/linux_patches/1000-add-qcom-haptics-driver.patch";
+      hash = "sha256-2s1EzbZsWvr5WLZBn1cfSaazy49K1yMwMYjIC9D9D/w=";
+    })
+    ./0011-enable-pm8550b-haptics.patch
+    (pkgs.fetchurl {
       url = "https://github.com/ianchb/sm8550-mainline/commit/b6c3859efdec4e7f51a77e7ae835c1425eb104c5.patch";
       hash = "sha256-GYYDCSYybKU4d8ohZHMh0vEgdT+anUeU5fnskAeT2pI=";
     })

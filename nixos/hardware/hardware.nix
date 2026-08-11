@@ -46,6 +46,7 @@
 
   boot.kernelModules = [
     "qrtr"
+    "qcom-hv-haptics"
   ];
 
   systemd.services.sheng-wifi-modules = {
