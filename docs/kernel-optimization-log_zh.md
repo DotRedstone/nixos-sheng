@@ -186,6 +186,18 @@ PS5169 的 `remove()` 通过 `i2c_get_clientdata()` 获取驱动私有结构，�
 
 本轮移除 `adsprpcd`、`adsprpcd-sensorspd` 的早期 path condition，以及正常启动链中冗余的 `systemd-udev-settle` 依赖。设备基线表明 settle 单元从未实际执行；root daemon 已有连续三次稳定检查，sensor PD 又严格依赖 root daemon、pd-mapper 与 devauth，因此具体设备状态检查比等待全局 udev 队列更准确。底层永久失败时，现有非零退出与 systemd restart 仍会负责恢复。
 
+### 12. 隔离 WirePlumber 的 BlueZ MIDI 崩溃路径
+
+历史日志没有 kernel panic、watchdog、UFS/ext4 I/O 错误或 remoteproc crash，但上一轮启动保留了两次 WirePlumber `SIGSEGV`。两次崩溃前都出现 BlueZ MIDI 对 `GattManager1.RegisterApplication()` 的重复失败，core 映射和调用栈也落在 PipeWire D-Bus SPA 路径。用户目录没有自定义 WirePlumber/PipeWire 配置，当前 ALSA 声卡本身正常，因此这更符合用户态 BLE MIDI monitor 的异常，而不是音频 codec 驱动掉线。
+
+WirePlumber 把普通 BlueZ 音频与 BlueZ MIDI 定义为独立 monitor。本轮仅禁用 `monitor.bluez-midi`，保留 `monitor.bluez`，所以 A2DP、HFP 与 LE Audio 不受影响。sheng 没有内置 MIDI 硬件；若用户确实需要外接 BLE MIDI，可以在个人配置中重新启用并继续向 PipeWire/WirePlumber 上游定位。
+
+预期验证：
+
+- 重复开关蓝牙、登录/退出桌面后 WirePlumber 不再产生 coredump。
+- 蓝牙耳机的 A2DP 播放与 HFP 输入仍正常。
+- 日志不再出现 `spa.bluez5.midi` 的 GATT 注册重试。
+
 ## 已确认健康的链路
 
 ```text

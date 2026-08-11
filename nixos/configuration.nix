@@ -183,6 +183,9 @@
         };
       };
     };
+    wireplumber.extraConfig."91-sheng-disable-bluez-midi" = {
+      "wireplumber.profiles".main."monitor.bluez-midi" = "disabled";
+    };
     wireplumber.extraConfig."92-sheng-speaker-eq" = {
       "wireplumber.profiles" = {
         main = {

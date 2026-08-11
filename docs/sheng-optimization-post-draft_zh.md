@@ -67,6 +67,8 @@ CPU 三个 cluster 已经使用 `schedutil`，GPU 和 UFS 空闲时也能降到�
 
 音频模块还有一个值得继续追踪的延迟：`q6apm` 首次查询 `APM_CMD_GET_SPF_STATE` 时等待 DSP 回包并超时，旧系统因此让 `sheng-audio-modules` 用时 3.517 秒。审计还发现查询错误被丢弃后，负 errno 会经 `bool` 转换反而表示“ADSP 已就绪”。本轮已修正错误传播并删除 probe 中结果无人使用的重复查询，但保留 `q6prm` 真正的同步就绪门禁；所有图管理命令共享的 5 秒超时没有被激进缩短。
 
+历史日志还保留了两次 WirePlumber `SIGSEGV`。它们都发生在 BlueZ MIDI 反复注册 GATT 服务失败之后，core 栈也经过 PipeWire 的 D-Bus SPA 层。系统现在只关闭独立的 BLE MIDI monitor，普通蓝牙音频 monitor、ALSA 声卡和 libcamera monitor 均保持启用。这解释了“音频设备突然消失但重启用户态又恢复”的一部分现象，也避免把用户态会话管理器崩溃误归因于 codec 驱动。
+
 ## 刷入后的验证方式
 
 1. 在相近电量、充电状态和室温下做至少三次冷启动，文章只使用中位数。
