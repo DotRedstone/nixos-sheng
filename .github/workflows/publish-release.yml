@@ -22,7 +22,7 @@ on:
       release_name:
         description: "Release name"
         required: true
-        default: "NixOS Sheng v0.1.2 (kernel 7.0.0)"
+        default: "NixOS Sheng v0.1.2 (kernel 7.1.8)"
       kernel_run_id:
         description: "Run ID for the kernel build (leave empty for latest)"
         required: false
@@ -60,7 +60,7 @@ jobs:
             echo "gnome_rootfs_run=${{ github.event.inputs.gnome_rootfs_run_id }}" >> $GITHUB_OUTPUT
           else
             echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "name=NixOS Sheng ${{ github.ref_name }} (kernel 7.0.0)" >> $GITHUB_OUTPUT
+            echo "name=NixOS Sheng ${{ github.ref_name }} (kernel 7.1.8)" >> $GITHUB_OUTPUT
             echo "kernel_run=" >> $GITHUB_OUTPUT
             echo "minimal_rootfs_run=" >> $GITHUB_OUTPUT
             echo "gnome_rootfs_run=" >> $GITHUB_OUTPUT
