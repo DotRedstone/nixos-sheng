@@ -83,11 +83,41 @@ jobs:
             exit 1
           fi
 
+      - name: Package matching kernel modules
+        run: |
+          set -euo pipefail
+
+          nix --extra-experimental-features "nix-command flakes" \
+            build \
+            './nixos#nixosConfigurations.sheng.config.boot.kernelPackages.kernel' \
+            --out-link out/kernel-package
+
+          kernel_version="$(
+            nix --extra-experimental-features "nix-command flakes" \
+              eval \
+              './nixos#nixosConfigurations.sheng.config.boot.kernelPackages.kernel.modDirVersion' \
+              --raw
+          )"
+          modules_dir="out/kernel-package/lib/modules/$kernel_version"
+          test -d "$modules_dir"
+
+          tar -C out/kernel-package/lib/modules \
+            -czf "out/kernel/sheng-linux-$kernel_version-modules.tar.gz" \
+            "$kernel_version"
+
+          find "$modules_dir" -type f -name 'qcom-hv-haptics.ko*' -print -quit \
+            | grep -q . || {
+              echo "ERROR: qcom-hv-haptics module is missing"
+              exit 1
+            }
+
+          sha256sum out/kernel/* > out/kernel/sha256sums.txt
+
       - name: Upload kernel artifact
         uses: actions/upload-artifact@v4
         with:
           name: sheng-mobile-nixos-boot
-          path: out/kernel/boot_sheng_nixos.img
+          path: out/kernel/
           retention-days: 14
 
       - name: Create release
