@@ -30,6 +30,12 @@
     # Managing the P2P device can leave WCN7850 scans stuck after Wi-Fi is
     # toggled, making every 5 GHz BSS disappear until the driver is reloaded.
     unmanaged = [ "interface-name:p2p-dev-wlp1s0" ];
+    wifi = {
+      # The sheng firmware can stop returning off-channel 5 GHz scan results
+      # after a randomized scan or a power-save transition.
+      scanRandMacAddress = false;
+      powersave = false;
+    };
   };
   # Connectivity is managed asynchronously and no sheng boot service requires
   # network-online.target. Waiting for carrier delayed graphical.target by
