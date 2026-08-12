@@ -49,6 +49,27 @@ mobile-nixos.kernel-builder-clang {
   postConfigure = ''
     echo "===== effective kernel config diagnostics ====="
 
+    require_config() {
+      expected="$1"
+      symbol="''${expected%%=*}"
+      if ! grep -qxF "$expected" build/.config; then
+        echo "ERROR: required sheng kernel option is missing: $expected"
+        grep -nE "^$symbol=|^# $symbol is not set" build/.config || true
+        exit 1
+      fi
+    }
+
+    # These are device/user ABI requirements rather than optional generic
+    # drivers. Keep this list small so accidental config pruning fails early.
+    require_config "CONFIG_COMPAT=y"
+    require_config "CONFIG_KUSER_HELPERS=y"
+    require_config "CONFIG_KERNEL_MODE_NEON=y"
+    require_config "CONFIG_F2FS_FS=m"
+    require_config "CONFIG_EXFAT_FS=m"
+    require_config "CONFIG_VFAT_FS=m"
+    require_config "CONFIG_BTRFS_FS=m"
+    require_config "CONFIG_EROFS_FS=m"
+
     echo "--- io_uring ---"
     grep -nE '^CONFIG_IO_URING=|^# CONFIG_IO_URING is not set' build/.config || true
 
@@ -65,7 +86,7 @@ mobile-nixos.kernel-builder-clang {
     grep -nE '^CONFIG_BRIDGE=|^CONFIG_BRIDGE_NETFILTER=|^CONFIG_NF_TABLES=|^CONFIG_NETFILTER_XTABLES=|^CONFIG_IP6_NF_IPTABLES=' build/.config || true
 
     echo "--- general-purpose userspace and filesystems ---"
-    grep -nE '^CONFIG_BPF_SYSCALL=|^CONFIG_BPF_UNPRIV_DEFAULT_OFF=|^CONFIG_CGROUP_BPF=|^CONFIG_IO_URING=|^CONFIG_ZRAM=|^CONFIG_ZRAM_DEF_COMP=|^CONFIG_FUSE_FS=|^CONFIG_OVERLAY_FS=|^CONFIG_SQUASHFS=|^CONFIG_EROFS_FS=|^CONFIG_NFS_FS=|^CONFIG_NFS_V3=|^CONFIG_NFS_V4=|^CONFIG_CIFS=' build/.config || true
+    grep -nE '^CONFIG_BPF_SYSCALL=|^CONFIG_BPF_UNPRIV_DEFAULT_OFF=|^CONFIG_CGROUP_BPF=|^CONFIG_IO_URING=|^CONFIG_ZRAM=|^CONFIG_ZRAM_DEF_COMP=|^CONFIG_FUSE_FS=|^CONFIG_OVERLAY_FS=|^CONFIG_SQUASHFS=|^CONFIG_EROFS_FS=|^CONFIG_F2FS_FS=|^CONFIG_EXFAT_FS=|^CONFIG_VFAT_FS=|^CONFIG_BTRFS_FS=|^CONFIG_UDF_FS=|^CONFIG_NFS_FS=|^CONFIG_NFS_V3=|^CONFIG_NFS_V4=|^CONFIG_CIFS=' build/.config || true
 
     echo "--- usb/input config ---"
     grep -nE '^(CONFIG_USB=|CONFIG_USB_COMMON=|CONFIG_USB_XHCI_HCD=|CONFIG_USB_XHCI_PLATFORM=|CONFIG_USB_DWC3=|CONFIG_USB_DWC3_QCOM=|CONFIG_USB_ROLE_SWITCH=|CONFIG_TYPEC=|CONFIG_TYPEC_UCSI=|CONFIG_UCSI_PMIC_GLINK=|CONFIG_QCOM_PMIC_GLINK=|CONFIG_QCOM_PMIC_GLINK_ALT_MODE=|CONFIG_QCOM_PDR_HELPERS=|CONFIG_QCOM_PD_MAPPER=|CONFIG_QRTR=|CONFIG_HID=|CONFIG_HID_GENERIC=|CONFIG_USB_HID=|CONFIG_INPUT_EVDEV=|CONFIG_USB_STORAGE=)' build/.config || true
