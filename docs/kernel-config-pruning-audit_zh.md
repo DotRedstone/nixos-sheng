@@ -61,7 +61,15 @@
 内核 `postConfigure` 阶段现在会检查最终 `build/.config`，而不是只相信源配置文件。以下关键项若被误剪或被 Kconfig 依赖改写，构建会立即失败并打印对应配置：
 
 - AArch32 兼容和 kernel-mode NEON；
-- F2FS、exFAT、VFAT、Btrfs、EROFS。
+- F2FS、exFAT、VFAT、Btrfs、EROFS；
+- PREEMPT、cluster scheduler、uclamp、Energy Model、MGLRU、PSCI cpuidle 和 Qualcomm CPUFreq；
+- RPMh、SM8550 interconnect、UFS PHY/host、Q6V5 remoteproc、PDR/PD Mapper、QRTR 和 FastRPC；
+- PMIC GLINK、UCSI、PS5169 Type-C mux、电池、温度、MSM DRM；
+- sheng 的音频 machine driver/codec、触控与两个相机传感器模块。
+
+这些断言读取 `olddefconfig` 之后的最终 `.config`。它们不会增加新驱动或改变频率、电压、
+thermal trip；作用是让一次上游 Kconfig 依赖变化在 CI 中直接失败，而不是生成一个能够启动、
+但缺少充电、传感器、音频或休眠能力的 boot 镜像。
 
 ## 预期影响
 
@@ -71,3 +79,7 @@
 - 后续配置错误会在 CI 阶段暴露，不必刷机后再排查。
 
 本次没有直接追求最小配置。当前有效配置约 2998 个启用项，Linux 仓库提供的 SM8550 基线约 3004 个，规模接近。后续若继续减小内核，应从已验证的设备基线生成配置片段，并按启动、音频、充电、传感器、相机和休眠链路分批验证，而不应继续根据单次编译错误直接关闭整组功能。
+
+实机复查还确认三个 CPU cluster 使用 `schedutil`，各 CPU 都累计进入 PSCI 深空闲状态，
+GPU 与 UFS 在空闲时分别降到 220 MHz 和 75 MHz。当前没有抬高最低频率或替换 governor 的
+证据；这类改动会用待机功耗换取难以量化的瞬时响应，故不纳入本轮优化。

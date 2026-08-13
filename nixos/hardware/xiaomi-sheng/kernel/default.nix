@@ -70,6 +70,46 @@ mobile-nixos.kernel-builder-clang {
     require_config "CONFIG_BTRFS_FS=m"
     require_config "CONFIG_EROFS_FS=m"
 
+    # These groups can disappear without making the image unbootable. Check
+    # the effective Kconfig so dependency changes fail in CI instead of later
+    # showing up as a missing tablet function.
+    require_config "CONFIG_PREEMPT=y"
+    require_config "CONFIG_NO_HZ_IDLE=y"
+    require_config "CONFIG_SCHED_CLUSTER=y"
+    require_config "CONFIG_UCLAMP_TASK=y"
+    require_config "CONFIG_ENERGY_MODEL=y"
+    require_config "CONFIG_LRU_GEN=y"
+    require_config "CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y"
+    require_config "CONFIG_ARM_QCOM_CPUFREQ_HW=y"
+    require_config "CONFIG_ARM_PSCI_CPUIDLE=y"
+    require_config "CONFIG_QCOM_RPMH=y"
+    require_config "CONFIG_QCOM_RPMHPD=y"
+    require_config "CONFIG_INTERCONNECT_QCOM_SM8550=y"
+
+    require_config "CONFIG_SCSI_UFS_QCOM=y"
+    require_config "CONFIG_PHY_QCOM_QMP_UFS=y"
+    require_config "CONFIG_QCOM_Q6V5_PAS=y"
+    require_config "CONFIG_QCOM_PDR_HELPERS=y"
+    require_config "CONFIG_QCOM_PD_MAPPER=y"
+    require_config "CONFIG_QRTR=y"
+    require_config "CONFIG_QRTR_SMD=y"
+    require_config "CONFIG_QCOM_FASTRPC=y"
+
+    require_config "CONFIG_QCOM_PMIC_GLINK=y"
+    require_config "CONFIG_UCSI_PMIC_GLINK=y"
+    require_config "CONFIG_TYPEC_MUX_PS5169=y"
+    require_config "CONFIG_BATTERY_QCOM_BATTMGR=y"
+    require_config "CONFIG_QCOM_TSENS=y"
+    require_config "CONFIG_QCOM_SPMI_TEMP_ALARM=y"
+    require_config "CONFIG_DRM_MSM=y"
+
+    require_config "CONFIG_SND_SOC_SC8280XP=m"
+    require_config "CONFIG_SND_SOC_WCD938X_SDW=m"
+    require_config "CONFIG_SND_SOC_CS35L43_I2C=m"
+    require_config "CONFIG_TOUCHSCREEN_NT36532E_SPI=m"
+    require_config "CONFIG_VIDEO_S5KJN1_SHENG=m"
+    require_config "CONFIG_VIDEO_OV32D40=m"
+
     echo "--- io_uring ---"
     grep -nE '^CONFIG_IO_URING=|^# CONFIG_IO_URING is not set' build/.config || true
 
