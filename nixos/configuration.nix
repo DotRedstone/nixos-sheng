@@ -172,6 +172,7 @@
         --setenv=HOME=/root \
         --setenv=USER=root \
         --setenv=LOGNAME=root \
+        --setenv=PATH=${lib.makeBinPath [ pkgs.coreutils pkgs.gitMinimal pkgs.nix pkgs.systemd ]} \
         ${config.system.build.nixos-rebuild}/bin/nixos-rebuild switch --flake "$flake_ref"
     '';
     sheng-alsa-ucm = pkgs.runCommand "sheng-alsa-ucm" { } ''
