@@ -10,6 +10,11 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
+  push:
+    branches:
+      - "fix/q6v5-smp2p-irq-storm"
+    paths:
+      - ".github/workflows/extract-boot-artifact.yml"
   workflow_dispatch:
     inputs:
       kernel_run_id:
@@ -25,13 +30,36 @@ jobs:
       actions: read
 
     steps:
+      - name: Select kernel run
+        id: source
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REQUESTED_RUN: ${{ inputs.kernel_run_id }}
+        run: |
+          set -euo pipefail
+          run_id="$REQUESTED_RUN"
+          if [ -z "$run_id" ]; then
+            run_id="$(
+              gh run list \
+                --repo "$GITHUB_REPOSITORY" \
+                --workflow kernel.yml \
+                --branch "$GITHUB_REF_NAME" \
+                --status success \
+                --limit 1 \
+                --json databaseId \
+                --jq '.[0].databaseId'
+            )"
+          fi
+          test -n "$run_id"
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+
       - name: Download kernel artifact
         uses: actions/download-artifact@v4
         with:
           name: sheng-mobile-nixos-boot
           path: kernel-artifact
           repository: ${{ github.repository }}
-          run-id: ${{ inputs.kernel_run_id }}
+          run-id: ${{ steps.source.outputs.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Verify and select boot image
