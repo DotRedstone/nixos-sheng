@@ -66,7 +66,13 @@ jobs:
         run: |
           set -euo pipefail
           cd kernel-artifact
-          sha256sum -c sha256sums.txt
+          for file in boot_sheng_nixos.img sheng-linux-*-modules.tar.gz; do
+            test -f "$file"
+            expected="$(awk -v name="/$file" '$2 ~ name "$" { print $1 }' sha256sums.txt)"
+            test -n "$expected"
+            actual="$(sha256sum "$file" | awk '{ print $1 }')"
+            test "$actual" = "$expected"
+          done
           test -f boot_sheng_nixos.img
           mkdir -p ../boot-only
           cp boot_sheng_nixos.img ../boot-only/
