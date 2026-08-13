@@ -10,11 +10,6 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
-  push:
-    branches:
-      - "fix/q6v5-smp2p-irq-storm"
-    paths:
-      - ".github/workflows/extract-boot-artifact.yml"
   workflow_dispatch:
     inputs:
       kernel_run_id:
