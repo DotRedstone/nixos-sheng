@@ -124,6 +124,56 @@
       sync
       systemctl reboot
     '';
+    sheng-nixos-rebuild = pkgs.writeShellScriptBin "sheng-nixos-rebuild" ''
+      set -eu
+
+      if [ "$(id -u)" -ne 0 ]; then
+        echo "Run this command with sudo." >&2
+        exit 1
+      fi
+
+      if [ "$#" -ne 1 ]; then
+        echo "Usage: sheng-nixos-rebuild PATH#CONFIGURATION" >&2
+        exit 2
+      fi
+
+      case "$1" in
+        *#*) flake_path="''${1%%#*}" ;;
+        *)
+          echo "The flake reference must include #CONFIGURATION." >&2
+          exit 2
+          ;;
+      esac
+
+      flake_path="$(realpath "$flake_path")"
+      flake_ref="$flake_path#''${1#*#}"
+      repo_root="$(${pkgs.gitMinimal}/bin/git -c safe.directory='*' \
+        -C "$flake_path" rev-parse --show-toplevel)"
+
+      export HOME=/root
+      mkdir -p "$HOME"
+      if ! ${pkgs.gitMinimal}/bin/git config --global --get-all safe.directory \
+          | grep -Fxq "$repo_root"; then
+        ${pkgs.gitMinimal}/bin/git config --global --add safe.directory "$repo_root"
+      fi
+
+      unit="sheng-nixos-rebuild-$(date +%Y%m%d-%H%M%S)"
+      echo "Starting $unit.service"
+      echo "Follow progress with: journalctl -fu $unit.service"
+
+      # Activation restarts adbd when its unit changes. Run the complete rebuild
+      # under PID 1 so losing the invoking ADB session cannot abort the switch.
+      systemd-run \
+        --unit="$unit" \
+        --description="Build and activate a sheng stage-2 generation" \
+        --collect \
+        --property=Type=exec \
+        --property=TimeoutStartSec=infinity \
+        --setenv=HOME=/root \
+        --setenv=USER=root \
+        --setenv=LOGNAME=root \
+        ${config.system.build.nixos-rebuild}/bin/nixos-rebuild switch --flake "$flake_ref"
+    '';
     sheng-alsa-ucm = pkgs.runCommand "sheng-alsa-ucm" { } ''
       install -Dm0644 ${./hardware/audio/ucm2/conf.d/sm8550/Xiaomi-Pad6SPro.conf} \
         $out/share/alsa/ucm2/conf.d/sm8550/Xiaomi-Pad6SPro.conf
@@ -132,6 +182,7 @@
     '';
   in with pkgs; [
     sheng-check
+    sheng-nixos-rebuild
     sheng-reboot-generation-menu
     sheng-alsa-ucm
     alsa-ucm-conf

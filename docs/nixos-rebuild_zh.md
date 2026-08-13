@@ -76,8 +76,14 @@ sudo nixos-rebuild test --flake ./nixos#sheng-stage2
 确认网络、桌面和硬件服务后，再设为默认 stage-2 世代：
 
 ```sh
-sudo nixos-rebuild switch --flake ./nixos#sheng-stage2
+sudo sheng-nixos-rebuild "$PWD/nixos#sheng-stage2"
 ```
+
+`sheng-nixos-rebuild` 会让 systemd 以独立的 transient service 完成整个构造和
+激活过程。切换过程中即使 `adbd.service` 因配置变化而重启、当前 ADB 会话断开，
+更新也不会随远程 shell 一起被终止。命令会打印本次 unit 名称；可用对应的
+`journalctl -fu <unit>.service` 查看进度。通过本地终端执行时，仍可直接使用
+`sudo nixos-rebuild switch --flake ./nixos#sheng-stage2`。
 
 ## 世代与回滚
 
