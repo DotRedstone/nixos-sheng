@@ -18,7 +18,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     shengKernelSrc = {
-      url = "github:DotRedstone/linux-sheng/upgrade/sheng-7.1.8";
+      url = "github:DotRedstone/linux-sheng/fix/q6v5-smp2p-irq-storm";
       flake = false;
     };
     shengFirmware = {
