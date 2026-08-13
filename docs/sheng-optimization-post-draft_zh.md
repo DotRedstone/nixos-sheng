@@ -63,9 +63,7 @@ CPU 三个 cluster 已经使用 `schedutil`，GPU 和 UFS 空闲时也能降到�
 
 ## 意外发现的续航大项
 
-当前系统为规避历史 CAMSS/RPMh 超时，把相机子系统永久设为 runtime active。实测 Titan Top GDSC 常开，空闲时 AHB 与 CAMNOC→DDR 仍各保留 2097152 kB/s 带宽投票。各 IFE 子域和相机时钟虽然已经关闭，这个固定投票仍可能抬高片上互连和内存功耗。
-
-这项暂时没有直接删除：旧备注指出切回 `auto` 曾连带阻塞共享的 UFS 互连。正确验证需要在可恢复环境里同时抓 RPMh/ICC trace、循环开关相机并做 UFS I/O，不能在无人看管时拿系统盘试错。它会是下一批最值得量化的功耗优化。
+当前系统过去为规避历史 CAMSS/RPMh 超时，把相机子系统永久设为 runtime active。更新到 7.1.8 并修复 Q6V5 启动中断后，在持续读取 UFS 根分区的同时完成了 120 次 CAMSS runtime PM 循环，没有出现新的 RPMh、ICC 或 UFS 错误。恢复 `auto` 后，AHB 与 CAMNOC→DDR 的 CAMSS 投票都从 2097152 kB/s 降为 0，Titan Top GDSC 也从常开进入 `off-0`。启动服务因此不再保留旧 workaround，并会确认 CAMSS 已真正挂起。
 
 音频模块还有一个值得继续追踪的延迟：`q6apm` 首次查询 `APM_CMD_GET_SPF_STATE` 时等待 DSP 回包并超时，旧系统因此让 `sheng-audio-modules` 用时 3.517 秒。审计还发现查询错误被丢弃后，负 errno 会经 `bool` 转换反而表示“ADSP 已就绪”。本轮已修正错误传播并删除 probe 中结果无人使用的重复查询，但保留 `q6prm` 真正的同步就绪门禁；所有图管理命令共享的 5 秒超时没有被激进缩短。
 
@@ -77,7 +75,7 @@ CPU 三个 cluster 已经使用 `schedutil`，GPU 和 UFS 空闲时也能降到�
 2. 检查传感器方向、光线、距离和触觉短振/长振，重复登录 GNOME，确认没有 failed unit 和 coredump。
 3. 做扬声器播放、暂停、再次播放，确认六颗功放恢复无首帧丢失；音质使用同一 PipeWire/EQ 配置做 AB，不用主观记忆跨版本比较。
 4. 低电量下用同一充电器和线材分别测试 USB-PD/PPS、MiPPS 与电脑 C-to-C，记录协商档位和电池端功率。
-5. 用户在场时再做多轮 deep suspend/resume、PS5169 unbind/bind 和 CAMSS runtime-PM 实验。
+5. 用户在场时再做多轮 deep suspend/resume 和 PS5169 unbind/bind 实验。
 
 ## 当前结论
 

@@ -175,23 +175,21 @@
         ${pkgs.kmod}/bin/modprobe "$module" || true
       done
 
-      # Repeated CAMSS runtime ICC votes can time out in RPMh and block the
-      # shared UFS interconnect path. Keep CAMSS active after it binds.
       camss_power=/sys/bus/platform/devices/acb7000.isp/power
       attempt=0
       while [ "$attempt" -lt 100 ]; do
         attempt=$((attempt + 1))
         if [ -w "$camss_power/control" ]; then
-          echo on > "$camss_power/control"
+          echo auto > "$camss_power/control"
           read -r runtime_status < "$camss_power/runtime_status"
-          if [ "$runtime_status" = active ]; then
+          if [ "$runtime_status" = suspended ]; then
             exit 0
           fi
         fi
         ${pkgs.coreutils}/bin/sleep 0.1
       done
 
-      echo "CAMSS runtime power did not become active" >&2
+      echo "CAMSS runtime power did not suspend" >&2
       exit 1
     '';
   };
