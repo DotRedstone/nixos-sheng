@@ -40,6 +40,7 @@ CPU 三个 cluster 已经使用 `schedutil`，GPU 和 UFS 空闲时也能降到�
 
 - 只有用户明确请求，或确实需要选择多个 generation 时才显示 stage-1 菜单。
 - charger 模式且电量不高于 2% 时留在低功耗 stage-1 充到 5%，不再 30 秒后强行启动桌面并触发 brownout 循环。
+- rootfs 仅由 stage-1 在离线 fsck 后按需扩到既有 `linux` 分区；stage-2 不再对 Android GPT 运行 growpart，也不再对同尺寸 ext4 做在线 resize。
 - 移除没有消费者的 `NetworkManager-wait-online`，网络继续异步连接。
 - 把 WCN7850 power-sequencer 和 PCI power-control 编进内核，避免 PCIe 从约 0.2 秒开始反复 deferred probe，直到 rootfs 在约 7.7 秒加载模块。
 - 恢复 pd-mapper 正常读取 firmware-class 路径，不再用无效文件描述符制造两条假错误。

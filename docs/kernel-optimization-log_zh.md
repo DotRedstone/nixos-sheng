@@ -258,6 +258,23 @@ GNOME、Wi-Fi 和蓝牙启动后，电池净电流转为放电，随后 brownout
 离线时仍会直接关机，避免无外部供电时继续耗尽电池。这样不会要求 Android 根分区可写，
 也不会在关机充电场景中反复启动完整用户态。
 
+### 17. 只在 stage-1 离线检查并扩展 rootfs
+
+只读故障现场确认根分区目录元数据损坏：ext4 在读取 Nix store 源码目录时报告
+`EFSCORRUPTED`，随后按 `errors=remount-ro` 中止 journal 并切为只读。没有同时出现
+UFS timeout、abort 或 I/O error，因此现有证据不能把损坏归因于 UFS 驱动；下一次启动的
+stage-1 `e2fsck` 已成功修复文件系统。
+
+审计同时发现每次启动存在两套扩容：Mobile NixOS stage-1 已在挂载前比较 ext4 与
+`linux` 分区并按需扩展，stage-2 却仍启用面向云镜像的 `growpart` 和
+`systemd-growfs-root`。现场分区没有可扩空间，growpart 每次返回 `NOCHANGE`，growfs
+仍在线执行一次 `20379131 -> 20379131` 的同尺寸 resize。它尚不能被证明是损坏根因，
+但在 Android GPT 上反复探测分区表和触碰已满尺寸 ext4 元数据没有收益。
+
+本轮保留 stage-1 的离线 `e2fsck` 与首次按需扩展，明确关闭 stage-2 的 growpart，
+并 mask `systemd-growfs-root.service`。新镜像刷入较大的既有 `linux` 分区时仍会在首次
+挂载前扩满；后续启动不再操作 Android 分区表，也不再在线重复 resize。
+
 ```text
 ADSP remoteproc
   -> charger_pd / sensor_pd PDR

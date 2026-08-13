@@ -126,6 +126,12 @@ in
     options = [ "noatime" ];
   };
 
+  # Mobile NixOS stage-1 already checks the offline filesystem and expands it
+  # to the existing linux partition. Do not run cloud-image partition growth
+  # or a second online ext4 resize after switch-root on this Android GPT.
+  boot.growPartition = lib.mkForce false;
+  systemd.units."systemd-growfs-root.service".enable = false;
+
   mobile.boot.stage-1 = {
     compression = "gzip";
     crashToBootloader = false;
