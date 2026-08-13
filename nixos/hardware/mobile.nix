@@ -143,7 +143,8 @@ in
         enable = true;
         critical_capacity = 2;
         boot_capacity = 5;
-        # Stage-2 starts the services that negotiate useful charging current.
+        # A normal boot may continue after this timeout. Charger-mode boots
+        # stay in low-power stage-1 until the battery reaches boot_capacity.
         max_wait_seconds = 30;
       };
     };

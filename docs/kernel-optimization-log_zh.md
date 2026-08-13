@@ -246,6 +246,18 @@ systemd 重启整个 sensor PD daemon。IIO 仍保留同一短门禁作为防御
 SSC 查询成功、两个单元 active，并输出恢复耗时。该修复不会写 remoteproc sysfs，
 也不会在无人值守时重置 ADSP；若 DSP 内部状态已经卡死，仍应先保存日志并做冷启动验证。
 
+### 16. 低电量 charger 启动不再超时进入完整桌面
+
+设备在 1%、约 3.53 V 时复现了完整启动循环：bootloader 以
+`androidboot.mode=charger` 拉起 NixOS，stage-1 只预充 30 秒便切到 stage-2；
+GNOME、Wi-Fi 和蓝牙启动后，电池净电流转为放电，随后 brownout，又被 USB 再次拉起。
+这条循环没有 pstore 崩溃记录，也没有新的 ext4/UFS 错误，并非 A/B 分区损坏。
+
+本轮保留普通启动的 30 秒兜底，但 charger-mode 启动在外接电源在线时不再超时，
+而是保持黑屏、低功耗 stage-1，直到电量达到 5% 才进入桌面。充电器连续三次检测为
+离线时仍会直接关机，避免无外部供电时继续耗尽电池。这样不会要求 Android 根分区可写，
+也不会在关机充电场景中反复启动完整用户态。
+
 ```text
 ADSP remoteproc
   -> charger_pd / sensor_pd PDR
