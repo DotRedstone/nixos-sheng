@@ -7,6 +7,17 @@
 # ---
 set -euo pipefail
 
+work=
+
+cleanup() {
+  if [[ -n ${work:-} && -d $work ]]; then
+    chmod -R u+w "$work" 2>/dev/null || true
+    rm -rf "$work"
+  fi
+}
+
+trap cleanup EXIT
+
 usage() {
   cat <<'EOF'
 Usage: scripts/inspect-bootimg.sh path/to/boot.img
@@ -121,7 +132,8 @@ json_get_bool() {
   local expected=$4
 
   if have jq; then
-    jq -r "$jq_expr // \"missing\"" "$config" 2>/dev/null || echo "missing"
+    jq -r "($jq_expr) as \$value | if \$value == null then \"missing\" else \$value end" \
+      "$config" 2>/dev/null || echo "missing"
   else
     if grep -Eq "$grep_pattern" "$config"; then
       echo "$expected"
@@ -129,6 +141,20 @@ json_get_bool() {
       echo "missing"
     fi
   fi
+}
+
+find_boot_config() {
+  local initrd=$1
+
+  find "$initrd" -type f \
+    \( -path '*/etc/boot/config' -o -name '*-boot-config' \) \
+    -print -quit
+}
+
+find_sheng_stage1_task() {
+  local initrd=$1
+
+  find "$initrd" -type f -name '*sheng-headless-stage1.rb' -print -quit
 }
 
 main() {
@@ -148,9 +174,7 @@ main() {
     die "need one boot image unpacker: unpack_bootimg, magiskboot, or abootimg"
   fi
 
-  local work
   work=$(mktemp -d)
-  trap 'rm -rf "$work"' EXIT
 
   local unpack_dir=$work/unpacked
   local initrd_dir=$work/initrd
@@ -192,25 +216,27 @@ main() {
     fi
   )
 
-  local config=$initrd_dir/etc/boot/config
-  print_section "/etc/boot/config"
-  if [[ -f $config ]]; then
+  local config
+  config=$(find_boot_config "$initrd_dir")
+  print_section "Boot config"
+  if [[ -n $config && -f $config ]]; then
+    echo "config: ${config#"$initrd_dir"/}"
     if have jq; then
       jq . "$config" || cat "$config"
     else
       cat "$config"
     fi
   else
-    echo "missing: etc/boot/config"
+    echo "missing: boot config"
   fi
 
   print_section "Config grep"
-  if [[ -f $config ]]; then
+  if [[ -n $config && -f $config ]]; then
     grep -nE 'boot_as_recovery|splash|bootFileSystems|autoResize|boot\.usb\.features|kernel\.modules|modules' "$config" || true
   fi
 
   print_section "Conclusion"
-  if [[ -f $config ]]; then
+  if [[ -n $config && -f $config ]]; then
     local boot_as_recovery
     local auto_resize
     local splash_disabled
@@ -222,15 +248,26 @@ main() {
     echo "root autoResize: $auto_resize"
     echo "splash.disabled: $splash_disabled"
   else
-    echo "boot_as_recovery: unknown (missing config)"
-    echo "root autoResize: unknown (missing config)"
-    echo "splash.disabled: unknown (missing config)"
+    echo "boot_as_recovery: unknown (missing boot config)"
+    echo "root autoResize: unknown (missing boot config)"
+    echo "splash.disabled: unknown (missing boot config)"
   fi
 
-  if [[ -e $initrd_dir/applets/boot-selection.mrb ]]; then
-    echo "boot-selection.mrb: present"
+  local stage1_task
+  stage1_task=$(find_sheng_stage1_task "$initrd_dir")
+  if [[ -n $stage1_task ]]; then
+    echo "sheng stage-1 task: ${stage1_task#"$initrd_dir"/}"
+    grep -q 'charger_boot ? "without a timeout"' "$stage1_task" \
+      && echo "charger-mode precharge: present" \
+      || echo "charger-mode precharge: missing"
+    grep -q 'restore_display()' "$stage1_task" \
+      && echo "precharge display restore: present" \
+      || echo "precharge display restore: missing"
+    grep -q 'explicit_request = ShengHeadlessGenerationMenu.requested?' "$stage1_task" \
+      && echo "explicit generation menu gate: present" \
+      || echo "explicit generation menu gate: missing"
   else
-    echo "boot-selection.mrb: missing"
+    echo "sheng stage-1 task: missing"
   fi
 
   if find "$initrd_dir" -maxdepth 4 \( -type f -o -type l \) | grep -Ei '/adb(d)?$|ffs\.adb|gadget' >/dev/null; then
