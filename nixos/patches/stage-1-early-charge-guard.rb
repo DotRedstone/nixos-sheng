@@ -194,6 +194,9 @@ module ShengEarlyChargeGuard
     end
 
     $logger.info("Early charge guard: battery reached #{capacity}%; continuing boot.") if target_reached
-    restore_display() unless charger_boot
+    # Both paths leave stage-1 and continue into the graphical system. Restore
+    # what we blanked even for a charger-mode boot that reached the threshold;
+    # otherwise the successful boot can inherit a black panel.
+    restore_display()
   end
 end
