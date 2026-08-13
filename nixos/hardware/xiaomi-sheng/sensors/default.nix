@@ -62,6 +62,22 @@ let
     echo "ADSP FastRPC did not settle in time" >&2
     exit 1
   '';
+  wait-for-sheng-ssc = pkgs.writeShellScript "wait-for-sheng-ssc" ''
+    set -eu
+
+    for attempt in $(seq 1 6); do
+      if ${libssc}/bin/ssccli --sensor light --timeout 1 >/dev/null 2>&1; then
+        echo "sheng SSC is queryable after attempt $attempt"
+        exit 0
+      fi
+
+      echo "waiting for sheng SSC service ($attempt/6)"
+      sleep 1
+    done
+
+    echo "sheng SSC service did not become queryable in time" >&2
+    exit 1
+  '';
 
 in
 {
@@ -200,8 +216,12 @@ in
     serviceConfig = {
       Type = "exec";
       ExecStart = "${fastrpc}/bin/adsprpcd sensorspd";
+      # Opening the static PD handle does not guarantee that SSC is registered.
+      # Keep this unit activating until an actual sensor query succeeds.
+      ExecStartPost = wait-for-sheng-ssc;
       Restart = "on-failure";
       RestartSec = "5";
+      TimeoutStartSec = 20;
       BindReadOnlyPaths = [ "/etc/sensors/config:/odm/etc/sensors/config" ];
       Environment = [
         "ADSP_LIBRARY_PATH=/usr/share/qcom/sm8550/Xiaomi/sheng;/run/pd-mapper-firmware;/run/pd-mapper-firmware/qcom/sm8550/sheng;/lib/firmware/qcom/sm8550/sheng"
@@ -217,7 +237,7 @@ in
     SUBSYSTEM=="misc", KERNEL=="fastrpc-adsp*", ENV{IIO_SENSOR_PROXY_TYPE}+="ssc-accel ssc-proximity ssc-light ssc-compass", ENV{ACCEL_MOUNT_MATRIX}="0, 1, 0; -1, 0, 0; 0, 0, -1", TAG+="systemd", ENV{SYSTEMD_WANTS}+="iio-sensor-proxy.service"
   '';
 
-  # 7. Ensure iio-sensor-proxy is enabled and starts after SSC is queryable.
+  # 7. Start iio-sensor-proxy only after the sensor PD readiness gate passes.
   hardware.sensor.iio.enable = lib.mkDefault true;
   systemd.services.iio-sensor-proxy = {
     after = [ "adsprpcd-sensorspd.service" ];
@@ -227,19 +247,7 @@ in
       StartLimitBurst = 20;
     };
     serviceConfig = {
-      ExecStartPre = pkgs.writeShellScript "wait-for-sheng-ssc" ''
-        for attempt in $(seq 1 6); do
-          if ${libssc}/bin/ssccli --sensor light --timeout 1 >/dev/null 2>&1; then
-            echo "sheng SSC is queryable after attempt $attempt"
-            exit 0
-          fi
-          echo "waiting for sheng SSC service ($attempt/6)"
-          sleep 1
-        done
-
-        echo "sheng SSC service did not become queryable in time" >&2
-        exit 1
-      '';
+      ExecStartPre = wait-for-sheng-ssc;
       Restart = "on-failure";
       RestartSec = 10;
       TimeoutStartSec = 20;

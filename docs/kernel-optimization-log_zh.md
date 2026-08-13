@@ -228,6 +228,24 @@ WirePlumber 把普通 BlueZ 音频与 BlueZ MIDI 定义为独立 monitor。本�
 
 ## 已确认健康的链路
 
+### 15. 把 SSC 可查询作为 sensorspd 的启动完成条件
+
+一次 ext4 离线修复把 stage-1 拉长到约 48 秒后，现场复现了传感器链假启动：
+`remoteproc0` 和 `adsprpcd-sensorspd` 都显示 running，FastRPC 也成功打开
+`createstaticpd:sensorspd`，但 QRTR 服务表里没有 SSC，`ssccli` 持续返回
+`SSC QMI Service not found`。单纯重启 adsprpcd、pd-mapper、devauth 和 sensorspd
+不能恢复，证明进程存活和静态 PD 句柄都不是可用性门禁。
+
+旧 `libssc` 补丁还在异步回调里同步 sleep，并且找到 SSC 后没有跳出外层五次循环。
+因此一次本可立即成功的探测也固定多等数秒，外层 systemd 重试又把延迟继续放大，
+最后撞上 `TimeoutStartSec`。本轮删除这个阻塞补丁，每次短探测重新读取 QRTR 服务表；
+`adsprpcd-sensorspd` 通过 `ExecStartPost` 查询真实 SSC，成功后才完成启动，失败则由
+systemd 重启整个 sensor PD daemon。IIO 仍保留同一短门禁作为防御，但不再独自等待三分钟。
+
+`scripts/test-sensor-startup.sh` 会重复重启用户态 sensor PD 和 IIO，每轮同时要求
+SSC 查询成功、两个单元 active，并输出恢复耗时。该修复不会写 remoteproc sysfs，
+也不会在无人值守时重置 ADSP；若 DSP 内部状态已经卡死，仍应先保存日志并做冷启动验证。
+
 ```text
 ADSP remoteproc
   -> charger_pd / sensor_pd PDR

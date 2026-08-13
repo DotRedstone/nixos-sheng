@@ -46,7 +46,7 @@ CPU 三个 cluster 已经使用 `schedutil`，GPU 和 UFS 空闲时也能降到�
 
 ### 恢复能力
 
-- SSC 未可查询时让 `iio-sensor-proxy` 启动失败并由 systemd 重试，不再带着半初始化状态进入桌面。
+- `sensorspd` 只有在 SSC 已经出现在 QRTR 并能完成真实查询后才算启动成功；失败时重启整个 sensor PD daemon，IIO 再做一次短门禁，不再由 IIO 独自等待三分钟。
 - MiPPS 在握手前检查 Type-C、PD/PPS、SVID 和 PDO，暂时未就绪时继续重试。
 - FastRPC 服务私有映射 `/odm/etc/sensors/config`，兼容原厂 ADSP 路径，但不污染根目录，也不把 Android persist 分区改为可写。
 - 移除 FastRPC 服务过早执行的 `ConditionPathExists`。现在节点稍晚出现时会进入明确的 remoteproc/FastRPC 稳定等待，而不是在等待脚本运行前就被 systemd 永久跳过。
