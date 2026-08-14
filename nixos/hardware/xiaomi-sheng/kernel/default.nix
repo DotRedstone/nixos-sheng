@@ -69,7 +69,7 @@ mobile-nixos.kernel-builder-clang {
     require_config "CONFIG_VFAT_FS=m"
     require_config "CONFIG_BTRFS_FS=m"
     require_config "CONFIG_EROFS_FS=m"
-    require_config "CONFIG_INPUT_FPC1552=m"
+    require_config "CONFIG_INPUT_FPC1552=y"
 
     echo "--- io_uring ---"
     grep -nE '^CONFIG_IO_URING=|^# CONFIG_IO_URING is not set' build/.config || true

@@ -43,8 +43,7 @@ in
       mobile.boot.stage-1.kernel = {
         package = pkgs.callPackage ./kernel { };
         modular = true;
-        modules = [ "fpc1552" ];
-        allowMissingModules = false;
+        allowMissingModules = true;
       };
 
       mobile.system.type = "android";

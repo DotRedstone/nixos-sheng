@@ -105,9 +105,8 @@ jobs:
             -czf "out/kernel/sheng-linux-$kernel_version-modules.tar.gz" \
             "$kernel_version"
 
-          find "$modules_dir" -type f -name 'fpc1552.ko*' -print -quit \
-            | grep -q . || {
-              echo "ERROR: fpc1552 fingerprint resource module is missing"
+          grep -qxF 'CONFIG_INPUT_FPC1552=y' out/kernel-package/build.config || {
+              echo "ERROR: FPC1552 fingerprint resource driver is not built in"
               exit 1
             }
 

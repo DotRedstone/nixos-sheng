@@ -46,7 +46,6 @@
 
   boot.kernelModules = [
     "qrtr"
-    "fpc1552"
   ];
 
   # WCN7850 occasionally exposes only 2.4 GHz after its first firmware boot.

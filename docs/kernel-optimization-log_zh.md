@@ -229,7 +229,7 @@ WirePlumber 把普通 BlueZ 音频与 BlueZ MIDI 定义为独立 monitor。本�
 
 本轮新增精简的 `fpc1552` 资源驱动，提供原厂用户态需要的 `device_prepare`、`hw_reset`、`irq`、`fingerdown_wait` 和 `wakeup_enable` 接口；用户态采用已在 sheng 上完成录入、列举、删除和验证测试的 [ianchb/xiaomi-sheng-fingerprint](https://github.com/ianchb/xiaomi-sheng-fingerprint)，以私有 libfprint 方式接入 fprintd，同时启动 QTEE supplicant、文件系统和 RPMB listeners。`fpcsheng.elf` 固定 SHA-256 为 `269b403b81392c93036dfab37b2408570d98f7d900a0ab29799005b1a7ca08c4`，避免远端固件静默变化。
 
-刷入包含新 DTS/模块的 boot 并更新 NixOS generation 后验证：
+刷入包含新 DTS/内建驱动的 boot 并更新 NixOS generation 后验证：
 
 ```sh
 dmesg | grep -Ei 'fpc1552|fingerprint|qtee|tee0|rpmb'
