@@ -12,6 +12,7 @@
     ./modules/sheng-boot-slot.nix
     ./modules/sheng-devauth.nix
     ./modules/sheng-offline-charging.nix
+    ./modules/sheng-fingerprint.nix
     ./modules/xiaomi-mipps-auth.nix
   ];
 
@@ -92,6 +93,7 @@
   };
 
   services.xiaomi-mipps-auth.enable = true;
+  services.sheng-fingerprint.enable = true;
 
   console = {
     earlySetup = true;

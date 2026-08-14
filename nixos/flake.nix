@@ -81,6 +81,7 @@
             });
         };
         gjs-osk = final.callPackage ./packages/gjs-osk.nix { };
+        xiaomi-sheng-fingerprint = final.callPackage ./packages/xiaomi-sheng-fingerprint.nix { };
         xdg-desktop-portal = prev.xdg-desktop-portal.overrideAttrs (old: {
           # Fallback source builds on GitHub's aarch64 runner can hit a flaky
           # notification sound-fd integration test. Release artifacts still use

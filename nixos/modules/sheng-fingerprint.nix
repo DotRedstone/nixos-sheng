@@ -1,0 +1,78 @@
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+
+let
+  cfg = config.services.sheng-fingerprint;
+  package = pkgs.xiaomi-sheng-fingerprint;
+in
+{
+  options.services.sheng-fingerprint.enable = lib.mkEnableOption "the Xiaomi sheng FPC1553 fingerprint sensor";
+
+  config = lib.mkIf cfg.enable {
+    services.fprintd.enable = true;
+
+    environment.systemPackages = [ package ];
+
+    services.udev.extraRules = ''
+      SUBSYSTEM=="tee", KERNEL=="tee[0-9]*", MODE="0600", OWNER="root", GROUP="root", TAG+="systemd", ENV{SYSTEMD_WANTS}+="qteesupplicant.service"
+    '';
+
+    systemd.services.sfsconfig = {
+      description = "QTEE secure-file-system configuration";
+      before = [ "qteesupplicant.service" ];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        ExecStart = "${package}/libexec/fpc-sfs-config";
+      };
+    };
+
+    systemd.services.qteesupplicant = {
+      description = "Qualcomm TEE listener services";
+      requires = [ "sfsconfig.service" ];
+      bindsTo = [ "dev-tee0.device" ];
+      after = [
+        "dev-tee0.device"
+        "sfsconfig.service"
+      ];
+      wantedBy = [ "multi-user.target" ];
+      environment.LD_LIBRARY_PATH = "${package}/lib/qtee-listeners";
+      serviceConfig = {
+        Type = "exec";
+        ExecStart = "${package}/libexec/qteesupplicant";
+        Restart = "always";
+        AmbientCapabilities = [ "CAP_SYS_RAWIO" ];
+        CapabilityBoundingSet = [ "CAP_SYS_RAWIO" ];
+        ProtectSystem = "full";
+        ProtectHome = false;
+        PrivateTmp = false;
+        NoNewPrivileges = false;
+        DeviceAllow = [
+          "/dev/tee0 rw"
+          "/dev/bsg/0:0:0:49476 rw"
+          "/dev/bsg/ufs-bsg0 rw"
+        ];
+      };
+    };
+
+    systemd.services.fprintd = {
+      requires = [ "qteesupplicant.service" ];
+      after = [ "qteesupplicant.service" ];
+      environment = {
+        FP_FPC1553 = "1";
+        FPC1553_TA_PATH = "${package}/lib/firmware/fpcsheng.elf";
+        LD_LIBRARY_PATH = "${package}/lib/xiaomi-sheng-fingerprint";
+      };
+      serviceConfig = {
+        StateDirectory = lib.mkForce "fprint fpc1553";
+        StateDirectoryMode = "0700";
+        DeviceAllow = [ "/dev/tee0 rw" ];
+        ReadWritePaths = [ "/sys/devices" ];
+      };
+    };
+  };
+}
