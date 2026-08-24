@@ -8,6 +8,22 @@
 let
   cfg = config.services.sheng-fingerprint;
   package = pkgs.xiaomi-sheng-fingerprint;
+  waitForQteeDevices = pkgs.writeShellScript "wait-for-qtee-devices" ''
+    for attempt in $(seq 1 30); do
+      if [ -c /dev/tee0 ] && {
+        [ -e /dev/bsg/0:0:0:49476 ] || [ -e /dev/bsg/ufs-bsg0 ];
+      }; then
+        exit 0
+      fi
+
+      if [ "$attempt" -eq 30 ]; then
+        echo "Timed out waiting for the QTEE and UFS RPMB devices" >&2
+        exit 1
+      fi
+
+      sleep 1
+    done
+  '';
 in
 {
   options.services.sheng-fingerprint.enable = lib.mkEnableOption "the Xiaomi sheng FPC1553 fingerprint sensor";
@@ -34,17 +50,15 @@ in
     systemd.services.qteesupplicant = {
       description = "Qualcomm TEE listener services";
       requires = [ "sfsconfig.service" ];
-      bindsTo = [ "dev-tee0.device" ];
-      after = [
-        "dev-tee0.device"
-        "sfsconfig.service"
-      ];
+      after = [ "sfsconfig.service" ];
       wantedBy = [ "multi-user.target" ];
       environment.LD_LIBRARY_PATH = "${package}/lib/qtee-listeners";
       serviceConfig = {
         Type = "exec";
+        ExecStartPre = waitForQteeDevices;
         ExecStart = "${package}/libexec/qteesupplicant";
         Restart = "always";
+        RestartSec = "2s";
         AmbientCapabilities = [ "CAP_SYS_RAWIO" ];
         CapabilityBoundingSet = [ "CAP_SYS_RAWIO" ];
         ProtectSystem = "full";
