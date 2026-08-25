@@ -31,6 +31,18 @@ in
   config = lib.mkIf cfg.enable {
     services.fprintd.enable = true;
 
+    # GNOME Settings may run outside the logind session scope when activated
+    # through the per-user service manager. Authorize device owners explicitly
+    # so fprintd discovery does not fail and hide the fingerprint settings row.
+    security.polkit.extraConfig = ''
+      polkit.addRule(function(action, subject) {
+        if (action.id.indexOf("net.reactivated.fprint.device.") === 0 &&
+            subject.isInGroup("wheel")) {
+          return polkit.Result.YES;
+        }
+      });
+    '';
+
     environment.systemPackages = [ package ];
 
     services.udev.extraRules = ''
