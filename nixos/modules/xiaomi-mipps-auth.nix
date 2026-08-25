@@ -279,7 +279,7 @@ let
         # Completion flags can lag behind the final VDM write. Give firmware
         # time to publish them before deciding that another handshake is
         # necessary.
-        for completion_wait in $(seq 1 5); do
+        for _completion_wait in $(seq 1 5); do
           if is_complete "$root"; then
             echo "MiPPS auth active after attempt $attempt"
             rm -f "$failed_attach_file"
