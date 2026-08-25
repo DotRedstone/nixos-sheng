@@ -76,6 +76,15 @@ let
         return 1
       }
 
+      current_attach_token() {
+        for path in /sys/class/typec/port*-partner; do
+          [ -e "$path" ] || continue
+          stat -Lc '%d:%i:%Z' "$path" 2>/dev/null
+          return
+        done
+        return 1
+      }
+
       has_active_usb_data_link() {
         local state=""
 
@@ -153,7 +162,22 @@ let
         exit 1
       fi
 
+      failed_attach_file=/run/xiaomi-mipps-auth/failed-attach
+      attach_token="$(current_attach_token || true)"
+      if is_complete "$root"; then
+        echo "MiPPS auth already active before attempt 1"
+        exit 0
+      fi
+      if [ -n "$attach_token" ] \
+        && [ -r "$failed_attach_file" ] \
+        && [ "$(cat "$failed_attach_file")" = "$attach_token" ]; then
+        echo "MiPPS auth skipped: handshake already exhausted for this Type-C attach"
+        exit 0
+      fi
+
       max_attempts=60
+      max_helper_attempts=3
+      helper_attempts=0
       non_pd_grace_attempts=6
       empty_svid_grace_attempts=15
       stale_svid_grace_attempts=6
@@ -248,10 +272,30 @@ let
           continue
         fi
 
+        helper_attempts=$((helper_attempts + 1))
+        vdm_before="$(read_node "$root" request_vdm_cmd 2>/dev/null || true)"
         xiaomi-mipps-auth --sysfs "$root" --timeout 6 || true
 
-        if is_complete "$root"; then
-          echo "MiPPS auth active after attempt $attempt"
+        # Completion flags can lag behind the final VDM write. Give firmware
+        # time to publish them before deciding that another handshake is
+        # necessary.
+        for completion_wait in $(seq 1 5); do
+          if is_complete "$root"; then
+            echo "MiPPS auth active after attempt $attempt"
+            rm -f "$failed_attach_file"
+            exit 0
+          fi
+          sleep 1
+        done
+
+        if [ "$helper_attempts" -ge "$max_helper_attempts" ]; then
+          vdm_after="$(read_node "$root" request_vdm_cmd 2>/dev/null || true)"
+          echo "MiPPS auth stopped after $helper_attempts handshakes: VDM did not complete (before=''${vdm_before:-unknown} after=''${vdm_after:-unknown})"
+          if [ -n "$attach_token" ]; then
+            mkdir -p "$(dirname "$failed_attach_file")"
+            printf '%s\n' "$attach_token" > "$failed_attach_file"
+          fi
+          sync_standard_pd_current
           exit 0
         fi
 
