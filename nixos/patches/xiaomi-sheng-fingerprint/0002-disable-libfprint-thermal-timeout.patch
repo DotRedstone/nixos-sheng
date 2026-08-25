@@ -1,0 +1,28 @@
+From: DotRedStone <dotredstone@users.noreply.github.com>
+Subject: [PATCH] libfprint: allow FPC1553 enrollment to run continuously
+
+FPC1553 enrollment requires 37 accepted samples. On a touch sensor this can
+take longer than libfprint's default temperature model allows, causing an
+otherwise healthy enrollment to be cancelled as FP_DEVICE_ERROR_TOO_HOT.
+
+The sensor and trusted application perform match-on-chip operations rather
+than continuously streaming images. Match the other MOC drivers and disable
+the generic time-based temperature cutoff for this device.
+---
+ patches/libfprint/0001-libfprint-add-fpc1553.patch | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/patches/libfprint/0001-libfprint-add-fpc1553.patch b/patches/libfprint/0001-libfprint-add-fpc1553.patch
+index ba2cc21..0a17371 100644
+--- a/patches/libfprint/0001-libfprint-add-fpc1553.patch
++++ b/patches/libfprint/0001-libfprint-add-fpc1553.patch
+@@ -1503,6 +1503,7 @@ index 0000000..ba813d2
+ +  dev_class->type = FP_DEVICE_TYPE_VIRTUAL;
+ +  dev_class->scan_type = FP_SCAN_TYPE_PRESS;
+ +  dev_class->id_table = fpc1553_id_table;
+++  dev_class->temp_hot_seconds = -1;
+ +  dev_class->nr_enroll_stages = FPC1553_ENROLL_STAGES;
+ +  dev_class->probe = fpc1553_probe;
+ +  dev_class->open = fpc1553_open;
+--
+2.51.0

@@ -39,6 +39,7 @@ stdenv.mkDerivation (finalAttrs: {
 
   patches = [
     ../patches/xiaomi-sheng-fingerprint/0001-qualify-finger-before-immediate-capture.patch
+    ../patches/xiaomi-sheng-fingerprint/0002-disable-libfprint-thermal-timeout.patch
   ];
 
   nativeBuildInputs = [
