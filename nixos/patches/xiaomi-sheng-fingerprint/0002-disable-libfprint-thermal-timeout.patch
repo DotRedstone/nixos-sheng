@@ -9,13 +9,22 @@ The sensor and trusted application perform match-on-chip operations rather
 than continuously streaming images. Match the other MOC drivers and disable
 the generic time-based temperature cutoff for this device.
 ---
- patches/libfprint/0001-libfprint-add-fpc1553.patch | 1 +
- 1 file changed, 1 insertion(+)
+ patches/libfprint/0001-libfprint-add-fpc1553.patch | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/patches/libfprint/0001-libfprint-add-fpc1553.patch b/patches/libfprint/0001-libfprint-add-fpc1553.patch
 index ba2cc21..0a17371 100644
 --- a/patches/libfprint/0001-libfprint-add-fpc1553.patch
 +++ b/patches/libfprint/0001-libfprint-add-fpc1553.patch
+@@ -2,7 +2,7 @@ new file mode 100644
+ index 0000000..ba813d2
+ --- /dev/null
+ +++ b/libfprint/drivers/fpc1553.c
+-@@ -0,0 +1,1513 @@
++@@ -0,0 +1,1514 @@
+ +/*
+ + * Xiaomi sheng FPC1553 match-on-chip driver.
+ + *
 @@ -1503,6 +1503,7 @@ index 0000000..ba813d2
  +  dev_class->type = FP_DEVICE_TYPE_VIRTUAL;
  +  dev_class->scan_type = FP_SCAN_TYPE_PRESS;
