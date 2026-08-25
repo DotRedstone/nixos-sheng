@@ -405,22 +405,29 @@ module ShengHeadlessGenerationMenu
     @dirty_bottom = bottom if !@dirty_bottom || bottom > @dirty_bottom
   end
 
-  def paint_tile_rect(tile, tile_top, tile_bottom, x, y, width, height, color)
+  def write_framebuffer_data(offset, data)
+    written = 0
+    framebuffer.sysseek(offset, IO::SEEK_SET)
+    while written < data.bytesize
+      count = framebuffer.syswrite(data[written, data.bytesize - written])
+      raise IOError, "short framebuffer write" unless count && count > 0
+
+      written += count
+    end
+  end
+
+  def write_framebuffer_rect(x, y, width, height, color)
     x = clamp(x, 0, @fb_width)
     y = clamp(y, 0, @fb_height)
     width = clamp(width, 0, @fb_width - x)
     height = clamp(height, 0, @fb_height - y)
     return if width <= 0 || height <= 0
 
-    start_y = [y, tile_top].max
-    end_y = [y + height, tile_bottom].min
-    return if end_y <= start_y
-
     row = pixel(color) * width
-    current_y = start_y
+    current_y = y
+    end_y = y + height
     while current_y < end_y
-      tile_offset = (current_y - tile_top) * @fb_stride + x * @fb_bytes
-      tile[tile_offset, row.bytesize] = row
+      write_framebuffer_data(current_y * @fb_stride + x * @fb_bytes, row)
       current_y += 1
     end
   end
@@ -430,183 +437,104 @@ module ShengHeadlessGenerationMenu
 
     started_at = Time.now.to_f
     operation_count = draw_operations().length
-    tile_count = ((@dirty_bottom - @dirty_top) + FRAMEBUFFER_TILE_HEIGHT - 1) / FRAMEBUFFER_TILE_HEIGHT
-    tile_operations = Array.new(tile_count) { [] }
     draw_operations().each do |operation|
-      operation_top = operation[2]
-      operation_bottom = operation_top + operation[4]
-      first_tile = [(operation_top - @dirty_top) / FRAMEBUFFER_TILE_HEIGHT, 0].max
-      last_tile = [(operation_bottom - 1 - @dirty_top) / FRAMEBUFFER_TILE_HEIGHT, tile_count - 1].min
-      tile_index = first_tile
-      while tile_index <= last_tile
-        tile_operations[tile_index] << operation
-        tile_index += 1
-      end
-    end
+      kind = operation[0]
+      x = operation[1]
+      y = operation[2]
+      width = operation[3]
+      height = operation[4]
 
-    tile_top = @dirty_top
-    tile_index = 0
-    while tile_top < @dirty_bottom
-      tile_bottom = [tile_top + FRAMEBUFFER_TILE_HEIGHT, @dirty_bottom].min
-      offset = tile_top * @fb_stride
-      length = (tile_bottom - tile_top) * @fb_stride
-      operations = tile_operations[tile_index]
-      fully_covered = operations.any? do |operation|
-        operation[0] == :rect &&
-          operation[1] == 0 &&
-          operation[3] >= @fb_width &&
-          operation[2] <= tile_top &&
-          operation[2] + operation[4] >= tile_bottom
-      end
+      case kind
+      when :rect
+        write_framebuffer_rect(x, y, width, height, operation[5])
+      when :line
+        x0, y0, x1, y1, color, thickness = operation[5]
+        dx = (x1 - x0).abs
+        sx = x0 < x1 ? 1 : -1
+        dy = -(y1 - y0).abs
+        sy = y0 < y1 ? 1 : -1
+        error = dx + dy
 
-      if fully_covered
-        tile = [0].pack("C") * length
-      else
-        framebuffer.sysseek(offset, IO::SEEK_SET)
-        tile = framebuffer.sysread(length)
-        if !tile || tile.bytesize < length
-          tile = (tile || "") + [0].pack("C") * (length - (tile ? tile.bytesize : 0))
+        loop do
+          write_framebuffer_rect(x0 - thickness / 2, y0 - thickness / 2, thickness, thickness, color)
+          break if x0 == x1 && y0 == y1
+
+          doubled = error * 2
+          if doubled >= dy
+            error += dy
+            x0 += sx
+          end
+          if doubled <= dx
+            error += dx
+            y0 += sy
+          end
         end
-      end
+      when :circle
+        cx, cy, radius, color, thickness = operation[5]
+        circle_x = radius
+        circle_y = 0
+        error = 1 - circle_x
 
-      operations.each do |operation|
-        kind = operation[0]
-        x = operation[1]
-        y = operation[2]
-        width = operation[3]
-        height = operation[4]
-        operation_bottom = y + height
-        next if operation_bottom <= tile_top || y >= tile_bottom
-
-        case kind
-        when :rect
-          paint_tile_rect(tile, tile_top, tile_bottom, x, y, width, height, operation[5])
-        when :line
-          x0, y0, x1, y1, color, thickness = operation[5]
-          dx = (x1 - x0).abs
-          sx = x0 < x1 ? 1 : -1
-          dy = -(y1 - y0).abs
-          sy = y0 < y1 ? 1 : -1
-          error = dx + dy
-
-          loop do
-            paint_tile_rect(
-              tile,
-              tile_top,
-              tile_bottom,
-              x0 - thickness / 2,
-              y0 - thickness / 2,
+        while circle_x >= circle_y
+          points = [
+            [circle_x, circle_y], [circle_y, circle_x], [-circle_y, circle_x], [-circle_x, circle_y],
+            [-circle_x, -circle_y], [-circle_y, -circle_x], [circle_y, -circle_x], [circle_x, -circle_y]
+          ]
+          points.each do |dx_point, dy_point|
+            write_framebuffer_rect(
+              cx + dx_point - thickness / 2,
+              cy + dy_point - thickness / 2,
               thickness,
               thickness,
               color
             )
-            break if x0 == x1 && y0 == y1
-
-            doubled = error * 2
-            if doubled >= dy
-              error += dy
-              x0 += sx
-            end
-            if doubled <= dx
-              error += dx
-              y0 += sy
-            end
           end
-        when :circle
-          cx, cy, radius, color, thickness = operation[5]
-          circle_x = radius
-          circle_y = 0
-          error = 1 - circle_x
+          circle_y += 1
+          if error < 0
+            error += 2 * circle_y + 1
+          else
+            circle_x -= 1
+            error += 2 * (circle_y - circle_x) + 1
+          end
+        end
+      else
+        text, fg, bg, scale, align = operation[5]
+        write_framebuffer_rect(x, y, width, height, bg)
+        chars = text.upcase.each_char.to_a
+        max_chars = [width / (6 * scale), 0].max
+        chars = chars[0, max_chars]
+        rendered_width = [chars.length * 6 * scale - scale, 0].max
+        start_x =
+          case align
+          when :right
+            [width - rendered_width, 0].max
+          when :center
+            [(width - rendered_width) / 2, 0].max
+          else
+            0
+          end
 
-          while circle_x >= circle_y
-            points = [
-              [circle_x, circle_y], [circle_y, circle_x], [-circle_y, circle_x], [-circle_x, circle_y],
-              [-circle_x, -circle_y], [-circle_y, -circle_x], [circle_y, -circle_x], [circle_x, -circle_y]
-            ]
-            points.each do |dx_point, dy_point|
-              paint_tile_rect(
-                tile,
-                tile_top,
-                tile_bottom,
-                cx + dx_point - thickness / 2,
-                cy + dy_point - thickness / 2,
-                thickness,
-                thickness,
-                color
+        chars.each_with_index do |char, char_index|
+          glyph_runs(char).each_with_index do |runs, glyph_y|
+            destination_y = glyph_y * scale
+            next if destination_y >= height
+
+            runs.each do |run_start, run_width|
+              destination_x = start_x + (char_index * 6 + run_start) * scale
+              next if destination_x >= width
+
+              clipped_width = [run_width * scale, width - destination_x].min
+              write_framebuffer_rect(
+                x + destination_x,
+                y + destination_y,
+                clipped_width,
+                [scale, height - destination_y].min,
+                fg
               )
-            end
-            circle_y += 1
-            if error < 0
-              error += 2 * circle_y + 1
-            else
-              circle_x -= 1
-              error += 2 * (circle_y - circle_x) + 1
-            end
-          end
-        else
-          text, fg, bg, scale, align = operation[5]
-          background_row = pixel(bg) * width
-          start_y = [y, tile_top].max
-          end_y = [operation_bottom, tile_bottom].min
-          current_y = start_y
-          while current_y < end_y
-            tile_offset = (current_y - tile_top) * @fb_stride + x * @fb_bytes
-            tile[tile_offset, background_row.bytesize] = background_row
-            current_y += 1
-          end
-
-          chars = text.upcase.each_char.to_a
-          max_chars = [width / (6 * scale), 0].max
-          chars = chars[0, max_chars]
-          rendered_width = [chars.length * 6 * scale - scale, 0].max
-          start_x =
-            case align
-            when :right
-              [width - rendered_width, 0].max
-            when :center
-              [(width - rendered_width) / 2, 0].max
-            else
-              0
-            end
-          foreground = pixel(fg)
-
-          chars.each_with_index do |char, char_index|
-            glyph_runs(char).each_with_index do |runs, glyph_y|
-              destination_y = y + glyph_y * scale
-              next if destination_y >= y + height
-              next if destination_y + scale <= tile_top || destination_y >= tile_bottom
-
-              runs.each do |run_start, run_width|
-                destination_x = start_x + (char_index * 6 + run_start) * scale
-                next if destination_x >= width
-
-                clipped_width = [run_width * scale, width - destination_x].min
-                foreground_row = foreground * clipped_width
-                scaled_y = 0
-                while scaled_y < scale
-                  current_y = destination_y + scaled_y
-                  if current_y >= tile_top && current_y < tile_bottom && current_y < y + height
-                    tile_offset = (current_y - tile_top) * @fb_stride + (x + destination_x) * @fb_bytes
-                    tile[tile_offset, foreground_row.bytesize] = foreground_row
-                  end
-                  scaled_y += 1
-                end
-              end
             end
           end
         end
       end
-
-      written = 0
-      framebuffer.sysseek(offset, IO::SEEK_SET)
-      while written < tile.bytesize
-        count = framebuffer.syswrite(tile[written, tile.bytesize - written])
-        raise IOError, "short framebuffer write" unless count && count > 0
-
-        written += count
-      end
-      tile_top = tile_bottom
-      tile_index += 1
     end
     framebuffer.flush
     @draw_operations = []
@@ -619,7 +547,6 @@ module ShengHeadlessGenerationMenu
       )
     end
   end
-
   def pixel(color)
     r, g, b = color
     case @fb_bpp
