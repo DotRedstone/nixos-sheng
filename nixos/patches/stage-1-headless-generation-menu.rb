@@ -470,13 +470,55 @@ module ShengHeadlessGenerationMenu
             current_y += 1
           end
         else
-          lines = operation[5]
-          lines.each_with_index do |line, index|
-            current_y = y + index
-            next if current_y < tile_top || current_y >= tile_bottom
-
+          text, fg, bg, scale, align = operation[5]
+          background_row = pixel(bg) * width
+          start_y = [y, tile_top].max
+          end_y = [operation_bottom, tile_bottom].min
+          current_y = start_y
+          while current_y < end_y
             tile_offset = (current_y - tile_top) * @fb_stride + x * @fb_bytes
-            tile[tile_offset, line.bytesize] = line
+            tile[tile_offset, background_row.bytesize] = background_row
+            current_y += 1
+          end
+
+          chars = text.upcase.each_char.to_a
+          max_chars = [width / (6 * scale), 0].max
+          chars = chars[0, max_chars]
+          rendered_width = [chars.length * 6 * scale - scale, 0].max
+          start_x =
+            case align
+            when :right
+              [width - rendered_width, 0].max
+            when :center
+              [(width - rendered_width) / 2, 0].max
+            else
+              0
+            end
+          foreground = pixel(fg)
+
+          chars.each_with_index do |char, char_index|
+            glyph_runs(char).each_with_index do |runs, glyph_y|
+              destination_y = y + glyph_y * scale
+              next if destination_y >= y + height
+              next if destination_y + scale <= tile_top || destination_y >= tile_bottom
+
+              runs.each do |run_start, run_width|
+                destination_x = start_x + (char_index * 6 + run_start) * scale
+                next if destination_x >= width
+
+                clipped_width = [run_width * scale, width - destination_x].min
+                foreground_row = foreground * clipped_width
+                scaled_y = 0
+                while scaled_y < scale
+                  current_y = destination_y + scaled_y
+                  if current_y >= tile_top && current_y < tile_bottom && current_y < y + height
+                    tile_offset = (current_y - tile_top) * @fb_stride + (x + destination_x) * @fb_bytes
+                    tile[tile_offset, foreground_row.bytesize] = foreground_row
+                  end
+                  scaled_y += 1
+                end
+              end
+            end
           end
         end
       end
@@ -542,61 +584,25 @@ module ShengHeadlessGenerationMenu
     FONT[char.upcase] || FONT["?"]
   end
 
-  def glyph_pixel_rows(char, fg_pixel, bg_pixel, scale)
-    @glyph_row_cache ||= {}
-    key = [char, fg_pixel, bg_pixel, scale]
-    return @glyph_row_cache[key] if @glyph_row_cache.key?(key)
+  def glyph_runs(char)
+    @glyph_run_cache ||= {}
+    normalized = char.upcase
+    return @glyph_run_cache[normalized] if @glyph_run_cache.key?(normalized)
 
-    foreground = fg_pixel * scale
-    background = bg_pixel * scale
-    @glyph_row_cache[key] = glyph(char).map do |bits|
-      row = ""
-      bits.each_char do |bit|
-        row << (bit == "1" ? foreground : background)
+    @glyph_run_cache[normalized] = glyph(normalized).map do |bits|
+      runs = []
+      run_start = nil
+      bits.each_char.with_index do |bit, index|
+        if bit == "1"
+          run_start = index if run_start.nil?
+        elsif run_start
+          runs << [run_start, index - run_start]
+          run_start = nil
+        end
       end
-      row
+      runs << [run_start, bits.length - run_start] if run_start
+      runs
     end
-  end
-
-  def text_pixels(text, width, height, fg, bg, scale, align)
-    foreground = pixel(fg)
-    background = pixel(bg)
-    background_row = background * width
-    lines = Array.new(height, background_row)
-    chars = text.to_s.upcase.each_char.to_a
-    max_chars = [width / (6 * scale), 0].max
-    chars = chars[0, max_chars]
-    rendered_width = [chars.length * 6 * scale - scale, 0].max
-    start_x =
-      case align
-      when :right
-        [width - rendered_width, 0].max
-      when :center
-        [(width - rendered_width) / 2, 0].max
-      else
-        0
-      end
-    target_bytes = width * @fb_bytes
-    spacing = background * scale
-
-    7.times do |glyph_y|
-      row = background * start_x
-      chars.each do |char|
-        row << glyph_pixel_rows(char, foreground, background, scale)[glyph_y]
-        row << spacing
-      end
-      if row.bytesize < target_bytes
-        row << background * ((target_bytes - row.bytesize) / @fb_bytes)
-      elsif row.bytesize > target_bytes
-        row = row[0, target_bytes]
-      end
-
-      scale.times do |scaled_y|
-        destination_y = glyph_y * scale + scaled_y
-        lines[destination_y] = row if destination_y < height
-      end
-    end
-    lines
   end
 
   def draw_text_box(x, y, width, height, text, fg, bg, scale: FONT_SCALE, align: :left)
@@ -609,8 +615,7 @@ module ShengHeadlessGenerationMenu
     height = clamp(height, 0, @fb_height - y)
     return if width <= 0 || height <= 0
 
-    lines = text_pixels(text, width, height, fg, bg, scale, align)
-    draw_operations() << [:text, x, y, width, height, lines]
+    draw_operations() << [:text, x, y, width, height, [text.to_s, fg, bg, scale, align]]
     mark_framebuffer_dirty(y, height)
   end
 
