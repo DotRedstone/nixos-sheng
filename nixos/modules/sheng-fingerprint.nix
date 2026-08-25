@@ -43,6 +43,12 @@ in
       });
     '';
 
+    # GNOME Settings hides the fingerprint row when the GDM login-screen
+    # schema is absent, even if fprintd already exposes a working device.
+    environment.sessionVariables.XDG_DATA_DIRS = [
+      "${pkgs.gdm}/share/gsettings-schemas/${pkgs.gdm.name}"
+    ];
+
     environment.systemPackages = [ package ];
 
     services.udev.extraRules = ''
