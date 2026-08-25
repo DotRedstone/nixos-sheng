@@ -1,0 +1,55 @@
+From: DotRedstone <dotredstone@users.noreply.github.com>
+Subject: [PATCH] backend: qualify finger before immediate capture
+
+The FINGER_DOWN_SETUP command first raises a short command-completion IRQ.
+Waiting for that IRQ alone does not mean that a finger is present. Poll the
+trusted application's qualification operation with a cancellation-aware
+backoff, then ask CAPTURE to image the finger immediately instead of making it
+wait for a second finger-down transition.
+
+This prevents command-completion IRQs from producing a tight stream of empty
+captures while preserving the real touch IRQ as the wake-up source.
+---
+ backend/src/fpc_qtee_client.c | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/backend/src/fpc_qtee_client.c b/backend/src/fpc_qtee_client.c
+index 09fd084..3544145 100644
+--- a/backend/src/fpc_qtee_client.c
++++ b/backend/src/fpc_qtee_client.c
+@@ -566,12 +566,19 @@ int fpc_qtee_sensor_wait_finger_down(struct fpc_qtee_client *client,
+ 		int qualification;
+ 
+ 		do {
++			if (atomic_load_explicit(&client->cancelled,
++						 memory_order_relaxed)) {
++				ret = -ECANCELED;
++				break;
++			}
+ 			qualification = fpc_qtee_sensor_command(
+ 				client, FPC_SENSOR_IRQ_QUALIFICATION, NULL);
+ 			if (qualification < 0) {
+ 				ret = qualification;
+ 				break;
+ 			}
++			if (qualification == 0)
++				usleep(20000);
+ 		} while (qualification == 0);
+ 	}
+ 	{
+@@ -746,11 +753,11 @@ int fpc_qtee_sensor_capture_sequence(struct fpc_qtee_client *client,
+ 		goto restore;
+ 	for (unsigned int attempt = 0; attempt < 4; attempt++) {
+ 		ret = fpc_qtee_sensor_wait_finger_down(
+-			client, sysfs_node, 0, timeout_ms);
++			client, sysfs_node, 1, timeout_ms);
+ 		debug_log("capture finger-down attempt %u: %d\n", attempt, ret);
+ 		if (ret)
+ 			break;
+-		ret = fpc_qtee_sensor_capture(client, 1, capture_detail);
++		ret = fpc_qtee_sensor_capture(client, 0, capture_detail);
+ 		debug_log("capture image attempt %u: ret=%d detail=%u\n",
+ 			  attempt, ret, *capture_detail);
+ 		if (ret != 1)
+-- 
+2.51.0

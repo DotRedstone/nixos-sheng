@@ -18,7 +18,7 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "xiaomi-sheng-fingerprint";
-  version = "0-unstable-2026-07-21";
+  version = "0-unstable-2026-08-25";
 
   src = fetchFromGitHub {
     owner = "ianchb";
@@ -36,6 +36,10 @@ stdenv.mkDerivation (finalAttrs: {
     url = "https://raw.githubusercontent.com/ianchb/sheng-firmware/2c1e2729a085c7f0470c855d236e49455c4601f0/fpcsheng.elf";
     hash = "sha256-JptAO4E5LJMDbfqzeyQIVw2Y99kAoKspeZAFsafKCMQ=";
   };
+
+  patches = [
+    ../patches/xiaomi-sheng-fingerprint/0001-qualify-finger-before-immediate-capture.patch
+  ];
 
   nativeBuildInputs = [
     autoPatchelfHook
