@@ -18,6 +18,30 @@ let
     text = ''
       set -u
 
+      typec_role_path=""
+      for path in /sys/class/typec/port*/data_role; do
+        [ -w "$path" ] || continue
+        typec_role_path="$path"
+        break
+      done
+
+      if [ -n "$typec_role_path" ]; then
+        typec_role="$(cat "$typec_role_path" 2>/dev/null || true)"
+        case "$typec_role" in
+          *"[device]"*) ;;
+          *)
+            printf '%s\n' device > "$typec_role_path" 2>/dev/null || true
+            for _typec_wait in $(seq 1 20); do
+              case "$(cat "$typec_role_path" 2>/dev/null || true)" in
+                *"[device]"*) break ;;
+              esac
+              sleep 0.1
+            done
+            echo "Type-C data role restored: $typec_role -> $(cat "$typec_role_path" 2>/dev/null || echo unknown)"
+            ;;
+        esac
+      fi
+
       role_path=""
       for path in /sys/class/usb_role/*/role; do
         [ -w "$path" ] || continue
@@ -217,7 +241,7 @@ let
       # short window to bind its gadget before deciding this is a charger. A
       # configured data link is a computer connection and must never be torn
       # down by the authentication helper's host-role request.
-      for _data_wait in $(seq 1 15); do
+      for _data_wait in $(seq 1 30); do
         if has_active_usb_data_link; then
           echo "MiPPS auth skipped: active USB data link"
           exit 0
