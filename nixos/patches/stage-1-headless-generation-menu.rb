@@ -458,17 +458,26 @@ module ShengHeadlessGenerationMenu
         operation_bottom = y + height
         next if operation_bottom <= tile_top || y >= tile_bottom
 
-        next unless kind == :rect
+        if kind == :rect
+          color = operation[5]
+          row = pixel(color) * width
+          start_y = [y, tile_top].max
+          end_y = [operation_bottom, tile_bottom].min
+          current_y = start_y
+          while current_y < end_y
+            tile_offset = (current_y - tile_top) * @fb_stride + x * @fb_bytes
+            tile[tile_offset, row.bytesize] = row
+            current_y += 1
+          end
+        else
+          lines = operation[5]
+          lines.each_with_index do |line, index|
+            current_y = y + index
+            next if current_y < tile_top || current_y >= tile_bottom
 
-        color = operation[5]
-        row = pixel(color) * width
-        start_y = [y, tile_top].max
-        end_y = [operation_bottom, tile_bottom].min
-        current_y = start_y
-        while current_y < end_y
-          tile_offset = (current_y - tile_top) * @fb_stride + x * @fb_bytes
-          tile[tile_offset, row.bytesize] = row
-          current_y += 1
+            tile_offset = (current_y - tile_top) * @fb_stride + x * @fb_bytes
+            tile[tile_offset, line.bytesize] = line
+          end
         end
       end
 
@@ -533,17 +542,27 @@ module ShengHeadlessGenerationMenu
     FONT[char.upcase] || FONT["?"]
   end
 
-  def draw_text_box(x, y, width, height, text, fg, bg, scale: FONT_SCALE, align: :left)
-    framebuffer_info()
-    return if width <= 0 || height <= 0
+  def glyph_pixel_rows(char, fg_pixel, bg_pixel, scale)
+    @glyph_row_cache ||= {}
+    key = [char, fg_pixel, bg_pixel, scale]
+    return @glyph_row_cache[key] if @glyph_row_cache.key?(key)
 
-    x = clamp(x, 0, @fb_width)
-    y = clamp(y, 0, @fb_height)
-    width = clamp(width, 0, @fb_width - x)
-    height = clamp(height, 0, @fb_height - y)
-    return if width <= 0 || height <= 0
+    foreground = fg_pixel * scale
+    background = bg_pixel * scale
+    @glyph_row_cache[key] = glyph(char).map do |bits|
+      row = ""
+      bits.each_char do |bit|
+        row << (bit == "1" ? foreground : background)
+      end
+      row
+    end
+  end
 
-    draw_rect(x, y, width, height, bg)
+  def text_pixels(text, width, height, fg, bg, scale, align)
+    foreground = pixel(fg)
+    background = pixel(bg)
+    background_row = background * width
+    lines = Array.new(height, background_row)
     chars = text.to_s.upcase.each_char.to_a
     max_chars = [width / (6 * scale), 0].max
     chars = chars[0, max_chars]
@@ -557,35 +576,42 @@ module ShengHeadlessGenerationMenu
       else
         0
       end
+    target_bytes = width * @fb_bytes
+    spacing = background * scale
 
-    chars.each_with_index do |char, char_index|
-      glyph(char).each_with_index do |bits, glyph_y|
-        dst_y = glyph_y * scale
-        next if dst_y >= height
+    7.times do |glyph_y|
+      row = background * start_x
+      chars.each do |char|
+        row << glyph_pixel_rows(char, foreground, background, scale)[glyph_y]
+        row << spacing
+      end
+      if row.bytesize < target_bytes
+        row << background * ((target_bytes - row.bytesize) / @fb_bytes)
+      elsif row.bytesize > target_bytes
+        row = row[0, target_bytes]
+      end
 
-        run_start = nil
-        bits.each_char.with_index do |bit, glyph_x|
-          if bit == "1"
-            run_start = glyph_x if run_start.nil?
-          elsif run_start
-            run_width = glyph_x - run_start
-            dst_x = start_x + (char_index * 6 + run_start) * scale
-            if dst_x < width
-              draw_rect(x + dst_x, y + dst_y, [run_width * scale, width - dst_x].min, [scale, height - dst_y].min, fg)
-            end
-            run_start = nil
-          end
-        end
-
-        next unless run_start
-
-        run_width = bits.length - run_start
-        dst_x = start_x + (char_index * 6 + run_start) * scale
-        if dst_x < width
-          draw_rect(x + dst_x, y + dst_y, [run_width * scale, width - dst_x].min, [scale, height - dst_y].min, fg)
-        end
+      scale.times do |scaled_y|
+        destination_y = glyph_y * scale + scaled_y
+        lines[destination_y] = row if destination_y < height
       end
     end
+    lines
+  end
+
+  def draw_text_box(x, y, width, height, text, fg, bg, scale: FONT_SCALE, align: :left)
+    framebuffer_info()
+    return if width <= 0 || height <= 0
+
+    x = clamp(x, 0, @fb_width)
+    y = clamp(y, 0, @fb_height)
+    width = clamp(width, 0, @fb_width - x)
+    height = clamp(height, 0, @fb_height - y)
+    return if width <= 0 || height <= 0
+
+    lines = text_pixels(text, width, height, fg, bg, scale, align)
+    draw_operations() << [:text, x, y, width, height, lines]
+    mark_framebuffer_dirty(y, height)
   end
 
   def draw_line(x0, y0, x1, y1, color, thickness = 3)
@@ -857,6 +883,7 @@ module ShengHeadlessGenerationMenu
   end
 
   def render_framebuffer(generations, selected, previous_selected: nil, remaining: nil, previous_remaining: nil)
+    started_at = Time.now.to_f
     framebuffer_info()
     labels =
       if generations.empty?
@@ -946,6 +973,12 @@ module ShengHeadlessGenerationMenu
       draw_countdown(footer_y, remaining)
     end
 
+    if $logger.respond_to?(:debug)
+      $logger.debug(
+        "Sheng generation framebuffer prepared #{draw_operations().length} operations in " \
+        "#{(Time.now.to_f - started_at).round(3)}s."
+      )
+    end
     present_framebuffer()
     true
   rescue => error
