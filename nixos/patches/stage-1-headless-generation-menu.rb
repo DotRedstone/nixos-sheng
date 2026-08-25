@@ -29,7 +29,7 @@ module ShengHeadlessGenerationMenu
   FOOTER_HEIGHT = 190
   SCROLLBAR_WIDTH = 8
   SCROLLBAR_GAP = 28
-  FRAMEBUFFER_TILE_HEIGHT = 32
+  FRAMEBUFFER_TILE_HEIGHT = 128
   BG = [8, 10, 11]
   PANEL_BG = [17, 19, 21]
   PANEL_BORDER_COLOR = [57, 64, 66]
@@ -430,13 +430,26 @@ module ShengHeadlessGenerationMenu
       tile_bottom = [tile_top + FRAMEBUFFER_TILE_HEIGHT, @dirty_bottom].min
       offset = tile_top * @fb_stride
       length = (tile_bottom - tile_top) * @fb_stride
-      framebuffer.sysseek(offset, IO::SEEK_SET)
-      tile = framebuffer.sysread(length)
-      if !tile || tile.bytesize < length
-        tile = (tile || "") + [0].pack("C") * (length - (tile ? tile.bytesize : 0))
+      operations = tile_operations[tile_index]
+      fully_covered = operations.any? do |operation|
+        operation[0] == :rect &&
+          operation[1] == 0 &&
+          operation[3] >= @fb_width &&
+          operation[2] <= tile_top &&
+          operation[2] + operation[4] >= tile_bottom
       end
 
-      tile_operations[tile_index].each do |operation|
+      if fully_covered
+        tile = [0].pack("C") * length
+      else
+        framebuffer.sysseek(offset, IO::SEEK_SET)
+        tile = framebuffer.sysread(length)
+        if !tile || tile.bytesize < length
+          tile = (tile || "") + [0].pack("C") * (length - (tile ? tile.bytesize : 0))
+        end
+      end
+
+      operations.each do |operation|
         kind = operation[0]
         x = operation[1]
         y = operation[2]
