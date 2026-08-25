@@ -281,8 +281,14 @@ in
 
     systemd.services.xiaomi-mipps-auth = {
       description = "Xiaomi MiPPS/PPS charger authentication";
-      unitConfig.ConditionPathExistsGlob =
-        "/sys/devices/platform/pmic-glink/*/xiaomi/request_vdm_cmd";
+      unitConfig = {
+        ConditionPathExistsGlob =
+          "/sys/devices/platform/pmic-glink/*/xiaomi/request_vdm_cmd";
+        # A single charger transition can emit several power_supply events.
+        # Keep later detach/attach events eligible after that initial burst;
+        # flock and the completion checks below make duplicate runs harmless.
+        StartLimitIntervalSec = 0;
+      };
       serviceConfig = {
         # Let boot finish while PD/SVID discovery continues in this service.
         Type = "simple";
