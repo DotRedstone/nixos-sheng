@@ -8,6 +8,96 @@
 let
   cfg = config.services.sheng-fingerprint;
   package = pkgs.xiaomi-sheng-fingerprint;
+  wakeUnlock = pkgs.writeScript "sheng-fingerprint-wake-unlock" ''
+    #!${pkgs.python3}/bin/python3
+    import os
+    import pwd
+    import signal
+    import subprocess
+    import time
+
+    BUSCTL = "${pkgs.systemd}/bin/busctl"
+    FPRINTD_VERIFY = "${config.services.fprintd.package}/bin/fprintd-verify"
+    LOGINCTL = "${pkgs.systemd}/bin/loginctl"
+    MUTTER_DESTINATION = "org.gnome.Mutter.DisplayConfig"
+    MUTTER_INTERFACE = "org.gnome.Mutter.DisplayConfig"
+    MUTTER_PATH = "/org/gnome/Mutter/DisplayConfig"
+
+    def output(*args):
+        try:
+            return subprocess.check_output(
+                args, stderr=subprocess.DEVNULL, text=True, timeout=2
+            ).strip()
+        except (OSError, subprocess.SubprocessError):
+            return ""
+
+    def display_session():
+        session = output(LOGINCTL, "show-user", str(os.getuid()),
+                         "-p", "Display", "--value")
+        if not session:
+            return ""
+        active = output(LOGINCTL, "show-session", session,
+                        "-p", "Active", "--value")
+        return session if active == "yes" else ""
+
+    def display_power_mode():
+        value = output(BUSCTL, "--user", "get-property", MUTTER_DESTINATION,
+                       MUTTER_PATH, MUTTER_INTERFACE, "PowerSaveMode")
+        try:
+            return int(value.rsplit(maxsplit=1)[-1])
+        except (IndexError, ValueError):
+            return -1
+
+    def session_locked(session):
+        return output(LOGINCTL, "show-session", session,
+                      "-p", "LockedHint", "--value") == "yes"
+
+    def wake_display(session):
+        if session_locked(session):
+            subprocess.run([LOGINCTL, "unlock-session", session], check=False)
+        subprocess.run(
+            [BUSCTL, "--user", "set-property", MUTTER_DESTINATION,
+             MUTTER_PATH, MUTTER_INTERFACE, "PowerSaveMode", "i", "0"],
+            check=False,
+        )
+
+    def stop_verification(process):
+        if process.poll() is not None:
+            return process.communicate()[0]
+        process.send_signal(signal.SIGINT)
+        try:
+            return process.communicate(timeout=2)[0]
+        except subprocess.TimeoutExpired:
+            process.kill()
+            return process.communicate()[0]
+
+    while True:
+        session = display_session()
+        if not session or display_power_mode() != 3:
+            time.sleep(0.25)
+            continue
+
+        process = subprocess.Popen(
+            [FPRINTD_VERIFY, pwd.getpwuid(os.getuid()).pw_name],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+
+        while process.poll() is None and display_power_mode() == 3:
+            time.sleep(0.25)
+
+        result = (process.communicate()[0] if process.poll() is not None
+                  else stop_verification(process))
+        if "verify-match" in result and display_power_mode() == 3:
+            current_session = display_session()
+            if current_session:
+                wake_display(current_session)
+                print("Fingerprint matched; woke and unlocked session",
+                      flush=True)
+
+        time.sleep(0.25)
+  '';
   waitForQteeDevices = pkgs.writeShellScript "wait-for-qtee-devices" ''
     for attempt in $(seq 1 30); do
       if [ -c /dev/tee0 ] && {
@@ -26,7 +116,10 @@ let
   '';
 in
 {
-  options.services.sheng-fingerprint.enable = lib.mkEnableOption "the Xiaomi sheng FPC1553 fingerprint sensor";
+  options.services.sheng-fingerprint = {
+    enable = lib.mkEnableOption "the Xiaomi sheng FPC1553 fingerprint sensor";
+    wakeUnlock = lib.mkEnableOption "fingerprint wake and unlock while the display is off";
+  };
 
   config = lib.mkIf cfg.enable {
     services.fprintd.enable = true;
@@ -104,6 +197,18 @@ in
         StateDirectoryMode = "0700";
         DeviceAllow = [ "/dev/tee0 rw" ];
         ReadWritePaths = [ "/sys/devices" ];
+      };
+    };
+
+    systemd.user.services.sheng-fingerprint-wake-unlock = lib.mkIf cfg.wakeUnlock {
+      description = "Wake and unlock the GNOME session with FPC1553";
+      wantedBy = [ "graphical-session.target" ];
+      partOf = [ "graphical-session.target" ];
+      after = [ "graphical-session-pre.target" ];
+      serviceConfig = {
+        ExecStart = wakeUnlock;
+        Restart = "always";
+        RestartSec = "1s";
       };
     };
   };

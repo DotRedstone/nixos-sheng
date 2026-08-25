@@ -95,6 +95,7 @@
 
   services.xiaomi-mipps-auth.enable = true;
   services.sheng-fingerprint.enable = true;
+  services.sheng-fingerprint.wakeUnlock = true;
 
   console = {
     earlySetup = true;
