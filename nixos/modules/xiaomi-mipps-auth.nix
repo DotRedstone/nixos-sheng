@@ -9,6 +9,44 @@
 let
   cfg = config.services.xiaomi-mipps-auth;
   package = pkgs.callPackage ../packages/xiaomi-mipps-auth.nix { };
+  usbDeviceRolePackage = pkgs.writeShellApplication {
+    name = "sheng-usb-device-role";
+    runtimeInputs = [
+      pkgs.coreutils
+      pkgs.systemd
+    ];
+    text = ''
+      set -u
+
+      role_path=""
+      for path in /sys/class/usb_role/*/role; do
+        [ -w "$path" ] || continue
+        role_path="$path"
+        break
+      done
+
+      if [ -z "$role_path" ]; then
+        echo "USB device-role recovery skipped: role switch is unavailable"
+        exit 0
+      fi
+
+      role="$(cat "$role_path" 2>/dev/null || true)"
+      if [ "$role" != "device" ]; then
+        printf '%s\n' device > "$role_path"
+        for _role_wait in $(seq 1 20); do
+          [ "$(cat "$role_path" 2>/dev/null || true)" = "device" ] && break
+          sleep 0.1
+        done
+        echo "USB data role restored: $role -> $(cat "$role_path" 2>/dev/null || echo unknown)"
+      else
+        echo "USB data role already device"
+      fi
+
+      # FunctionFS may have started while no UDC was available. Re-enabling
+      # adbd binds the existing gadget as soon as the device role is active.
+      systemctl try-restart adbd.service
+    '';
+  };
   retryPackage = pkgs.writeShellApplication {
     name = "xiaomi-mipps-auth-retry";
     runtimeInputs = [
@@ -175,6 +213,18 @@ let
         exit 0
       fi
 
+      # A Type-C partner event also starts sheng-usb-device-role. Give adbd a
+      # short window to bind its gadget before deciding this is a charger. A
+      # configured data link is a computer connection and must never be torn
+      # down by the authentication helper's host-role request.
+      for _data_wait in $(seq 1 15); do
+        if has_active_usb_data_link; then
+          echo "MiPPS auth skipped: active USB data link"
+          exit 0
+        fi
+        sleep 0.2
+      done
+
       max_attempts=60
       max_helper_attempts=3
       helper_attempts=0
@@ -325,6 +375,7 @@ in
 
     systemd.services.xiaomi-mipps-auth = {
       description = "Xiaomi MiPPS/PPS charger authentication";
+      after = [ "sheng-usb-device-role.service" ];
       unitConfig = {
         ConditionPathExistsGlob =
           "/sys/devices/platform/pmic-glink/*/xiaomi/request_vdm_cmd";
@@ -343,9 +394,18 @@ in
       };
     };
 
+    systemd.services.sheng-usb-device-role = {
+      description = "Restore the sheng USB device role for ADB";
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = "${usbDeviceRolePackage}/bin/sheng-usb-device-role";
+      };
+    };
+
     services.udev.extraRules = ''
-      # Delegate Xiaomi MiPPS authentication to systemd after a USB-C partner attaches.
-      ACTION=="add", SUBSYSTEM=="typec", KERNEL=="port*-partner", TAG+="systemd", ENV{SYSTEMD_WANTS}+="xiaomi-mipps-auth.service"
+      # Restore the gadget role first, then let MiPPS distinguish a computer
+      # from a charger by whether the UDC reaches the configured state.
+      ACTION=="add", SUBSYSTEM=="typec", KERNEL=="port*-partner", TAG+="systemd", ENV{SYSTEMD_WANTS}+="sheng-usb-device-role.service xiaomi-mipps-auth.service"
       # Some adapters expose their Xiaomi SVID/PDOs only after the USB power_supply
       # node changes from SDP/unknown to PD/PPS. Retry when that state changes.
       ACTION=="change", SUBSYSTEM=="power_supply", KERNEL=="qcom-battmgr-usb", ATTR{online}=="1", TAG+="systemd", ENV{SYSTEMD_WANTS}+="xiaomi-mipps-auth.service"
