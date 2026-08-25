@@ -267,7 +267,9 @@ let
       max_attempts=60
       max_helper_attempts=3
       helper_attempts=0
-      non_pd_grace_attempts=6
+      # A partner add event is the only hotplug trigger. Keep waiting long
+      # enough for charger_pd to publish PD/PPS after a cold boot.
+      non_pd_grace_attempts=30
       empty_svid_grace_attempts=15
       stale_svid_grace_attempts=6
       sleep_seconds=2
@@ -417,12 +419,12 @@ in
     systemd.services.xiaomi-mipps-auth = {
       description = "Xiaomi MiPPS/PPS charger authentication";
       after = [ "sheng-usb-device-role.service" ];
+      wantedBy = [ "multi-user.target" ];
       unitConfig = {
         ConditionPathExistsGlob =
           "/sys/devices/platform/pmic-glink/*/xiaomi/request_vdm_cmd";
-        # A single charger transition can emit several power_supply events.
-        # Keep later detach/attach events eligible after that initial burst;
-        # flock and the completion checks below make duplicate runs harmless.
+        # Keep rapid detach/attach cycles eligible; flock and the per-attach
+        # completion token make duplicate partner events harmless.
         StartLimitIntervalSec = 0;
       };
       serviceConfig = {
@@ -447,9 +449,6 @@ in
       # Restore the gadget role first, then let MiPPS distinguish a computer
       # from a charger by whether the UDC reaches the configured state.
       ACTION=="add", SUBSYSTEM=="typec", KERNEL=="port*-partner", TAG+="systemd", ENV{SYSTEMD_WANTS}+="sheng-usb-device-role.service xiaomi-mipps-auth.service"
-      # Some adapters expose their Xiaomi SVID/PDOs only after the USB power_supply
-      # node changes from SDP/unknown to PD/PPS. Retry when that state changes.
-      ACTION=="change", SUBSYSTEM=="power_supply", KERNEL=="qcom-battmgr-usb", ATTR{online}=="1", TAG+="systemd", ENV{SYSTEMD_WANTS}+="xiaomi-mipps-auth.service"
     '';
   };
 }
