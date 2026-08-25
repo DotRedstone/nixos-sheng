@@ -405,6 +405,26 @@ module ShengHeadlessGenerationMenu
     @dirty_bottom = bottom if !@dirty_bottom || bottom > @dirty_bottom
   end
 
+  def paint_tile_rect(tile, tile_top, tile_bottom, x, y, width, height, color)
+    x = clamp(x, 0, @fb_width)
+    y = clamp(y, 0, @fb_height)
+    width = clamp(width, 0, @fb_width - x)
+    height = clamp(height, 0, @fb_height - y)
+    return if width <= 0 || height <= 0
+
+    start_y = [y, tile_top].max
+    end_y = [y + height, tile_bottom].min
+    return if end_y <= start_y
+
+    row = pixel(color) * width
+    current_y = start_y
+    while current_y < end_y
+      tile_offset = (current_y - tile_top) * @fb_stride + x * @fb_bytes
+      tile[tile_offset, row.bytesize] = row
+      current_y += 1
+    end
+  end
+
   def present_framebuffer()
     return unless @dirty_top && @dirty_bottom
 
@@ -458,16 +478,70 @@ module ShengHeadlessGenerationMenu
         operation_bottom = y + height
         next if operation_bottom <= tile_top || y >= tile_bottom
 
-        if kind == :rect
-          color = operation[5]
-          row = pixel(color) * width
-          start_y = [y, tile_top].max
-          end_y = [operation_bottom, tile_bottom].min
-          current_y = start_y
-          while current_y < end_y
-            tile_offset = (current_y - tile_top) * @fb_stride + x * @fb_bytes
-            tile[tile_offset, row.bytesize] = row
-            current_y += 1
+        case kind
+        when :rect
+          paint_tile_rect(tile, tile_top, tile_bottom, x, y, width, height, operation[5])
+        when :line
+          x0, y0, x1, y1, color, thickness = operation[5]
+          dx = (x1 - x0).abs
+          sx = x0 < x1 ? 1 : -1
+          dy = -(y1 - y0).abs
+          sy = y0 < y1 ? 1 : -1
+          error = dx + dy
+
+          loop do
+            paint_tile_rect(
+              tile,
+              tile_top,
+              tile_bottom,
+              x0 - thickness / 2,
+              y0 - thickness / 2,
+              thickness,
+              thickness,
+              color
+            )
+            break if x0 == x1 && y0 == y1
+
+            doubled = error * 2
+            if doubled >= dy
+              error += dy
+              x0 += sx
+            end
+            if doubled <= dx
+              error += dx
+              y0 += sy
+            end
+          end
+        when :circle
+          cx, cy, radius, color, thickness = operation[5]
+          circle_x = radius
+          circle_y = 0
+          error = 1 - circle_x
+
+          while circle_x >= circle_y
+            points = [
+              [circle_x, circle_y], [circle_y, circle_x], [-circle_y, circle_x], [-circle_x, circle_y],
+              [-circle_x, -circle_y], [-circle_y, -circle_x], [circle_y, -circle_x], [circle_x, -circle_y]
+            ]
+            points.each do |dx_point, dy_point|
+              paint_tile_rect(
+                tile,
+                tile_top,
+                tile_bottom,
+                cx + dx_point - thickness / 2,
+                cy + dy_point - thickness / 2,
+                thickness,
+                thickness,
+                color
+              )
+            end
+            circle_y += 1
+            if error < 0
+              error += 2 * circle_y + 1
+            else
+              circle_x -= 1
+              error += 2 * (circle_y - circle_x) + 1
+            end
           end
         else
           text, fg, bg, scale, align = operation[5]
@@ -620,45 +694,22 @@ module ShengHeadlessGenerationMenu
   end
 
   def draw_line(x0, y0, x1, y1, color, thickness = 3)
-    dx = (x1 - x0).abs
-    sx = x0 < x1 ? 1 : -1
-    dy = -(y1 - y0).abs
-    sy = y0 < y1 ? 1 : -1
-    error = dx + dy
-
-    loop do
-      draw_rect(x0 - thickness / 2, y0 - thickness / 2, thickness, thickness, color)
-      break if x0 == x1 && y0 == y1
-
-      doubled = error * 2
-      if doubled >= dy
-        error += dy
-        x0 += sx
-      end
-      if doubled <= dx
-        error += dx
-        y0 += sy
-      end
-    end
+    framebuffer_info()
+    left = [x0, x1].min - thickness / 2
+    top = [y0, y1].min - thickness / 2
+    right = [x0, x1].max - thickness / 2 + thickness
+    bottom = [y0, y1].max - thickness / 2 + thickness
+    draw_operations() << [:line, left, top, right - left, bottom - top, [x0, y0, x1, y1, color, thickness]]
+    mark_framebuffer_dirty(top, bottom - top)
   end
 
   def draw_circle(cx, cy, radius, color, thickness = 3)
-    x = radius
-    y = 0
-    error = 1 - x
-
-    while x >= y
-      [[x, y], [y, x], [-y, x], [-x, y], [-x, -y], [-y, -x], [y, -x], [x, -y]].each do |dx, dy|
-        draw_rect(cx + dx - thickness / 2, cy + dy - thickness / 2, thickness, thickness, color)
-      end
-      y += 1
-      if error < 0
-        error += 2 * y + 1
-      else
-        x -= 1
-        error += 2 * (y - x) + 1
-      end
-    end
+    framebuffer_info()
+    left = cx - radius - thickness / 2
+    top = cy - radius - thickness / 2
+    diameter = radius * 2 + thickness
+    draw_operations() << [:circle, left, top, diameter, diameter, [cx, cy, radius, color, thickness]]
+    mark_framebuffer_dirty(top, diameter)
   end
 
   def draw_brand_mark(x, y, size, color)
@@ -889,6 +940,7 @@ module ShengHeadlessGenerationMenu
 
   def render_framebuffer(generations, selected, previous_selected: nil, remaining: nil, previous_remaining: nil)
     started_at = Time.now.to_f
+    $logger.debug("Sheng generation framebuffer render started.") if $logger.respond_to?(:debug)
     framebuffer_info()
     labels =
       if generations.empty?
@@ -1092,17 +1144,21 @@ module ShengHeadlessGenerationMenu
   end
 
   def choose(switch_root)
+    $logger.debug("Sheng generation menu initialization started.") if $logger.respond_to?(:debug)
     generations = Tasks::SwitchRoot::NixOSGeneration.generations()
     selected = 0
     deadline = Time.now.to_i + timeout()
     countdown_active = true
     activate_console()
+    $logger.debug("Sheng generation menu console activated.") if $logger.respond_to?(:debug)
     set_console_echo(false)
     set_console_keyboard(false)
     suppress_console_logs()
+    $logger.debug("Sheng generation menu input scan started.") if $logger.respond_to?(:debug)
     refresh_input_devices(force: true)
     input_held.clear
     wait_for_release(VOLUME_UP + VOLUME_DOWN + CONFIRM)
+    $logger.debug("Sheng generation menu input ready.") if $logger.respond_to?(:debug)
     last_selected = nil
     last_remaining = nil
     volume_up_was_pressed = false
