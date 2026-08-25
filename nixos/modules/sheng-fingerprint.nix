@@ -22,6 +22,9 @@ let
     MUTTER_DESTINATION = "org.gnome.Mutter.DisplayConfig"
     MUTTER_INTERFACE = "org.gnome.Mutter.DisplayConfig"
     MUTTER_PATH = "/org/gnome/Mutter/DisplayConfig"
+    SCREENSAVER_DESTINATION = "org.gnome.ScreenSaver"
+    SCREENSAVER_INTERFACE = "org.gnome.ScreenSaver"
+    SCREENSAVER_PATH = "/org/gnome/ScreenSaver"
 
     def output(*args):
         try:
@@ -55,6 +58,12 @@ let
     def wake_display(session):
         if session_locked(session):
             subprocess.run([LOGINCTL, "unlock-session", session], check=False)
+        subprocess.run(
+            [BUSCTL, "--user", "call", SCREENSAVER_DESTINATION,
+             SCREENSAVER_PATH, SCREENSAVER_INTERFACE, "SetActive", "b",
+             "false"],
+            check=False,
+        )
         subprocess.run(
             [BUSCTL, "--user", "set-property", MUTTER_DESTINATION,
              MUTTER_PATH, MUTTER_INTERFACE, "PowerSaveMode", "i", "0"],
