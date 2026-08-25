@@ -408,7 +408,24 @@ module ShengHeadlessGenerationMenu
   def present_framebuffer()
     return unless @dirty_top && @dirty_bottom
 
+    started_at = Time.now.to_f
+    operation_count = draw_operations().length
+    tile_count = ((@dirty_bottom - @dirty_top) + FRAMEBUFFER_TILE_HEIGHT - 1) / FRAMEBUFFER_TILE_HEIGHT
+    tile_operations = Array.new(tile_count) { [] }
+    draw_operations().each do |operation|
+      operation_top = operation[2]
+      operation_bottom = operation_top + operation[4]
+      first_tile = [(operation_top - @dirty_top) / FRAMEBUFFER_TILE_HEIGHT, 0].max
+      last_tile = [(operation_bottom - 1 - @dirty_top) / FRAMEBUFFER_TILE_HEIGHT, tile_count - 1].min
+      tile_index = first_tile
+      while tile_index <= last_tile
+        tile_operations[tile_index] << operation
+        tile_index += 1
+      end
+    end
+
     tile_top = @dirty_top
+    tile_index = 0
     while tile_top < @dirty_bottom
       tile_bottom = [tile_top + FRAMEBUFFER_TILE_HEIGHT, @dirty_bottom].min
       offset = tile_top * @fb_stride
@@ -419,7 +436,7 @@ module ShengHeadlessGenerationMenu
         tile = (tile || "") + [0].pack("C") * (length - (tile ? tile.bytesize : 0))
       end
 
-      draw_operations().each do |operation|
+      tile_operations[tile_index].each do |operation|
         kind = operation[0]
         x = operation[1]
         y = operation[2]
@@ -451,11 +468,18 @@ module ShengHeadlessGenerationMenu
         written += count
       end
       tile_top = tile_bottom
+      tile_index += 1
     end
     framebuffer.flush
     @draw_operations = []
     @dirty_top = nil
     @dirty_bottom = nil
+    if $logger.respond_to?(:debug)
+      $logger.debug(
+        "Sheng generation framebuffer presented #{operation_count} operations in " \
+        "#{(Time.now.to_f - started_at).round(3)}s."
+      )
+    end
   end
 
   def pixel(color)
