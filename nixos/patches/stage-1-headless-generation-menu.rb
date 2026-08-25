@@ -29,6 +29,7 @@ module ShengHeadlessGenerationMenu
   FOOTER_HEIGHT = 190
   SCROLLBAR_WIDTH = 8
   SCROLLBAR_GAP = 28
+  FRAMEBUFFER_TILE_HEIGHT = 32
   BG = [8, 10, 11]
   PANEL_BG = [17, 19, 21]
   PANEL_BORDER_COLOR = [57, 64, 66]
@@ -391,13 +392,8 @@ module ShengHeadlessGenerationMenu
     @fb_ready = true
   end
 
-  def framebuffer_buffer()
-    framebuffer_info()
-    size = @fb_stride * @fb_height
-    if !@framebuffer_buffer || @framebuffer_buffer.bytesize != size
-      @framebuffer_buffer = [0].pack("C") * size
-    end
-    @framebuffer_buffer
+  def draw_operations()
+    @draw_operations ||= []
   end
 
   def mark_framebuffer_dirty(y, height)
@@ -412,19 +408,66 @@ module ShengHeadlessGenerationMenu
   def present_framebuffer()
     return unless @dirty_top && @dirty_bottom
 
-    offset = @dirty_top * @fb_stride
-    length = (@dirty_bottom - @dirty_top) * @fb_stride
-    data = framebuffer_buffer()[offset, length]
-    written = 0
+    tile_top = @dirty_top
+    while tile_top < @dirty_bottom
+      tile_bottom = [tile_top + FRAMEBUFFER_TILE_HEIGHT, @dirty_bottom].min
+      offset = tile_top * @fb_stride
+      length = (tile_bottom - tile_top) * @fb_stride
+      framebuffer.sysseek(offset, IO::SEEK_SET)
+      tile = framebuffer.sysread(length)
+      if !tile || tile.bytesize < length
+        tile = (tile || "") + [0].pack("C") * (length - (tile ? tile.bytesize : 0))
+      end
 
-    framebuffer.sysseek(offset, IO::SEEK_SET)
-    while written < data.bytesize
-      count = framebuffer.syswrite(data[written, data.bytesize - written])
-      raise IOError, "short framebuffer write" unless count && count > 0
+      draw_operations().each do |operation|
+        kind = operation[0]
+        x = operation[1]
+        y = operation[2]
+        width = operation[3]
+        height = operation[4]
+        operation_bottom = y + height
+        next if operation_bottom <= tile_top || y >= tile_bottom
 
-      written += count
+        if kind == :rect
+          color = operation[5]
+          row = pixel(color) * width
+          start_y = [y, tile_top].max
+          end_y = [operation_bottom, tile_bottom].min
+          current_y = start_y
+          while current_y < end_y
+            tile_offset = (current_y - tile_top) * @fb_stride + x * @fb_bytes
+            tile[tile_offset, row.bytesize] = row
+            current_y += 1
+          end
+        else
+          text = operation[5]
+          fg = operation[6]
+          bg = operation[7]
+          scale = operation[8]
+          align = operation[9]
+          lines = text_pixels(text, width, height, fg, bg, scale, align)
+          lines.each_with_index do |line, index|
+            current_y = y + index
+            next if current_y < tile_top || current_y >= tile_bottom
+
+            tile_offset = (current_y - tile_top) * @fb_stride + x * @fb_bytes
+            tile[tile_offset, line.bytesize] = line
+          end
+        end
+      end
+
+      written = 0
+      framebuffer.sysseek(offset, IO::SEEK_SET)
+      while written < tile.bytesize
+        count = framebuffer.syswrite(tile[written, tile.bytesize - written])
+        raise IOError, "short framebuffer write" unless count && count > 0
+
+        written += count
+      end
+      tile_top = tile_bottom
     end
     framebuffer.flush
+    @draw_operations = []
     @dirty_top = nil
     @dirty_bottom = nil
   end
@@ -459,13 +502,7 @@ module ShengHeadlessGenerationMenu
     height = clamp(height, 0, @fb_height - y)
     return if width <= 0 || height <= 0
 
-    row = pixel(color) * width
-    current_y = y
-    while current_y < y + height
-      offset = current_y * @fb_stride + x * @fb_bytes
-      framebuffer_buffer()[offset, row.bytesize] = row
-      current_y += 1
-    end
+    draw_operations() << [:rect, x, y, width, height, color]
     mark_framebuffer_dirty(y, height)
   end
 
@@ -530,11 +567,7 @@ module ShengHeadlessGenerationMenu
     height = clamp(height, 0, @fb_height - y)
     return if width <= 0 || height <= 0
 
-    lines = text_pixels(text, width, height, fg, bg, scale, align)
-    lines.each_with_index do |line, index|
-      offset = (y + index) * @fb_stride + x * @fb_bytes
-      framebuffer_buffer()[offset, line.bytesize] = line
-    end
+    draw_operations() << [:text, x, y, width, height, text, fg, bg, scale, align]
     mark_framebuffer_dirty(y, height)
   end
 
