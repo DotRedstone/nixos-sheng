@@ -347,7 +347,7 @@ module ShengHeadlessGenerationMenu
 
   def set_console_keyboard(enabled)
     mode = enabled ? "-u" : "-s"
-    System.run("kbd_mode", "-f", mode, "-C", console_path())
+    System.run("kbd_mode", mode, "-C", console_path())
   rescue System::CommandError => error
     $logger.warn("Could not update sheng generation menu keyboard mode: #{error}")
   end
@@ -391,6 +391,44 @@ module ShengHeadlessGenerationMenu
     @fb_ready = true
   end
 
+  def framebuffer_buffer()
+    framebuffer_info()
+    size = @fb_stride * @fb_height
+    if !@framebuffer_buffer || @framebuffer_buffer.bytesize != size
+      @framebuffer_buffer = [0].pack("C") * size
+    end
+    @framebuffer_buffer
+  end
+
+  def mark_framebuffer_dirty(y, height)
+    top = clamp(y, 0, @fb_height)
+    bottom = clamp(y + height, 0, @fb_height)
+    return if bottom <= top
+
+    @dirty_top = top if !@dirty_top || top < @dirty_top
+    @dirty_bottom = bottom if !@dirty_bottom || bottom > @dirty_bottom
+  end
+
+  def present_framebuffer()
+    return unless @dirty_top && @dirty_bottom
+
+    offset = @dirty_top * @fb_stride
+    length = (@dirty_bottom - @dirty_top) * @fb_stride
+    data = framebuffer_buffer()[offset, length]
+    written = 0
+
+    framebuffer.sysseek(offset, IO::SEEK_SET)
+    while written < data.bytesize
+      count = framebuffer.syswrite(data[written, data.bytesize - written])
+      raise IOError, "short framebuffer write" unless count && count > 0
+
+      written += count
+    end
+    framebuffer.flush
+    @dirty_top = nil
+    @dirty_bottom = nil
+  end
+
   def pixel(color)
     r, g, b = color
     case @fb_bpp
@@ -424,10 +462,11 @@ module ShengHeadlessGenerationMenu
     row = pixel(color) * width
     current_y = y
     while current_y < y + height
-      framebuffer.sysseek(current_y * @fb_stride + x * @fb_bytes, IO::SEEK_SET)
-      framebuffer.syswrite(row)
+      offset = current_y * @fb_stride + x * @fb_bytes
+      framebuffer_buffer()[offset, row.bytesize] = row
       current_y += 1
     end
+    mark_framebuffer_dirty(y, height)
   end
 
   def glyph(char)
@@ -493,9 +532,10 @@ module ShengHeadlessGenerationMenu
 
     lines = text_pixels(text, width, height, fg, bg, scale, align)
     lines.each_with_index do |line, index|
-      framebuffer.sysseek((y + index) * @fb_stride + x * @fb_bytes, IO::SEEK_SET)
-      framebuffer.syswrite(line)
+      offset = (y + index) * @fb_stride + x * @fb_bytes
+      framebuffer_buffer()[offset, line.bytesize] = line
     end
+    mark_framebuffer_dirty(y, height)
   end
 
   def draw_line(x0, y0, x1, y1, color, thickness = 3)
@@ -856,7 +896,7 @@ module ShengHeadlessGenerationMenu
       draw_countdown(footer_y, remaining)
     end
 
-    framebuffer.flush
+    present_framebuffer()
     true
   rescue => error
     $logger.warn("Could not render sheng generation menu framebuffer: #{error}")
@@ -958,7 +998,7 @@ module ShengHeadlessGenerationMenu
     )
     draw_rect(x + PANEL_PADDING, y + 339, width - PANEL_PADDING * 2, 8, ROW_BG)
     draw_rect(x + PANEL_PADDING, y + 339, width - PANEL_PADDING * 2, 8, BOOT_FG)
-    framebuffer.flush
+    present_framebuffer()
   rescue => error
     $logger.warn("Could not render sheng generation menu boot status: #{error}")
   end
