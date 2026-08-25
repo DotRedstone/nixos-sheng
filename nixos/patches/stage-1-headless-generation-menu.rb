@@ -428,31 +428,17 @@ module ShengHeadlessGenerationMenu
         operation_bottom = y + height
         next if operation_bottom <= tile_top || y >= tile_bottom
 
-        if kind == :rect
-          color = operation[5]
-          row = pixel(color) * width
-          start_y = [y, tile_top].max
-          end_y = [operation_bottom, tile_bottom].min
-          current_y = start_y
-          while current_y < end_y
-            tile_offset = (current_y - tile_top) * @fb_stride + x * @fb_bytes
-            tile[tile_offset, row.bytesize] = row
-            current_y += 1
-          end
-        else
-          text = operation[5]
-          fg = operation[6]
-          bg = operation[7]
-          scale = operation[8]
-          align = operation[9]
-          lines = text_pixels(text, width, height, fg, bg, scale, align)
-          lines.each_with_index do |line, index|
-            current_y = y + index
-            next if current_y < tile_top || current_y >= tile_bottom
+        next unless kind == :rect
 
-            tile_offset = (current_y - tile_top) * @fb_stride + x * @fb_bytes
-            tile[tile_offset, line.bytesize] = line
-          end
+        color = operation[5]
+        row = pixel(color) * width
+        start_y = [y, tile_top].max
+        end_y = [operation_bottom, tile_bottom].min
+        current_y = start_y
+        while current_y < end_y
+          tile_offset = (current_y - tile_top) * @fb_stride + x * @fb_bytes
+          tile[tile_offset, row.bytesize] = row
+          current_y += 1
         end
       end
 
@@ -510,11 +496,17 @@ module ShengHeadlessGenerationMenu
     FONT[char.upcase] || FONT["?"]
   end
 
-  def text_pixels(text, width, height, fg, bg, scale = FONT_SCALE, align = :left)
+  def draw_text_box(x, y, width, height, text, fg, bg, scale: FONT_SCALE, align: :left)
     framebuffer_info()
-    fg_pixel = pixel(fg)
-    bg_pixel = pixel(bg)
-    lines = Array.new(height) { bg_pixel * width }
+    return if width <= 0 || height <= 0
+
+    x = clamp(x, 0, @fb_width)
+    y = clamp(y, 0, @fb_height)
+    width = clamp(width, 0, @fb_width - x)
+    height = clamp(height, 0, @fb_height - y)
+    return if width <= 0 || height <= 0
+
+    draw_rect(x, y, width, height, bg)
     chars = text.to_s.upcase.each_char.to_a
     max_chars = [width / (6 * scale), 0].max
     chars = chars[0, max_chars]
@@ -529,46 +521,34 @@ module ShengHeadlessGenerationMenu
         0
       end
 
-    7.times do |glyph_y|
-      scale.times do |sy|
-        dst_y = glyph_y * scale + sy
+    chars.each_with_index do |char, char_index|
+      glyph(char).each_with_index do |bits, glyph_y|
+        dst_y = glyph_y * scale
         next if dst_y >= height
 
-        row = lines[dst_y].dup
-        char_x = start_x
-        chars.each do |char|
-          bits = glyph(char)[glyph_y]
-          bits.each_char do |bit|
-            pixel_data = bit == "1" ? fg_pixel : bg_pixel
-            scale.times do |sx|
-              dst_x = char_x + sx
-              if dst_x < width
-                row[dst_x * @fb_bytes, @fb_bytes] = pixel_data
-              end
+        run_start = nil
+        bits.each_char.with_index do |bit, glyph_x|
+          if bit == "1"
+            run_start = glyph_x if run_start.nil?
+          elsif run_start
+            run_width = glyph_x - run_start
+            dst_x = start_x + (char_index * 6 + run_start) * scale
+            if dst_x < width
+              draw_rect(x + dst_x, y + dst_y, [run_width * scale, width - dst_x].min, [scale, height - dst_y].min, fg)
             end
-            char_x += scale
+            run_start = nil
           end
-          char_x += scale
         end
-        lines[dst_y] = row
+
+        next unless run_start
+
+        run_width = bits.length - run_start
+        dst_x = start_x + (char_index * 6 + run_start) * scale
+        if dst_x < width
+          draw_rect(x + dst_x, y + dst_y, [run_width * scale, width - dst_x].min, [scale, height - dst_y].min, fg)
+        end
       end
     end
-
-    lines
-  end
-
-  def draw_text_box(x, y, width, height, text, fg, bg, scale: FONT_SCALE, align: :left)
-    framebuffer_info()
-    return if width <= 0 || height <= 0
-
-    x = clamp(x, 0, @fb_width)
-    y = clamp(y, 0, @fb_height)
-    width = clamp(width, 0, @fb_width - x)
-    height = clamp(height, 0, @fb_height - y)
-    return if width <= 0 || height <= 0
-
-    draw_operations() << [:text, x, y, width, height, text, fg, bg, scale, align]
-    mark_framebuffer_dirty(y, height)
   end
 
   def draw_line(x0, y0, x1, y1, color, thickness = 3)
