@@ -162,7 +162,9 @@ let
       for attempt in $(seq 1 "$max_attempts"); do
         if is_complete "$root"; then
           echo "MiPPS auth already active before attempt $attempt"
-          xiaomi-mipps-auth --sysfs "$root" --timeout 3 || true
+          # Authentication completion emits another power_supply change event.
+          # Do not invoke the helper again from that event: its data-role swap
+          # can tear down the freshly authenticated Type-C partner.
           exit 0
         fi
 
@@ -182,6 +184,9 @@ let
           # seconds and disturb a normal USB data connection.
           if [ "$attempt" -ge "$non_pd_grace_attempts" ]; then
             echo "MiPPS auth skipped: PD/PPS not ready after $attempt attempts (real_type=''${real_type:-unknown})"
+            if ! has_active_usb_data_link; then
+              sync_standard_pd_current
+            fi
             exit 0
           fi
           sleep "$sleep_seconds"
