@@ -147,6 +147,13 @@ let
         return 1
       }
 
+      mark_attach_complete() {
+        [ -n "''${attach_token:-}" ] || return 0
+        mkdir -p "$(dirname "$completed_attach_file")"
+        printf '%s\n' "$attach_token" > "$completed_attach_file"
+        rm -f "$failed_attach_file"
+      }
+
       has_active_usb_data_link() {
         local state=""
 
@@ -224,9 +231,17 @@ let
         exit 1
       fi
 
+      completed_attach_file=/run/xiaomi-mipps-auth/completed-attach
       failed_attach_file=/run/xiaomi-mipps-auth/failed-attach
       attach_token="$(current_attach_token || true)"
+      if [ -n "$attach_token" ] \
+        && [ -r "$completed_attach_file" ] \
+        && [ "$(cat "$completed_attach_file")" = "$attach_token" ]; then
+        echo "MiPPS auth skipped: authentication already completed for this Type-C attach"
+        exit 0
+      fi
       if is_complete "$root"; then
+        mark_attach_complete
         echo "MiPPS auth already active before attempt 1"
         exit 0
       fi
@@ -259,6 +274,7 @@ let
 
       for attempt in $(seq 1 "$max_attempts"); do
         if is_complete "$root"; then
+          mark_attach_complete
           echo "MiPPS auth already active before attempt $attempt"
           # Authentication completion emits another power_supply change event.
           # Do not invoke the helper again from that event: its data-role swap
@@ -302,6 +318,7 @@ let
               xiaomi-mipps-auth --sysfs "$root" --timeout 6 || true
 
               if is_complete "$root"; then
+                mark_attach_complete
                 echo "MiPPS auth active after identity probe"
                 exit 0
               fi
@@ -356,7 +373,7 @@ let
         for _completion_wait in $(seq 1 5); do
           if is_complete "$root"; then
             echo "MiPPS auth active after attempt $attempt"
-            rm -f "$failed_attach_file"
+            mark_attach_complete
             exit 0
           fi
           sleep 1
