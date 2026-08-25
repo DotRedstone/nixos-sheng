@@ -1145,8 +1145,8 @@ class Tasks::SwitchRoot
     ShengEarlyChargeGuard.wait_if_critical()
     explicit_request = ShengHeadlessGenerationMenu.requested?()
     wants_menu =
-      !ShengEarlyChargeGuard.charger_mode?() &&
-      explicit_request
+      explicit_request &&
+      ShengEarlyChargeGuard.interactive_boot_safe?()
 
     if wants_menu &&
        ShengHeadlessStage1.enabled? &&
