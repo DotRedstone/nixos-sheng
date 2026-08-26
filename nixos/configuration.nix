@@ -45,6 +45,10 @@
   systemd.services.NetworkManager-wait-online.wantedBy = lib.mkForce [ ];
   networking.useDHCP = lib.mkDefault true;
 
+  # GNOME enables Avahi for local-network discovery. Keep its NSS side wired
+  # up as well so .local lookups do not fail despite the daemon being active.
+  services.avahi.nssmdns4 = true;
+
   time.timeZone = lib.mkDefault "Asia/Shanghai";
   services.timesyncd = {
     enable = lib.mkDefault true;
