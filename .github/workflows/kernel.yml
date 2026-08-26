@@ -39,6 +39,12 @@ jobs:
       - name: Enable Nix cache
         uses: DeterminateSystems/magic-nix-cache-action@v13
 
+      - name: Validate generation menu renderer
+        run: |
+          nix --extra-experimental-features "nix-command flakes" \
+            build './nixos#checks.aarch64-linux.generationMenuRenderer' \
+            --no-link
+
       - name: Build boot image
         run: |
           set -o pipefail

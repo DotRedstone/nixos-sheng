@@ -30,6 +30,8 @@ module ShengHeadlessGenerationMenu
   SCROLLBAR_WIDTH = 8
   SCROLLBAR_GAP = 28
   FRAMEBUFFER_TILE_HEIGHT = 128
+  FRAMEBUFFER_RENDER_TIMEOUT = 5.0
+  MAX_LINE_SAMPLES = 48
   BG = [8, 10, 11]
   PANEL_BG = [17, 19, 21]
   PANEL_BORDER_COLOR = [57, 64, 66]
@@ -406,9 +408,11 @@ module ShengHeadlessGenerationMenu
   end
 
   def write_framebuffer_data(offset, data)
+    check_framebuffer_deadline()
     written = 0
     framebuffer.sysseek(offset, IO::SEEK_SET)
     while written < data.bytesize
+      check_framebuffer_deadline()
       count = framebuffer.syswrite(data[written, data.bytesize - written])
       raise IOError, "short framebuffer write" unless count && count > 0
 
@@ -416,18 +420,101 @@ module ShengHeadlessGenerationMenu
     end
   end
 
-  def write_framebuffer_rect(x, y, width, height, color)
-    x = clamp(x, 0, @fb_width)
-    y = clamp(y, 0, @fb_height)
-    width = clamp(width, 0, @fb_width - x)
-    height = clamp(height, 0, @fb_height - y)
-    return if width <= 0 || height <= 0
+  def read_framebuffer_data(offset, length)
+    data = ""
+    framebuffer.sysseek(offset, IO::SEEK_SET)
+    while data.bytesize < length
+      check_framebuffer_deadline()
+      chunk = framebuffer.sysread(length - data.bytesize)
+      raise IOError, "short framebuffer read" unless chunk && chunk.bytesize > 0
 
-    row = pixel(color) * width
-    current_y = y
-    end_y = y + height
-    while current_y < end_y
-      write_framebuffer_data(current_y * @fb_stride + x * @fb_bytes, row)
+      data << chunk
+    end
+    data
+  end
+
+  def check_framebuffer_deadline()
+    return unless @framebuffer_deadline
+    return if Time.now.to_f <= @framebuffer_deadline
+
+    raise IOError, "sheng generation framebuffer render exceeded #{FRAMEBUFFER_RENDER_TIMEOUT}s"
+  end
+
+  def unblank_framebuffer()
+    blank_path = "#{FB_SYSFS}/blank"
+    File.write(blank_path, "0\n") if File.exist?(blank_path)
+  rescue => error
+    $logger.warn("Could not unblank sheng generation menu framebuffer: #{error}")
+  end
+
+  def framebuffer_rectangles()
+    rectangles = []
+    draw_operations().each do |operation|
+      if operation[0] == :rect
+        rectangles << operation
+        next
+      end
+
+      x = operation[1]
+      y = operation[2]
+      width = operation[3]
+      height = operation[4]
+      text, fg, bg, scale, align = operation[5]
+      rectangles << [:rect, x, y, width, height, bg]
+      chars = text.upcase.each_char.to_a
+      max_chars = [width / (6 * scale), 0].max
+      chars = chars[0, max_chars]
+      rendered_width = [chars.length * 6 * scale - scale, 0].max
+      start_x =
+        case align
+        when :right
+          [width - rendered_width, 0].max
+        when :center
+          [(width - rendered_width) / 2, 0].max
+        else
+          0
+        end
+
+      chars.each_with_index do |char, char_index|
+        glyph_runs(char).each_with_index do |runs, glyph_y|
+          destination_y = glyph_y * scale
+          next if destination_y >= height
+
+          runs.each do |run_start, run_width|
+            destination_x = start_x + (char_index * 6 + run_start) * scale
+            next if destination_x >= width
+
+            clipped_width = [run_width * scale, width - destination_x].min
+            rectangles << [
+              :rect,
+              x + destination_x,
+              y + destination_y,
+              clipped_width,
+              [scale, height - destination_y].min,
+              fg
+            ]
+          end
+        end
+      end
+    end
+    rectangles
+  end
+
+  def paint_framebuffer_tile(tile, tile_top, tile_height, operation)
+    x = operation[1]
+    y = operation[2]
+    width = operation[3]
+    height = operation[4]
+    top = [y, tile_top].max
+    bottom = [y + height, tile_top + tile_height].min
+    return if bottom <= top
+
+    row = pixel(operation[5]) * width
+    current_y = top
+    while current_y < bottom
+      check_framebuffer_deadline()
+      offset = (current_y - tile_top) * @fb_stride + x * @fb_bytes
+      tile[offset, row.bytesize] = row
       current_y += 1
     end
   end
@@ -437,112 +524,31 @@ module ShengHeadlessGenerationMenu
 
     started_at = Time.now.to_f
     operation_count = draw_operations().length
-    draw_operations().each do |operation|
-      kind = operation[0]
-      x = operation[1]
-      y = operation[2]
-      width = operation[3]
-      height = operation[4]
-
-      case kind
-      when :rect
-        write_framebuffer_rect(x, y, width, height, operation[5])
-      when :line
-        x0, y0, x1, y1, color, thickness = operation[5]
-        dx = (x1 - x0).abs
-        sx = x0 < x1 ? 1 : -1
-        dy = -(y1 - y0).abs
-        sy = y0 < y1 ? 1 : -1
-        error = dx + dy
-
-        loop do
-          write_framebuffer_rect(x0 - thickness / 2, y0 - thickness / 2, thickness, thickness, color)
-          break if x0 == x1 && y0 == y1
-
-          doubled = error * 2
-          if doubled >= dy
-            error += dy
-            x0 += sx
-          end
-          if doubled <= dx
-            error += dx
-            y0 += sy
-          end
+    @framebuffer_deadline = started_at + FRAMEBUFFER_RENDER_TIMEOUT
+    unblank_framebuffer()
+    begin
+      rectangles = framebuffer_rectangles()
+      tile_top = @dirty_top / FRAMEBUFFER_TILE_HEIGHT * FRAMEBUFFER_TILE_HEIGHT
+      while tile_top < @dirty_bottom
+        tile_height = [FRAMEBUFFER_TILE_HEIGHT, @fb_height - tile_top].min
+        tile_offset = tile_top * @fb_stride
+        tile = read_framebuffer_data(tile_offset, tile_height * @fb_stride)
+        rectangles.each do |operation|
+          paint_framebuffer_tile(tile, tile_top, tile_height, operation)
         end
-      when :circle
-        cx, cy, radius, color, thickness = operation[5]
-        circle_x = radius
-        circle_y = 0
-        error = 1 - circle_x
-
-        while circle_x >= circle_y
-          points = [
-            [circle_x, circle_y], [circle_y, circle_x], [-circle_y, circle_x], [-circle_x, circle_y],
-            [-circle_x, -circle_y], [-circle_y, -circle_x], [circle_y, -circle_x], [circle_x, -circle_y]
-          ]
-          points.each do |dx_point, dy_point|
-            write_framebuffer_rect(
-              cx + dx_point - thickness / 2,
-              cy + dy_point - thickness / 2,
-              thickness,
-              thickness,
-              color
-            )
-          end
-          circle_y += 1
-          if error < 0
-            error += 2 * circle_y + 1
-          else
-            circle_x -= 1
-            error += 2 * (circle_y - circle_x) + 1
-          end
-        end
-      else
-        text, fg, bg, scale, align = operation[5]
-        write_framebuffer_rect(x, y, width, height, bg)
-        chars = text.upcase.each_char.to_a
-        max_chars = [width / (6 * scale), 0].max
-        chars = chars[0, max_chars]
-        rendered_width = [chars.length * 6 * scale - scale, 0].max
-        start_x =
-          case align
-          when :right
-            [width - rendered_width, 0].max
-          when :center
-            [(width - rendered_width) / 2, 0].max
-          else
-            0
-          end
-
-        chars.each_with_index do |char, char_index|
-          glyph_runs(char).each_with_index do |runs, glyph_y|
-            destination_y = glyph_y * scale
-            next if destination_y >= height
-
-            runs.each do |run_start, run_width|
-              destination_x = start_x + (char_index * 6 + run_start) * scale
-              next if destination_x >= width
-
-              clipped_width = [run_width * scale, width - destination_x].min
-              write_framebuffer_rect(
-                x + destination_x,
-                y + destination_y,
-                clipped_width,
-                [scale, height - destination_y].min,
-                fg
-              )
-            end
-          end
-        end
+        write_framebuffer_data(tile_offset, tile)
+        tile_top += tile_height
       end
+      framebuffer.flush
+    ensure
+      @framebuffer_deadline = nil
+      @draw_operations = []
+      @dirty_top = nil
+      @dirty_bottom = nil
     end
-    framebuffer.flush
-    @draw_operations = []
-    @dirty_top = nil
-    @dirty_bottom = nil
     if $logger.respond_to?(:debug)
       $logger.debug(
-        "Sheng generation framebuffer presented #{operation_count} operations in " \
+        "Sheng generation framebuffer presented #{operation_count} queued operations in " \
         "#{(Time.now.to_f - started_at).round(3)}s."
       )
     end
@@ -622,21 +628,38 @@ module ShengHeadlessGenerationMenu
 
   def draw_line(x0, y0, x1, y1, color, thickness = 3)
     framebuffer_info()
-    left = [x0, x1].min - thickness / 2
-    top = [y0, y1].min - thickness / 2
-    right = [x0, x1].max - thickness / 2 + thickness
-    bottom = [y0, y1].max - thickness / 2 + thickness
-    draw_operations() << [:line, left, top, right - left, bottom - top, [x0, y0, x1, y1, color, thickness]]
-    mark_framebuffer_dirty(top, bottom - top)
+    x0 = clamp(x0, 0, @fb_width - 1)
+    y0 = clamp(y0, 0, @fb_height - 1)
+    x1 = clamp(x1, 0, @fb_width - 1)
+    y1 = clamp(y1, 0, @fb_height - 1)
+    steps = [(x1 - x0).abs, (y1 - y0).abs].max
+    samples = [steps, MAX_LINE_SAMPLES].min
+    samples = 1 if samples < 1
+    index = 0
+    while index <= samples
+      x = x0 + (x1 - x0) * index / samples
+      y = y0 + (y1 - y0) * index / samples
+      draw_rect(x - thickness / 2, y - thickness / 2, thickness, thickness, color)
+      index += 1
+    end
   end
 
   def draw_circle(cx, cy, radius, color, thickness = 3)
-    framebuffer_info()
-    left = cx - radius - thickness / 2
-    top = cy - radius - thickness / 2
-    diameter = radius * 2 + thickness
-    draw_operations() << [:circle, left, top, diameter, diameter, [cx, cy, radius, color, thickness]]
-    mark_framebuffer_dirty(top, diameter)
+    half = radius * 3 / 4
+    points = [
+      [cx, cy - radius], [cx + half, cy - half], [cx + radius, cy], [cx + half, cy + half],
+      [cx, cy + radius], [cx - half, cy + half], [cx - radius, cy], [cx - half, cy - half],
+      [cx, cy - radius]
+    ]
+    index = 0
+    while index + 1 < points.length
+      draw_line(
+        points[index][0], points[index][1],
+        points[index + 1][0], points[index + 1][1],
+        color, thickness
+      )
+      index += 1
+    end
   end
 
   def draw_brand_mark(x, y, size, color)
@@ -1077,6 +1100,7 @@ module ShengHeadlessGenerationMenu
     deadline = Time.now.to_i + timeout()
     countdown_active = true
     activate_console()
+    unblank_framebuffer()
     $logger.debug("Sheng generation menu console activated.") if $logger.respond_to?(:debug)
     set_console_echo(false)
     set_console_keyboard(false)

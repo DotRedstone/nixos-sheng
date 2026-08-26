@@ -213,6 +213,14 @@
       };
 
       checks.${system} = {
+        generationMenuRenderer = pkgs.runCommand "sheng-generation-menu-renderer-check" {
+          nativeBuildInputs = [ pkgs.mruby ];
+        } ''
+          mruby \
+            ${./tests/test-stage1-generation-menu-renderer.rb} \
+            ${./patches/stage-1-headless-generation-menu.rb}
+          touch $out
+        '';
         publicGnomeSystem =
           (self.lib.${system}.mkShengGnomeSystem [ ]).config.system.build.toplevel;
         publicMinimalSystem =
