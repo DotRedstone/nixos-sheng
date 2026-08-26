@@ -100,11 +100,11 @@
     "shengKernelSrc": {
       "flake": false,
       "locked": {
-        "lastModified": 1787753053,
-        "narHash": "sha256-WHhp+mZAxZkCXaZnu3wiaOLpGP8rEzdh+LmL2cvvrfo=",
+        "lastModified": 1787758027,
+        "narHash": "sha256-QXLg6sRoPPxvqP1BCunbwgbVFpyvHWu7l0iA32kNEvk=",
         "owner": "DotRedstone",
         "repo": "linux-sheng",
-        "rev": "dabaadb2344172b2f90be985d20228822560beb3",
+        "rev": "78d1d2b670f9e609056188541f73b8b52d0cd9a8",
         "type": "github"
       },
       "original": {
