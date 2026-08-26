@@ -48,7 +48,7 @@ CPU 三个 cluster 已经使用 `schedutil`，GPU 和 UFS 空闲时也能降到�
 
 - SSC 未可查询时让 `iio-sensor-proxy` 启动失败并由 systemd 重试，不再带着半初始化状态进入桌面。
 - MiPPS 在握手前检查 Type-C、PD/PPS、SVID 和 PDO，暂时未就绪时继续重试。
-- 电脑 C-to-C 接入时，UCSI 已报告 5 V/3 A，但 DWC3 未连接到 `qcom-battmgr-usb`，固件 ICL 因而一直停在 100 mA。设备树现已补上 DWC3 电源接口，USB 枚举先提交配置描述符对应的 500 mA，再由只接受有效 5 V Type-C source 的延迟任务复核 CC 通告电流；DCP、PD/PPS 和 MiPPS 路径不参与这次覆盖。刷入后的实测结果仍需补录。
+- 电脑 C-to-C 接入时，UCSI 报告 5 V/3 A，但 DWC3 原先没有连接到 `qcom-battmgr-usb`，固件 ICL 因而一直停在 USB 未配置状态的 100 mA。补上 DWC3 电源接口并刷入实测后，USB gadget 完成枚举时会把 ICL 稳定更新为 500 mA，电池状态由未充电变为充电，静置时电池端约有 0.24--0.30 A 正向电流。尝试把 UCSI 的 3 A CC 通告直接写入 ICL 时，charger firmware 始终将 SDP 连接钳回 500 mA；负值撤销 ICL 投票也得到相同结果。因此已删除无效的 3 A 强推和重试告警，保留符合原厂驱动职责边界的 USB 枚举路径。UCSI 通告代表 Type-C source 能力，不等于小米充电固件已经允许使用全部电流。
 - FastRPC 服务私有映射 `/odm/etc/sensors/config`，兼容原厂 ADSP 路径，但不污染根目录，也不把 Android persist 分区改为可写。
 - 移除 FastRPC 服务过早执行的 `ConditionPathExists`。现在节点稍晚出现时会进入明确的 remoteproc/FastRPC 稳定等待，而不是在等待脚本运行前就被 systemd 永久跳过。
 - Novatek 触控固件 WDT 自恢复后先等待 ReK 基线状态，再发送 idle/doze 命令。这个缺口在一次约 89 分钟后的真实固件复位中表现为连续 `0xBF` 命令失败。
