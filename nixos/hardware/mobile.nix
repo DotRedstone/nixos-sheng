@@ -181,6 +181,7 @@ in
 
     extraUtils = [
       pkgs.kbd
+      pkgs.sheng-fb-painter
     ];
 
     shell.shellOnFail = true;

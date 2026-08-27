@@ -29,8 +29,10 @@ module ShengHeadlessGenerationMenu
   FOOTER_HEIGHT = 190
   SCROLLBAR_WIDTH = 8
   SCROLLBAR_GAP = 28
-  FRAMEBUFFER_TILE_HEIGHT = 128
-  FRAMEBUFFER_RENDER_TIMEOUT = 5.0
+  FRAMEBUFFER_PAINTER = "sheng-fb-painter"
+  FRAMEBUFFER_COMMAND_PATH = "/run/sheng-generation-menu.fbops"
+  FRAMEBUFFER_COMMAND_MAGIC = "SFB1"
+  MAX_FRAMEBUFFER_RECTANGLES = 10_000
   MAX_LINE_SAMPLES = 48
   BG = [8, 10, 11]
   PANEL_BG = [17, 19, 21]
@@ -368,10 +370,6 @@ module ShengHeadlessGenerationMenu
     $logger.warn("Could not restore kernel console log level: #{error}")
   end
 
-  def framebuffer()
-    @framebuffer ||= File.open(FB_PATH, "r+b")
-  end
-
   def read_fb_integer(name, fallback)
     path = "#{FB_SYSFS}/#{name}"
     return fallback unless File.exist?(path)
@@ -405,39 +403,6 @@ module ShengHeadlessGenerationMenu
 
     @dirty_top = top if !@dirty_top || top < @dirty_top
     @dirty_bottom = bottom if !@dirty_bottom || bottom > @dirty_bottom
-  end
-
-  def write_framebuffer_data(offset, data)
-    check_framebuffer_deadline()
-    written = 0
-    framebuffer.sysseek(offset, IO::SEEK_SET)
-    while written < data.bytesize
-      check_framebuffer_deadline()
-      count = framebuffer.syswrite(data[written, data.bytesize - written])
-      raise IOError, "short framebuffer write" unless count && count > 0
-
-      written += count
-    end
-  end
-
-  def read_framebuffer_data(offset, length)
-    data = ""
-    framebuffer.sysseek(offset, IO::SEEK_SET)
-    while data.bytesize < length
-      check_framebuffer_deadline()
-      chunk = framebuffer.sysread(length - data.bytesize)
-      raise IOError, "short framebuffer read" unless chunk && chunk.bytesize > 0
-
-      data << chunk
-    end
-    data
-  end
-
-  def check_framebuffer_deadline()
-    return unless @framebuffer_deadline
-    return if Time.now.to_f <= @framebuffer_deadline
-
-    raise IOError, "sheng generation framebuffer render exceeded #{FRAMEBUFFER_RENDER_TIMEOUT}s"
   end
 
   def unblank_framebuffer()
@@ -507,23 +472,35 @@ module ShengHeadlessGenerationMenu
     rectangles
   end
 
-  def paint_framebuffer_tile(tile, tile_top, tile_height, operation)
-    x = operation[1]
-    y = operation[2]
-    width = operation[3]
-    height = operation[4]
-    top = [y, tile_top].max
-    bottom = [y + height, tile_top + tile_height].min
-    return if bottom <= top
-
-    row = pixel(operation[5]) * width
-    current_y = top
-    while current_y < bottom
-      check_framebuffer_deadline()
-      offset = (current_y - tile_top) * @fb_stride + x * @fb_bytes
-      tile[offset, row.bytesize] = row
-      current_y += 1
+  def framebuffer_command_data(rectangles)
+    raise IOError, "no framebuffer rectangles were generated" if rectangles.empty?()
+    if rectangles.length > MAX_FRAMEBUFFER_RECTANGLES
+      raise IOError, "framebuffer rectangle limit exceeded (#{rectangles.length})"
     end
+
+    data = FRAMEBUFFER_COMMAND_MAGIC.dup
+    rectangles.each do |operation|
+      x, y, width, height, color = operation[1], operation[2], operation[3], operation[4], operation[5]
+      data << [x, y, width, height].pack("v4")
+      data << [color[0], color[1], color[2], 0].pack("C4")
+    end
+    data
+  end
+
+  def write_framebuffer_commands(path, rectangles)
+    data = framebuffer_command_data(rectangles)
+    file = File.open(path, "wb")
+    written = 0
+    while written < data.bytesize
+      count = file.syswrite(data[written, data.bytesize - written])
+      raise IOError, "short framebuffer command write" unless count && count > 0
+
+      written += count
+    end
+    file.close
+  rescue
+    file.close if file && !file.closed?
+    raise
   end
 
   def present_framebuffer()
@@ -531,32 +508,22 @@ module ShengHeadlessGenerationMenu
 
     started_at = Time.now.to_f
     operation_count = draw_operations().length
-    @framebuffer_deadline = started_at + FRAMEBUFFER_RENDER_TIMEOUT
+    rectangles = framebuffer_rectangles()
     raise IOError, "sheng generation menu framebuffer is blank" unless unblank_framebuffer()
     begin
-      rectangles = framebuffer_rectangles()
-      tile_top = @dirty_top / FRAMEBUFFER_TILE_HEIGHT * FRAMEBUFFER_TILE_HEIGHT
-      while tile_top < @dirty_bottom
-        tile_height = [FRAMEBUFFER_TILE_HEIGHT, @fb_height - tile_top].min
-        tile_offset = tile_top * @fb_stride
-        tile = read_framebuffer_data(tile_offset, tile_height * @fb_stride)
-        rectangles.each do |operation|
-          paint_framebuffer_tile(tile, tile_top, tile_height, operation)
-        end
-        write_framebuffer_data(tile_offset, tile)
-        tile_top += tile_height
-      end
-      framebuffer.flush
+      write_framebuffer_commands(FRAMEBUFFER_COMMAND_PATH, rectangles)
+      System.run(FRAMEBUFFER_PAINTER, FRAMEBUFFER_COMMAND_PATH)
+      raise IOError, "sheng generation menu framebuffer became blank" unless unblank_framebuffer()
     ensure
-      @framebuffer_deadline = nil
+      File.delete(FRAMEBUFFER_COMMAND_PATH) if File.exist?(FRAMEBUFFER_COMMAND_PATH)
       @draw_operations = []
       @dirty_top = nil
       @dirty_bottom = nil
     end
     if $logger.respond_to?(:debug)
       $logger.debug(
-        "Sheng generation framebuffer presented #{operation_count} queued operations in " \
-        "#{(Time.now.to_f - started_at).round(3)}s."
+        "Sheng generation framebuffer presented #{operation_count} operations as " \
+        "#{rectangles.length} native rectangles in #{(Time.now.to_f - started_at).round(3)}s."
       )
     end
   end
