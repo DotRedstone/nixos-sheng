@@ -442,9 +442,16 @@ module ShengHeadlessGenerationMenu
 
   def unblank_framebuffer()
     blank_path = "#{FB_SYSFS}/blank"
-    File.write(blank_path, "0\n") if File.exist?(blank_path)
+    return true unless File.exist?(blank_path)
+
+    File.write(blank_path, "0\n")
+    state = File.read(blank_path).strip
+    raise IOError, "framebuffer remained blank (state #{state})" unless state == "0"
+
+    true
   rescue => error
     $logger.warn("Could not unblank sheng generation menu framebuffer: #{error}")
+    false
   end
 
   def framebuffer_rectangles()
@@ -525,7 +532,7 @@ module ShengHeadlessGenerationMenu
     started_at = Time.now.to_f
     operation_count = draw_operations().length
     @framebuffer_deadline = started_at + FRAMEBUFFER_RENDER_TIMEOUT
-    unblank_framebuffer()
+    raise IOError, "sheng generation menu framebuffer is blank" unless unblank_framebuffer()
     begin
       rectangles = framebuffer_rectangles()
       tile_top = @dirty_top / FRAMEBUFFER_TILE_HEIGHT * FRAMEBUFFER_TILE_HEIGHT
@@ -853,7 +860,7 @@ module ShengHeadlessGenerationMenu
     track_y = footer_y + 76
     width = content_width()
     status = remaining ? "AUTO BOOT" : "MANUAL SELECTION"
-    value = remaining ? "#{remaining}S" : "PAUSED"
+    value = remaining ? "#{remaining} SEC" : "PAUSED"
     color = remaining ? STATUS_FG : MUTED_FG
 
     draw_text_box(content_x(), label_y, width / 2, 28, status, color, PANEL_BG, scale: SUBTITLE_FONT_SCALE)

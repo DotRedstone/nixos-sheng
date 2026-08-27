@@ -49,7 +49,7 @@ class TestGeneration
   end
 
   def label()
-    "NixOS ##{@number} (26.11pre-git 2026-08-27)"
+    "NixOS ##{@number} (2026-08-27 - 26.11pre-git)"
   end
 end
 
@@ -66,10 +66,17 @@ module ShengHeadlessGenerationMenu
     end
 
     def generation_parts(label, index)
-      ["GENERATION #{index + 1}", label.to_s]
+      parts = label.to_s.split("#", 2)
+      number_and_details = parts.length > 1 ? parts[1] : "#{index + 1}"
+      number = number_and_details.split(" ", 2)[0]
+      details_parts = number_and_details.split("(", 2)
+      details = details_parts.length > 1 ? details_parts[1] : "SYSTEM PROFILE"
+      details = details[0, details.length - 1] if details[-1, 1] == ")"
+      ["GENERATION #{number}", details]
     end
 
     def unblank_framebuffer()
+      true
     end
   end
 end
@@ -103,6 +110,43 @@ class TestFramebuffer
   end
 end
 
+class PreviewFramebuffer
+  def initialize(size)
+    @data = "\0" * size
+    @offset = 0
+  end
+
+  def sysseek(offset, whence)
+    @offset = offset
+  end
+
+  def sysread(length)
+    data = @data[@offset, length]
+    @offset += data.bytesize
+    data
+  end
+
+  def syswrite(data)
+    @data[@offset, data.bytesize] = data
+    @offset += data.bytesize
+    data.bytesize
+  end
+
+  def flush()
+  end
+
+  def save(path)
+    file = File.open(path, "wb")
+    written = 0
+    while written < @data.bytesize
+      count = file.syswrite(@data[written, @data.bytesize - written])
+      raise "short preview write" unless count && count > 0
+      written += count
+    end
+    file.close
+  end
+end
+
 menu = ShengHeadlessGenerationMenu
 menu.instance_variable_set(:@fb_width, 3048)
 menu.instance_variable_set(:@fb_height, 2032)
@@ -112,8 +156,8 @@ menu.instance_variable_set(:@fb_stride, 12288)
 menu.instance_variable_set(:@fb_ready, true)
 
 started_at = Time.now.to_f
-generations = (1..63).map { |number| TestGeneration.new(number) }
-menu.render_framebuffer(generations, 62, remaining: 30)
+generations = (1..63).to_a.reverse.map { |number| TestGeneration.new(number) }
+menu.render_framebuffer(generations, 0, remaining: 30)
 elapsed = Time.now.to_f - started_at
 operations = menu.captured_operations
 
@@ -153,6 +197,36 @@ raise "unexpected tile read count #{fake_framebuffer.read_count}" unless fake_fr
 raise "unexpected tile write count #{fake_framebuffer.write_count}" unless fake_framebuffer.write_count == expected_tiles
 raise "tile transfer exceeded memory bound" if fake_framebuffer.largest_transfer > menu::FRAMEBUFFER_TILE_HEIGHT * 12288
 raise "tile presentation took #{present_elapsed}s" if present_elapsed > menu::FRAMEBUFFER_RENDER_TIMEOUT
+
+preview_path = ARGV[1]
+if preview_path
+  preview_framebuffer = PreviewFramebuffer.new(2032 * 12288)
+  menu.instance_variable_set(:@framebuffer, preview_framebuffer)
+  menu.instance_variable_set(:@draw_operations, operations.dup)
+  menu.instance_variable_set(:@dirty_top, 0)
+  menu.instance_variable_set(:@dirty_bottom, 2032)
+  menu.real_present_framebuffer()
+  preview_framebuffer.save(preview_path)
+end
+
+menu.render_framebuffer(
+  generations,
+  1,
+  previous_selected: 0,
+  remaining: nil,
+  previous_remaining: 30
+)
+partial_operations = menu.captured_operations
+raise "partial redraw queued too many operations" if partial_operations.length > 250
+
+menu.render_framebuffer(generations, generations.length - 1, remaining: nil)
+bottom_operations = menu.captured_operations
+bottom_operations.each do |operation|
+  kind, x, y, width, height = operation
+  raise "unexpected bottom operation #{kind}" unless kind == :rect || kind == :text
+  raise "bottom operation escaped framebuffer #{operation.inspect}" if x < 0 || y < 0
+  raise "bottom operation escaped framebuffer #{operation.inspect}" if x + width > 3048 || y + height > 2032
+end
 
 menu.instance_variable_set(:@draw_operations, [])
 menu.draw_line(-100000, -100000, 100000, 100000, menu::ACCENT, 5)
