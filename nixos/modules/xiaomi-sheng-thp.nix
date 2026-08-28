@@ -11,7 +11,10 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    boot.kernelModules = [ "uinput" ];
+    boot.kernelModules = [
+      "uinput"
+      "uhid"
+    ];
     environment.systemPackages = [ cfg.package ];
 
     systemd.services.xiaomi-sheng-thp = {
