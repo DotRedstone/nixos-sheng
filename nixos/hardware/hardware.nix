@@ -127,12 +127,16 @@
   # Android's factory-programmed address without ever writing to persist.
   systemd.services.sheng-bluetooth-address = {
     description = "Load the factory Bluetooth address for sheng";
-    requires = [ "mnt-vendor-persist.mount" ];
+    wantedBy = [ "multi-user.target" ];
+    requires = [
+      "bluetooth.service"
+      "mnt-vendor-persist.mount"
+    ];
     after = [
+      "bluetooth.service"
       "mnt-vendor-persist.mount"
       "sheng-bluetooth-modules.service"
     ];
-    before = [ "bluetooth.service" ];
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
@@ -176,6 +180,9 @@
 
       ${pkgs.bluez}/bin/btmgmt power off || true
       ${pkgs.bluez}/bin/btmgmt public-addr "$address"
+      # The address change replaces the MGMT index. This command races the
+      # replacement by design; bluetoothd powers the new index when it appears.
+      ${pkgs.bluez}/bin/btmgmt power on || true
 
       for attempt in $(seq 1 50); do
         current="$(${pkgs.bluez}/bin/btmgmt info 2>/dev/null |
