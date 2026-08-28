@@ -9,13 +9,13 @@
 
 stdenv.mkDerivation {
   pname = "xiaomi-sheng-thp";
-  version = "0-unstable-2026-07-24";
+  version = "0-unstable-2026-08-29";
 
   src = fetchFromGitHub {
-    owner = "ianchb";
+    owner = "DotRedstone";
     repo = "xiaomi-sheng-thp";
-    rev = "34046210932d654a4c0df0121ecc31c008f8148c";
-    hash = "sha256-+eSthfDjeP4nueqDuR88ZuWsWFs/4yxMH6iSlnujJpA=";
+    rev = "05e893da1ee4a754df0be3a6611a58cbe5348670";
+    hash = "sha256-D8lZ51wSW4Anlq6XLBbYFKu4eXECguLBFTrtG/ANJ88=";
   };
 
   nativeBuildInputs = [ pkg-config ];
@@ -43,7 +43,7 @@ stdenv.mkDerivation {
 
   meta = {
     description = "Userspace touch and Focus Pen processor for Xiaomi sheng";
-    homepage = "https://github.com/ianchb/xiaomi-sheng-thp";
+    homepage = "https://github.com/DotRedstone/xiaomi-sheng-thp";
     license = lib.licenses.asl20;
     platforms = [ "aarch64-linux" ];
     mainProgram = "xiaomi-sheng-thp";
