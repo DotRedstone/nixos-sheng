@@ -123,6 +123,76 @@
     '';
   };
 
+  # Qualcomm's bundled NVM contains a placeholder controller address. Reuse
+  # Android's factory-programmed address without ever writing to persist.
+  systemd.services.sheng-bluetooth-address = {
+    description = "Load the factory Bluetooth address for sheng";
+    wantedBy = [ "bluetooth.service" ];
+    requires = [ "mnt-vendor-persist.mount" ];
+    after = [
+      "mnt-vendor-persist.mount"
+      "sheng-bluetooth-modules.service"
+    ];
+    before = [ "bluetooth.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      address_file=/mnt/vendor/persist/bluetooth/.bt_nv.bin
+      if [ ! -r "$address_file" ]; then
+        echo "Factory Bluetooth address is unavailable; keeping firmware address" >&2
+        exit 0
+      fi
+
+      read -r -a octets <<< "$(${pkgs.coreutils}/bin/od -An -tx1 -N6 "$address_file")"
+      if [ "''${#octets[@]}" -ne 6 ]; then
+        echo "Factory Bluetooth address has an invalid length" >&2
+        exit 1
+      fi
+      for octet in "''${octets[@]}"; do
+        if [[ ! "$octet" =~ ^[0-9a-fA-F]{2}$ ]]; then
+          echo "Factory Bluetooth address contains invalid data" >&2
+          exit 1
+        fi
+      done
+      printf -v address '%s:%s:%s:%s:%s:%s' "''${octets[@]}"
+      address="''${address^^}"
+
+      for attempt in $(seq 1 50); do
+        current="$(${pkgs.bluez}/bin/btmgmt info 2>/dev/null |
+          ${pkgs.gawk}/bin/awk '/addr / { print $2; exit }')"
+        if [ -n "$current" ]; then
+          break
+        fi
+        sleep 0.1
+      done
+      if [ -z "$current" ]; then
+        echo "Bluetooth controller did not appear" >&2
+        exit 1
+      fi
+      if [ "$current" = "$address" ]; then
+        exit 0
+      fi
+
+      ${pkgs.bluez}/bin/btmgmt power off || true
+      ${pkgs.bluez}/bin/btmgmt public-addr "$address"
+
+      for attempt in $(seq 1 50); do
+        current="$(${pkgs.bluez}/bin/btmgmt info 2>/dev/null |
+          ${pkgs.gawk}/bin/awk '/addr / { print $2; exit }')"
+        if [ "$current" = "$address" ]; then
+          echo "Loaded factory Bluetooth address $address"
+          exit 0
+        fi
+        sleep 0.1
+      done
+
+      echo "Bluetooth controller did not return with its factory address" >&2
+      exit 1
+    '';
+  };
+
   systemd.services.sheng-touchscreen-modules = {
     description = "Load sheng Novatek touchscreen modules";
     wantedBy = [ "multi-user.target" ];
