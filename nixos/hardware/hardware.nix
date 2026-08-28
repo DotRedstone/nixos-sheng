@@ -127,7 +127,6 @@
   # Android's factory-programmed address without ever writing to persist.
   systemd.services.sheng-bluetooth-address = {
     description = "Load the factory Bluetooth address for sheng";
-    wantedBy = [ "bluetooth.service" ];
     requires = [ "mnt-vendor-persist.mount" ];
     after = [
       "mnt-vendor-persist.mount"
