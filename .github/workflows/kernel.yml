@@ -116,6 +116,17 @@ jobs:
               exit 1
             }
 
+          grep -qxF 'CONFIG_TOUCHSCREEN_NT36532E_SPI=m' out/kernel-package/build.config || {
+              echo "ERROR: NT36532E touchscreen driver is not built as a module"
+              exit 1
+            }
+
+          thp_module="$(find "$modules_dir" -type f -name 'nt36532e_ts.ko*' -print -quit)"
+          if [ -z "$thp_module" ]; then
+            echo "ERROR: NT36532E THP module is missing from the kernel package"
+            exit 1
+          fi
+
           sha256sum out/kernel/* > out/kernel/sha256sums.txt
 
       - name: Upload kernel artifact

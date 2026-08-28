@@ -18,7 +18,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     shengKernelSrc = {
-      url = "github:DotRedstone/linux-sheng/upgrade/sheng-7.1.8";
+      url = "github:DotRedstone/linux-sheng/feat/stylus-thp";
       flake = false;
     };
     shengFirmware = {
@@ -82,6 +82,11 @@
         };
         gjs-osk = final.callPackage ./packages/gjs-osk.nix { };
         sheng-fb-painter = final.callPackage ./packages/sheng-fb-painter.nix { };
+        sheng-libssc = final.callPackage ./hardware/xiaomi-sheng/sensors/libssc.nix { };
+        sheng-touch-firmware = final.callPackage ./packages/xiaomi-sheng-touch-firmware.nix { };
+        xiaomi-sheng-thp = final.callPackage ./packages/xiaomi-sheng-thp.nix {
+          libssc = final.sheng-libssc;
+        };
         xiaomi-sheng-fingerprint = final.callPackage ./packages/xiaomi-sheng-fingerprint.nix { };
         xdg-desktop-portal = prev.xdg-desktop-portal.overrideAttrs (old: {
           # Fallback source builds on GitHub's aarch64 runner can hit a flaky
@@ -200,6 +205,7 @@
       };
 
       packages.${system} = {
+        xiaomiShengThp = pkgs.xiaomi-sheng-thp;
         mobileAndroidBootimg = mobileEval.outputs.android.android-bootimg;
         mobileFastbootImages = mobileEval.outputs.android.android-fastboot-images;
         mobileRootfsImage = mobileEval.outputs.generatedFilesystems.rootfs;

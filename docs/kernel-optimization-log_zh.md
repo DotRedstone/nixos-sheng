@@ -243,6 +243,25 @@ fprintd-verify
 
 在实机完成录入和验证前，状态保持“联调中”，不把构建成功写成硬件已经可用。
 
+### 16. 接入 NT36532E THP 触控与触控笔链路
+
+sheng 的 NT36532E 原厂固件输出完整的 THP 电容矩阵，不是普通 65 字节触摸/笔事件。旧驱动只读取 760 字节内部事件缓冲并在内核中做简化解析，虽然手指触摸可用，但其遗留的 `NVTCapacitivePen` 解析器与 sheng 帧格式不匹配，直接打开 DTS 的 `novatek,pen-support` 只会注册一个没有有效事件的空设备。
+
+本轮改为与原厂协议一致的分层实现：内核每次 IRQ 读取 5417 字节 THP 传输帧，通过 root-only FIFO 暴露时间戳、帧有效性和固件 epoch；用户态 [ianchb/xiaomi-sheng-thp](https://github.com/ianchb/xiaomi-sheng-thp) 负责多点追踪、掌拒、笔坐标、悬停、倾斜和压感，再通过 uinput 注册标准 Linux 输入设备。普通 Focus Pen 的压力范围为 0..8191，Focus Pen Pro 为 0..16383；蓝牙不可用时手指触控和笔坐标仍可工作，侧键、压力传输和 Pro 姿态功能按可用能力降级。
+
+内核切换到 OS3.0.7.0 原厂 `novatek_nt36532_n81a_fw_csot.bin`，Nix 包固定源码和固件提交及哈希。固件更新、WDT 恢复和面板 resume 后都会恢复笔扫描模式并标记新 epoch，用户态据此清空旧参考矩阵，避免恢复后坐标跳变或按键卡住。充电状态变化继续通过 Novatek 原厂命令同步，保留此前验证过的固件更新失败处理。
+
+验证命令：
+
+```sh
+systemctl status xiaomi-sheng-thp --no-pager
+cat /proc/nvt_thp_status
+libinput list-devices | grep -A20 -E 'NVT|M80p|P81c'
+journalctl -b -u xiaomi-sheng-thp --no-pager
+```
+
+实机验收需要覆盖十指触控、掌拒、悬停、连续压感、两枚侧键、60/120 Hz 切换、屏幕熄灭/唤醒、插拔充电器和 WDT 恢复。上游明确笔扫描仅支持 60 Hz 与 120 Hz，因此其它刷新率下不把无笔事件判定为驱动回归。
+
 ## 已确认健康的链路
 
 ```text

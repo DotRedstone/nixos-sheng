@@ -27,7 +27,10 @@
   };
 
   hardware.enableRedistributableFirmware = true;
-  hardware.firmware = [ pkgs.sheng-firmware ];
+  hardware.firmware = [
+    pkgs.sheng-firmware
+    pkgs.sheng-touch-firmware
+  ];
   hardware.wirelessRegulatoryDatabase = true;
 
   systemd.tmpfiles.rules = [
