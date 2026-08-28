@@ -87,6 +87,7 @@
         xiaomi-sheng-thp = final.callPackage ./packages/xiaomi-sheng-thp.nix {
           libssc = final.sheng-libssc;
         };
+        xiaomi-pen-status = final.callPackage ./packages/xiaomi-pen-status.nix { };
         xiaomi-sheng-fingerprint = final.callPackage ./packages/xiaomi-sheng-fingerprint.nix { };
         xdg-desktop-portal = prev.xdg-desktop-portal.overrideAttrs (old: {
           # Fallback source builds on GitHub's aarch64 runner can hit a flaky
@@ -206,6 +207,7 @@
 
       packages.${system} = {
         xiaomiShengThp = pkgs.xiaomi-sheng-thp;
+        xiaomiPenStatus = pkgs.xiaomi-pen-status;
         mobileAndroidBootimg = mobileEval.outputs.android.android-bootimg;
         mobileFastbootImages = mobileEval.outputs.android.android-fastboot-images;
         mobileRootfsImage = mobileEval.outputs.generatedFilesystems.rootfs;

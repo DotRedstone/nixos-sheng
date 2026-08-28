@@ -15,6 +15,7 @@
     ./modules/sheng-fingerprint.nix
     ./modules/sheng-rootfs-health.nix
     ./modules/xiaomi-mipps-auth.nix
+    ./modules/xiaomi-pen-status.nix
     ./modules/xiaomi-sheng-thp.nix
   ];
 
@@ -99,6 +100,7 @@
   };
 
   services.xiaomi-mipps-auth.enable = true;
+  services.xiaomi-pen-status.enable = true;
   services.xiaomi-sheng-thp.enable = true;
   services.sheng-fingerprint.enable = true;
   services.sheng-fingerprint.wakeUnlock = true;
