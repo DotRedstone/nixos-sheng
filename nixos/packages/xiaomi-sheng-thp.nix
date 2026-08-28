@@ -14,8 +14,8 @@ stdenv.mkDerivation {
   src = fetchFromGitHub {
     owner = "DotRedstone";
     repo = "xiaomi-sheng-thp";
-    rev = "5a1eb75e920ae3aea604d74bb58da7af466d2d76";
-    hash = "sha256-hB633DJsgMZlsV+ahBBG4BWoYhEEvI6Iu9MmX9bPicM=";
+    rev = "554712f3936fb42932744b543e6fdb56ae3d2382";
+    hash = "sha256-xRglaE6wczp7Djt32+jkFjb9qEUy17s/mQ6qEUncrUo=";
   };
 
   nativeBuildInputs = [ pkg-config ];
