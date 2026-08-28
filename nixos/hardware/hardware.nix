@@ -180,9 +180,6 @@
 
       ${pkgs.bluez}/bin/btmgmt power off || true
       ${pkgs.bluez}/bin/btmgmt public-addr "$address"
-      # The address change replaces the MGMT index. This command races the
-      # replacement by design; bluetoothd powers the new index when it appears.
-      ${pkgs.bluez}/bin/btmgmt power on || true
 
       for attempt in $(seq 1 50); do
         current="$(${pkgs.bluez}/bin/btmgmt info 2>/dev/null |
