@@ -7,13 +7,13 @@
 
 stdenv.mkDerivation {
   pname = "xiaomi-pen-status";
-  version = "0.2.3-unstable-2026-07-24";
+  version = "0.3.0-unstable-2026-08-29";
 
   src = fetchFromGitHub {
-    owner = "ianchb";
+    owner = "DotRedstone";
     repo = "xiaomi-pen-status";
-    rev = "fcf349109d2e69aedf7170479cc38b102ba1d4c0";
-    hash = "sha256-UwRYo4nSElw14HRsuNlR7XimSA26RLmsB4iivf9IT6Y=";
+    rev = "b70ba9a9ed8fa82a6578c6608b0de91567e85278";
+    hash = "sha256-qxo6u6a3/ElsGnj3CZGJRf7HhEZgI3o75P6qbvSHRPA=";
   };
 
   nativeBuildInputs = [
@@ -46,7 +46,7 @@ stdenv.mkDerivation {
 
   meta = {
     description = "Xiaomi Focus Pen status and Bluetooth auto-connection utility";
-    homepage = "https://github.com/ianchb/xiaomi-pen-status";
+    homepage = "https://github.com/DotRedstone/xiaomi-pen-status";
     license = lib.licenses.gpl2Only;
     platforms = lib.platforms.linux;
     mainProgram = "xiaomi-pen-status";
