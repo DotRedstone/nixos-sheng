@@ -24,6 +24,8 @@ about to enter stage-2.
 
 - Volume up/down or an external keyboard's up/down arrows change the
   highlighted stage-2 generation.
+- The highlight advances within the current page and only switches pages after
+  moving past that page's final entry.
 - Holding a navigation key repeats the selection movement.
 - Volume key handling is edge-triggered, so selection redraw does not wait for
   a delayed key-release event.
