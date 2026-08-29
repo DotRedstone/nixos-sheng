@@ -43,8 +43,8 @@ adb shell 'chmod 755 /tmp/collect-hardware-baseline.sh && /tmp/collect-hardware-
 | GPU devfreq | `simple_ondemand`，220–680 MHz，空闲采样为 220 MHz |
 | UFS devfreq | `simple_ondemand`，75–300 MHz，空闲采样为 75 MHz |
 | UFS I/O scheduler | `mq-deadline`，read-ahead 2048 KiB |
-| CAMSS runtime PM | 被现有 workaround 强制为 `on/active`，开机后几乎全程 active |
-| CAMSS interconnect | idle 时仍保留 AHB 与 CAMNOC→DDR 各 2097152 kB/s 投票 |
+| CAMSS runtime PM | 已恢复 `auto/suspended`，启动服务会确认实际进入挂起 |
+| CAMSS interconnect | idle 时 AHB 与 CAMNOC→DDR 的 CAMSS 投票均为 0 |
 | ftrace | `current_tracer=nop` |
 | 温度 | SoC 约 31–36°C，PMIC 约 37°C，电池约 29.7°C |
 | ADSP | `running`，固件为 sheng 原厂 ADSP |
@@ -59,7 +59,7 @@ adb shell 'chmod 755 /tmp/collect-hardware-baseline.sh && /tmp/collect-hardware-
 
 GPU 和 UFS 在采样时也都降到了最低 OPP。虽然内核启用了 dynamic ftrace，运行时 tracer 为 `nop`，调用点处于动态 NOP 状态；在驱动仍处于审计阶段时，保留诊断能力比未经基准测试就删掉 ftrace 更合理。
 
-相机链路目前是明显的剩余功耗项。`sheng-camera-modules` 为规避历史上的 CAMSS runtime ICC/RPMh 超时，把 `acb7000.isp` 永久设为 `power/control=on`。实测 Titan Top GDSC 常开，虽然各 IFE 子域和相机时钟能关闭，但空闲时仍向 AHB 和 CAMNOC→DDR 各保留 2097152 kB/s 带宽投票。上游 SM8550 CAMSS 仍使用相同的固定带宽和 runtime suspend 实现，因此不能只改一个数字或直接删除 workaround；后续应在可恢复环境中测试 `auto`、抓取 RPMh/ICC trace，并同时验证 UFS I/O 和相机反复开关。
+相机链路曾为规避历史上的 CAMSS runtime ICC/RPMh 超时，把 `acb7000.isp` 永久设为 `power/control=on`。在 7.1.8 与 Q6V5 启动中断修复后的实机上，CAMSS 在持续读取 UFS 根分区时完成了 120 次 `active -> suspended` 循环，没有新增 RPMh、ICC 或 UFS 错误。切回 `auto` 后，AHB 与 CAMNOC→DDR 的 CAMSS 投票均从 2097152 kB/s 降为 0，Titan Top GDSC 从 `on` 进入 `off-0`。因此启动服务现在恢复 runtime PM，并等待 CAMSS 确认进入 suspended；不再为已经无法复现的旧故障永久保留相机互联与顶层电源域。
 
 ## 第一批修改
 
@@ -265,6 +265,54 @@ journalctl -b -u xiaomi-sheng-thp --no-pager
 实机验收需要覆盖十指触控、掌拒、悬停、连续压感、两枚侧键、60/120 Hz 切换、屏幕熄灭/唤醒、插拔充电器和 WDT 恢复。上游明确笔扫描仅支持 60 Hz 与 120 Hz，因此其它刷新率下不把无笔事件判定为驱动回归。
 
 ## 已确认健康的链路
+
+### 15. 把 SSC 可查询作为 sensorspd 的启动完成条件
+
+一次 ext4 离线修复把 stage-1 拉长到约 48 秒后，现场复现了传感器链假启动：
+`remoteproc0` 和 `adsprpcd-sensorspd` 都显示 running，FastRPC 也成功打开
+`createstaticpd:sensorspd`，但 QRTR 服务表里没有 SSC，`ssccli` 持续返回
+`SSC QMI Service not found`。单纯重启 adsprpcd、pd-mapper、devauth 和 sensorspd
+不能恢复，证明进程存活和静态 PD 句柄都不是可用性门禁。
+
+旧 `libssc` 补丁还在异步回调里同步 sleep，并且找到 SSC 后没有跳出外层五次循环。
+因此一次本可立即成功的探测也固定多等数秒，外层 systemd 重试又把延迟继续放大，
+最后撞上 `TimeoutStartSec`。本轮删除这个阻塞补丁，每次短探测重新读取 QRTR 服务表；
+`adsprpcd-sensorspd` 通过 `ExecStartPost` 查询真实 SSC，成功后才完成启动，失败则由
+systemd 重启整个 sensor PD daemon。IIO 仍保留同一短门禁作为防御，但不再独自等待三分钟。
+
+`scripts/test-sensor-startup.sh` 会重复重启用户态 sensor PD 和 IIO，每轮同时要求
+SSC 查询成功、两个单元 active，并输出恢复耗时。该修复不会写 remoteproc sysfs，
+也不会在无人值守时重置 ADSP；若 DSP 内部状态已经卡死，仍应先保存日志并做冷启动验证。
+
+### 16. 低电量 charger 启动不再超时进入完整桌面
+
+设备在 1%、约 3.53 V 时复现了完整启动循环：bootloader 以
+`androidboot.mode=charger` 拉起 NixOS，stage-1 只预充 30 秒便切到 stage-2；
+GNOME、Wi-Fi 和蓝牙启动后，电池净电流转为放电，随后 brownout，又被 USB 再次拉起。
+这条循环没有 pstore 崩溃记录，也没有新的 ext4/UFS 错误，并非 A/B 分区损坏。
+
+本轮保留普通启动的 30 秒兜底，但 charger-mode 启动在外接电源在线时不再超时，
+而是保持黑屏、低功耗 stage-1，直到电量达到 5% 才进入桌面。充电器连续三次检测为
+离线时仍会直接关机，避免无外部供电时继续耗尽电池。这样不会要求 Android 根分区可写，
+也不会在关机充电场景中反复启动完整用户态。达到阈值并决定继续启动后，stage-1 会恢复
+此前保存的背光值，避免 charger-mode 成功进入桌面后仍继承黑屏状态。
+
+### 17. 只在 stage-1 离线检查并扩展 rootfs
+
+只读故障现场确认根分区目录元数据损坏：ext4 在读取 Nix store 源码目录时报告
+`EFSCORRUPTED`，随后按 `errors=remount-ro` 中止 journal 并切为只读。没有同时出现
+UFS timeout、abort 或 I/O error，因此现有证据不能把损坏归因于 UFS 驱动；下一次启动的
+stage-1 `e2fsck` 已成功修复文件系统。
+
+审计同时发现每次启动存在两套扩容：Mobile NixOS stage-1 已在挂载前比较 ext4 与
+`linux` 分区并按需扩展，stage-2 却仍启用面向云镜像的 `growpart` 和
+`systemd-growfs-root`。现场分区没有可扩空间，growpart 每次返回 `NOCHANGE`，growfs
+仍在线执行一次 `20379131 -> 20379131` 的同尺寸 resize。它尚不能被证明是损坏根因，
+但在 Android GPT 上反复探测分区表和触碰已满尺寸 ext4 元数据没有收益。
+
+本轮保留 stage-1 的离线 `e2fsck` 与首次按需扩展，明确关闭 stage-2 的 growpart，
+并 mask `systemd-growfs-root.service`。新镜像刷入较大的既有 `linux` 分区时仍会在首次
+挂载前扩满；后续启动不再操作 Android 分区表，也不再在线重复 resize。
 
 ```text
 ADSP remoteproc

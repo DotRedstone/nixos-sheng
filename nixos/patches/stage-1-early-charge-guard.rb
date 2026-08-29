@@ -155,9 +155,11 @@ module ShengEarlyChargeGuard
       return
     end
 
+    charger_boot = charger_mode?()
+    wait_limit = charger_boot ? "without a timeout" : "for at most #{max_wait_seconds()} seconds"
     $logger.info(
       "Early charge guard: battery is at #{capacity}%; charging with the display off until #{boot_capacity()}% " \
-      "or for at most #{max_wait_seconds()} seconds."
+      "(#{wait_limit})."
     )
     blank_display()
     last_report = nil
@@ -172,7 +174,7 @@ module ShengEarlyChargeGuard
         break
       end
 
-      if elapsed >= max_wait_seconds()
+      if !charger_boot && elapsed >= max_wait_seconds()
         $logger.warn(
           "Early charge guard: pre-charge timed out at #{capacity || "unknown"}%; continuing boot so userspace charging can start."
         )
@@ -199,6 +201,9 @@ module ShengEarlyChargeGuard
     end
 
     $logger.info("Early charge guard: battery reached #{capacity}%; continuing boot.") if target_reached
-    restore_display() unless charger_mode?()
+    # Both paths leave stage-1 and continue into the graphical system. Restore
+    # what we blanked even for a charger-mode boot that reached the threshold;
+    # otherwise the successful boot can inherit a black panel.
+    restore_display()
   end
 end

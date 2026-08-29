@@ -149,6 +149,12 @@ in
     ];
   };
 
+  # Mobile NixOS stage-1 already checks the offline filesystem and expands it
+  # to the existing linux partition. Do not run cloud-image partition growth
+  # or a second online ext4 resize after switch-root on this Android GPT.
+  boot.growPartition = lib.mkForce false;
+  systemd.units."systemd-growfs-root.service".enable = false;
+
   mobile.boot.stage-1 = {
     compression = "gzip";
     crashToBootloader = false;
@@ -166,7 +172,8 @@ in
         enable = true;
         critical_capacity = 2;
         boot_capacity = 5;
-        # Stage-2 starts the services that negotiate useful charging current.
+        # A normal boot may continue after this timeout. Charger-mode boots
+        # stay in low-power stage-1 until the battery reaches boot_capacity.
         max_wait_seconds = 30;
       };
     };

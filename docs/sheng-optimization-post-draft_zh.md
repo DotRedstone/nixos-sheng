@@ -39,6 +39,8 @@ CPU 三个 cluster 已经使用 `schedutil`，GPU 和 UFS 空闲时也能降到�
 ### 启动路径
 
 - 只有用户明确请求，或确实需要选择多个 generation 时才显示 stage-1 菜单。
+- charger 模式且电量不高于 2% 时留在低功耗 stage-1 充到 5%，不再 30 秒后强行启动桌面并触发 brownout 循环。
+- rootfs 仅由 stage-1 在离线 fsck 后按需扩到既有 `linux` 分区；stage-2 不再对 Android GPT 运行 growpart，也不再对同尺寸 ext4 做在线 resize。
 - 移除没有消费者的 `NetworkManager-wait-online`，网络继续异步连接。
 - 把 WCN7850 power-sequencer 和 PCI power-control 编进内核，避免 PCIe 从约 0.2 秒开始反复 deferred probe，直到 rootfs 在约 7.7 秒加载模块。
 - 恢复 pd-mapper 正常读取 firmware-class 路径，不再用无效文件描述符制造两条假错误。
@@ -46,7 +48,7 @@ CPU 三个 cluster 已经使用 `schedutil`，GPU 和 UFS 空闲时也能降到�
 
 ### 恢复能力
 
-- SSC 未可查询时让 `iio-sensor-proxy` 启动失败并由 systemd 重试，不再带着半初始化状态进入桌面。
+- `sensorspd` 只有在 SSC 已经出现在 QRTR 并能完成真实查询后才算启动成功；失败时重启整个 sensor PD daemon，IIO 再做一次短门禁，不再由 IIO 独自等待三分钟。
 - MiPPS 在握手前检查 Type-C、PD/PPS、SVID 和 PDO，暂时未就绪时继续重试。
 - 电脑 C-to-C 接入时，UCSI 报告 5 V/3 A，但 DWC3 原先没有连接到 `qcom-battmgr-usb`，固件 ICL 因而一直停在 USB 未配置状态的 100 mA。补上 DWC3 电源接口并刷入实测后，USB gadget 完成枚举时会把 ICL 稳定更新为 500 mA，电池状态由未充电变为充电，静置时电池端约有 0.24--0.30 A 正向电流。尝试把 UCSI 的 3 A CC 通告直接写入 ICL 时，charger firmware 始终将 SDP 连接钳回 500 mA；负值撤销 ICL 投票也得到相同结果。因此已删除无效的 3 A 强推和重试告警，保留符合原厂驱动职责边界的 USB 枚举路径。UCSI 通告代表 Type-C source 能力，不等于小米充电固件已经允许使用全部电流。
 - FastRPC 服务私有映射 `/odm/etc/sensors/config`，兼容原厂 ADSP 路径，但不污染根目录，也不把 Android persist 分区改为可写。
@@ -64,9 +66,7 @@ CPU 三个 cluster 已经使用 `schedutil`，GPU 和 UFS 空闲时也能降到�
 
 ## 意外发现的续航大项
 
-当前系统为规避历史 CAMSS/RPMh 超时，把相机子系统永久设为 runtime active。实测 Titan Top GDSC 常开，空闲时 AHB 与 CAMNOC→DDR 仍各保留 2097152 kB/s 带宽投票。各 IFE 子域和相机时钟虽然已经关闭，这个固定投票仍可能抬高片上互连和内存功耗。
-
-这项暂时没有直接删除：旧备注指出切回 `auto` 曾连带阻塞共享的 UFS 互连。正确验证需要在可恢复环境里同时抓 RPMh/ICC trace、循环开关相机并做 UFS I/O，不能在无人看管时拿系统盘试错。它会是下一批最值得量化的功耗优化。
+当前系统过去为规避历史 CAMSS/RPMh 超时，把相机子系统永久设为 runtime active。更新到 7.1.8 并修复 Q6V5 启动中断后，在持续读取 UFS 根分区的同时完成了 120 次 CAMSS runtime PM 循环，没有出现新的 RPMh、ICC 或 UFS 错误。恢复 `auto` 后，AHB 与 CAMNOC→DDR 的 CAMSS 投票都从 2097152 kB/s 降为 0，Titan Top GDSC 也从常开进入 `off-0`。启动服务因此不再保留旧 workaround，并会确认 CAMSS 已真正挂起。
 
 音频模块还有一个值得继续追踪的延迟：`q6apm` 首次查询 `APM_CMD_GET_SPF_STATE` 时等待 DSP 回包并超时，旧系统因此让 `sheng-audio-modules` 用时 3.517 秒。审计还发现查询错误被丢弃后，负 errno 会经 `bool` 转换反而表示“ADSP 已就绪”。本轮已修正错误传播并删除 probe 中结果无人使用的重复查询，但保留 `q6prm` 真正的同步就绪门禁；所有图管理命令共享的 5 秒超时没有被激进缩短。
 
