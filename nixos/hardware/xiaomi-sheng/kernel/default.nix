@@ -69,6 +69,7 @@ mobile-nixos.kernel-builder-clang {
     require_config "CONFIG_VFAT_FS=m"
     require_config "CONFIG_BTRFS_FS=m"
     require_config "CONFIG_EROFS_FS=m"
+    require_config "CONFIG_INPUT_FPC1552=y"
 
     # These groups can disappear without making the image unbootable. Check
     # the effective Kconfig so dependency changes fail in CI instead of later

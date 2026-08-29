@@ -18,7 +18,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     shengKernelSrc = {
-      url = "github:DotRedstone/linux-sheng/upgrade/sheng-7.1.8";
+      url = "github:DotRedstone/linux-sheng/feat/stylus-thp";
       flake = false;
     };
     shengFirmware = {
@@ -81,6 +81,14 @@
             });
         };
         gjs-osk = final.callPackage ./packages/gjs-osk.nix { };
+        sheng-fb-painter = final.callPackage ./packages/sheng-fb-painter.nix { };
+        sheng-libssc = final.callPackage ./hardware/xiaomi-sheng/sensors/libssc.nix { };
+        sheng-touch-firmware = final.callPackage ./packages/xiaomi-sheng-touch-firmware.nix { };
+        xiaomi-sheng-thp = final.callPackage ./packages/xiaomi-sheng-thp.nix {
+          libssc = final.sheng-libssc;
+        };
+        xiaomi-pen-status = final.callPackage ./packages/xiaomi-pen-status.nix { };
+        xiaomi-sheng-fingerprint = final.callPackage ./packages/xiaomi-sheng-fingerprint.nix { };
         xdg-desktop-portal = prev.xdg-desktop-portal.overrideAttrs (old: {
           # Fallback source builds on GitHub's aarch64 runner can hit a flaky
           # notification sound-fd integration test. Release artifacts still use
@@ -198,6 +206,8 @@
       };
 
       packages.${system} = {
+        xiaomiShengThp = pkgs.xiaomi-sheng-thp;
+        xiaomiPenStatus = pkgs.xiaomi-pen-status;
         mobileAndroidBootimg = mobileEval.outputs.android.android-bootimg;
         mobileFastbootImages = mobileEval.outputs.android.android-fastboot-images;
         mobileRootfsImage = mobileEval.outputs.generatedFilesystems.rootfs;
@@ -212,6 +222,44 @@
       };
 
       checks.${system} = {
+        generationMenuRenderer = pkgs.runCommand "sheng-generation-menu-renderer-check" {
+          nativeBuildInputs = [
+            pkgs.coreutils
+            pkgs.mruby
+            pkgs.sheng-fb-painter
+          ];
+        } ''
+          commands="$TMPDIR/sheng-menu.fbops"
+          framebuffer="$TMPDIR/sheng-menu.raw"
+
+          mruby \
+            ${./tests/test-stage1-generation-menu-renderer.rb} \
+            ${./patches/stage-1-headless-generation-menu.rb} \
+            "$commands"
+
+          truncate -s $((2032 * 12288)) "$framebuffer"
+          started_at="$(date +%s%N)"
+          timeout 4 sheng-fb-painter \
+            --file "$framebuffer" 3048 2032 12288 32 "$commands"
+          elapsed_ms=$((($(date +%s%N) - started_at) / 1000000))
+          test "$elapsed_ms" -lt 3000
+
+          check_pixel() {
+            offset=$((($2 * 12288) + ($1 * 4)))
+            read -r blue green red alpha < <(od -An -v -tu1 -j "$offset" -N 4 "$framebuffer")
+            test "$blue,$green,$red,$alpha" = "$3"
+          }
+
+          check_pixel 0 0 "11,10,8,0"
+          check_pixel 484 115 "199,210,115,0"
+          check_pixel 600 350 "67,67,35,0"
+          check_pixel 2400 450 "29,27,24,0"
+          test "$(sha256sum "$framebuffer" | cut -d' ' -f1)" = \
+            "943794ba5b96bbd97f4facbe601482d09a4bd813f172fa3c4d4b2d48c6f06a5f"
+
+          echo "native framebuffer render completed in ''${elapsed_ms}ms"
+          touch $out
+        '';
         publicGnomeSystem =
           (self.lib.${system}.mkShengGnomeSystem [ ]).config.system.build.toplevel;
         publicMinimalSystem =

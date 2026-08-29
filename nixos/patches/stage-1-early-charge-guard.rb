@@ -45,6 +45,13 @@ module ShengEarlyChargeGuard
     false
   end
 
+  def interactive_boot_safe?()
+    return true unless charger_mode?()
+
+    capacity = battery_capacity()
+    !capacity.nil? && capacity > critical_capacity()
+  end
+
   def power_supply_type(path)
     File.read(File.join(path, "type")).strip
   rescue

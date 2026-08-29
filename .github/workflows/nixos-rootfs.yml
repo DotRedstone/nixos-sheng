@@ -98,6 +98,23 @@ jobs:
           chmod +x build-nixos-rootfs.sh
           sudo env "PATH=$PATH" "NIX_PATH=$NIX_PATH" IMAGE_SIZE="${{ github.event.inputs.image_size }}" ROOTFS_FLAKE_ATTR="${{ github.event.inputs.rootfs_flake_attr }}" ./build-nixos-rootfs.sh
 
+      - name: Verify rootfs integrity features
+        run: |
+          set -euo pipefail
+
+          image="$(find out -maxdepth 1 -type f -name 'nixos-sheng-*.img' -print -quit)"
+          test -n "$image"
+          sudo e2fsck -fn "$image"
+
+          features="$(sudo dumpe2fs -h "$image" 2>/dev/null | awk -F: '/Filesystem features/ { print $2 }')"
+          echo "Filesystem features:$features"
+          for feature in metadata_csum 64bit dir_index; do
+            grep -qw "$feature" <<<"$features" || {
+              echo "ERROR: rootfs is missing required ext4 feature: $feature" >&2
+              exit 1
+            }
+          done
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:

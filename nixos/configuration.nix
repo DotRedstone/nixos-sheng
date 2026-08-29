@@ -12,7 +12,11 @@
     ./modules/sheng-boot-slot.nix
     ./modules/sheng-devauth.nix
     ./modules/sheng-offline-charging.nix
+    ./modules/sheng-fingerprint.nix
+    ./modules/sheng-rootfs-health.nix
     ./modules/xiaomi-mipps-auth.nix
+    ./modules/xiaomi-pen-status.nix
+    ./modules/xiaomi-sheng-thp.nix
   ];
 
   nixpkgs.hostPlatform = "aarch64-linux";
@@ -42,6 +46,10 @@
   # roughly 18 seconds in the measured baseline.
   systemd.services.NetworkManager-wait-online.wantedBy = lib.mkForce [ ];
   networking.useDHCP = lib.mkDefault true;
+
+  # GNOME enables Avahi for local-network discovery. Keep its NSS side wired
+  # up as well so .local lookups do not fail despite the daemon being active.
+  services.avahi.nssmdns4 = true;
 
   time.timeZone = lib.mkDefault "Asia/Shanghai";
   services.timesyncd = {
@@ -92,6 +100,10 @@
   };
 
   services.xiaomi-mipps-auth.enable = true;
+  services.xiaomi-pen-status.enable = true;
+  services.xiaomi-sheng-thp.enable = true;
+  services.sheng-fingerprint.enable = true;
+  services.sheng-fingerprint.wakeUnlock = true;
 
   console = {
     earlySetup = true;

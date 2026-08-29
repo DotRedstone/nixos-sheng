@@ -50,7 +50,8 @@ issues before flashing.
 | Audio | Partially working | ALSA card and playback/capture PCM devices enumerate; playback and recording need validation |
 | Cameras | Partially working | front/rear RAW10 frames captured; libcamera, auto exposure, and desktop camera app need integration |
 | Sensors | User-space working | accelerometer, proximity, ambient light, and compass work through SSC + iio-sensor-proxy D-Bus |
-| Fingerprint | Unsupported | Hardware uses proprietary Qualcomm TEE/TrustZone encryption; no open-source Linux solution exists |
+| Touch and stylus | Integrated, needs release-image validation | NT36532E raw THP processing provides multitouch, palm rejection, and Xiaomi Focus Pen/Focus Pen Pro pressure, tilt, hover, and buttons |
+| Fingerprint | Bring-up | FPC1553 power/IRQ resources and the QTEE-backed private libfprint driver are integrated; enrollment and verification need release-image validation |
 | Charging | Working | Standard PD and Xiaomi 120W MiPPS private fast charging are supported |
 
 ## Upstream Projects

@@ -211,20 +211,58 @@ WirePlumber 把普通 BlueZ 音频与 BlueZ MIDI 定义为独立 monitor。本�
 - 正常重启不会生成虚假 crash 记录。
 - 若未来再次异常重启，第一时间保存 `/sys/fs/pstore/*` 后再做其他操作。
 
-### 14. 恢复 sheng 原厂 150 Hz 触觉频率
+### 14. 撤销不存在的 HV haptics 设备
 
-初版 HV haptics 移植同时带入了一段面向另一类 200 Hz LRA 的 workaround：启动时只接受 185--215 Hz，三次校准仍不在范围内就强制写成 205 Hz。sheng 原厂 DTBO 的设备节点却明确使用 `qcom,lra-period-us = <6667>`，对应约 150 Hz；小米公开的 `sheng-u-oss` 驱动在 `haptics_hw_init()` 中也没有这段强制校准。两份一手来源一致，说明该通用 workaround 不适用于本机。
+早期移植把 PM8550B 的通用 HV haptics 节点直接设为 `okay`，因此 Linux 能注册一个 force-feedback 输入设备，但注册成功并不等于机身内存在执行器。实机反复触发没有触感，驱动校准结果稳定为 `lra_impedance=Open circuit`。重新反编译 sheng 原厂 DTBO 后还确认：PM8550B HV haptics 与 SoundWire haptics 两套候选节点都保持 `status = "disabled"`，没有任何产品 overlay 将其启用。
 
-公开源码依据：[MiCode/Xiaomi_Kernel_OpenSource `sheng-u-oss`](https://github.com/MiCode/Xiaomi_Kernel_OpenSource/blob/sheng-u-oss/drivers/input/misc/qcom-hv-haptics.c)。本轮对照提交为 `29db5d592c5b`，对应 Xiaomi Pad 6S Pro Android U 发布分支。
+因此本轮删除 sheng DTS 中臆造的 haptics 节点，撤销 probe 阶段强制打开模块的改动，并停止自动加载 `qcom-hv-haptics`。这避免 PMIC 持续驱动开路输出，也避免桌面把一个不可用的 FF 设备误认为震动马达。若以后拆机或原理图证明存在独立执行器，应按真实总线、供电和校准数据新增驱动，不能继续用 PM8550B 通用节点猜测。
 
-内核提交 `11e0728a488e` 只移除了强制频率窗口，保留主线移植版的其余错误处理、FF 接口和生命周期修复，没有把 RichTap 私有 ABI、厂商异常上报和多机型条件宏重新引入。设备树中的 3600 mV、6667 us、闭环制动和 SDAM 描述继续与 sheng DTBO 一致。
+验证标准：
 
-预期验证：
+- 启动日志不再注册 `qcom-hv-haptics`，也不再出现 LRA 开路校准。
+- `/sys/class/input` 不再暴露虚假的 haptics/vibrator 设备。
+- 充电、PMIC 和待机链路不因该节点出现新的错误。
 
-- `qcom-hv-haptics` 成功注册 input force-feedback 设备。
-- 启动日志不再把约 150 Hz 判为异常并强制改成 205 Hz。
-- 短振、长振和连续触发均能停止，不出现过热、杂音或模块卸载崩溃。
-- 实机感受和强度只能在刷入后确认；源码一致性不替代执行器测试。
+### 15. 接入 FPC1553 指纹安全链路
+
+原厂 DTS 和 FPC 平台驱动表明，sheng 的侧边指纹使用 L9B 3.3 V 供电、GPIO41 复位和 GPIO40 上升沿中断。内核侧只负责这些电气资源；录入、匹配和模板管理全部在 Qualcomm TEE 中由 `fpcsheng` trusted application 完成，不能用普通 SPI libfprint 驱动替代。
+
+本轮新增精简的 `fpc1552` 资源驱动，提供原厂用户态需要的 `device_prepare`、`hw_reset`、`irq`、`fingerdown_wait` 和 `wakeup_enable` 接口；用户态采用已在 sheng 上完成录入、列举、删除和验证测试的 [ianchb/xiaomi-sheng-fingerprint](https://github.com/ianchb/xiaomi-sheng-fingerprint)，以私有 libfprint 方式接入 fprintd，同时启动 QTEE supplicant、文件系统和 RPMB listeners。`fpcsheng.elf` 固定 SHA-256 为 `269b403b81392c93036dfab37b2408570d98f7d900a0ab29799005b1a7ca08c4`，避免远端固件静默变化。
+
+实机联调还发现 FPC trusted application 会先用一个很短的 IRQ 表示 `FINGER_DOWN_SETUP` 命令完成，它并不代表手指已经按下。内核侧增加一次性 IRQ pending 锁存，避免用户态轮询错过这个边沿；用户态随后以 20 ms 退避查询 TA 的触摸资格状态，确认真实触摸后使用立即采集模式。修正前空闲录入会持续产生 `enroll-retry-scan`，修正后每次真实触摸只推进一个样本，空闲时不再触发采集或占满 CPU。
+
+刷入包含新 DTS/内建驱动的 boot 并更新 NixOS generation 后验证：
+
+```sh
+dmesg | grep -Ei 'fpc1552|fingerprint|qtee|tee0|rpmb'
+systemctl status qteesupplicant fprintd --no-pager
+ls -l /sys/bus/platform/devices/fingerprint_fpc
+fprintd-enroll
+fprintd-verify
+```
+
+在实机完成录入和验证前，状态保持“联调中”，不把构建成功写成硬件已经可用。
+
+### 16. 接入 NT36532E THP 触控与触控笔链路
+
+sheng 的 NT36532E 原厂固件输出完整的 THP 电容矩阵，不是普通 65 字节触摸/笔事件。旧驱动只读取 760 字节内部事件缓冲并在内核中做简化解析，虽然手指触摸可用，但其遗留的 `NVTCapacitivePen` 解析器与 sheng 帧格式不匹配，直接打开 DTS 的 `novatek,pen-support` 只会注册一个没有有效事件的空设备。
+
+本轮改为与原厂协议一致的分层实现：内核每次 IRQ 读取 5417 字节 THP 传输帧，通过 root-only FIFO 暴露时间戳、帧有效性和固件 epoch；用户态 [ianchb/xiaomi-sheng-thp](https://github.com/ianchb/xiaomi-sheng-thp) 负责多点追踪、掌拒、笔坐标、悬停、倾斜和压感，再通过 uinput 注册标准 Linux 输入设备。普通 Focus Pen 的压力范围为 0..8191，Focus Pen Pro 为 0..16383；蓝牙不可用时手指触控和笔坐标仍可工作，侧键、压力传输和 Pro 姿态功能按可用能力降级。
+
+内核切换到 OS3.0.7.0 原厂 `novatek_nt36532_n81a_fw_csot.bin`，Nix 包固定源码和固件提交及哈希。固件更新、WDT 恢复和面板 resume 后都会恢复笔扫描模式并标记新 epoch，用户态据此清空旧参考矩阵，避免恢复后坐标跳变或按键卡住。充电状态变化继续通过 Novatek 原厂命令同步，保留此前验证过的固件更新失败处理。
+
+THP 改动位于可加载的 `nt36532e_ts.ko` 中，不只在 boot 镜像内。即使新旧内核都显示 `7.1.8` 且 vermagic 相同，stage-2 rootfs 里的旧模块仍可能被成功加载并继续注册旧触控设备。因此部署顺序必须是：先安装工厂固件和用户态服务，再同步同一次 Action 构建的 NT36532E 模块，最后刷写对应的 boot_b。内核 CI 除完整模块归档外还会上传独立的小型 `sheng-nt36532e-thp-module` 产物，便于只更新这个模块并校验 SHA256。
+
+验证命令：
+
+```sh
+systemctl status xiaomi-sheng-thp --no-pager
+cat /proc/nvt_thp_status
+libinput list-devices | grep -A20 -E 'NVT|M80p|P81c'
+journalctl -b -u xiaomi-sheng-thp --no-pager
+```
+
+实机验收需要覆盖十指触控、掌拒、悬停、连续压感、两枚侧键、60/120 Hz 切换、屏幕熄灭/唤醒、插拔充电器和 WDT 恢复。上游明确笔扫描仅支持 60 Hz 与 120 Hz，因此其它刷新率下不把无笔事件判定为驱动回归。
 
 ## 已确认健康的链路
 
@@ -331,8 +369,8 @@ charger_pd
 systemd-analyze time
 systemd-analyze blame --no-pager | head -30
 dmesg | grep -E 'pwrseq|qcom-pcie|PCIe Gen|wcn7850|vpbr-enable|cs35l43'
-dmesg | grep -Ei 'haptics|lra|pstore|ramoops'
-grep -H . /sys/class/input/event*/device/name | grep -Ei 'haptics|vibrator'
+dmesg | grep -Ei 'fpc1552|fingerprint|qtee|tee0|rpmb|pstore|ramoops'
+test ! -e /sys/bus/platform/drivers/qcom-hv-haptics
 lsmod | grep -E 'pwrseq_qcom_wcn|pci_pwrctrl_pwrseq'
 systemctl --failed
 ```
@@ -352,7 +390,7 @@ systemctl --failed
 
 ## 后续方向
 
-1. 刷入后完成三次冷启动、触觉短振/长振和扬声器播放/暂停恢复测试。
+1. 刷入后完成三次冷启动、指纹录入/验证和扬声器播放/暂停恢复测试。
 2. 在用户在场时执行多轮 deep suspend/resume，记录 wakeup source 和 ADSP/UCSI 恢复。
 3. 对比 Android live DT 与 Linux DTS 的 regulator consumer 映射，只合入能确认 rail 的 supply。
 4. 为 libcamera 缺少的 `ov02b1b`、`ov32d40` IPA tuning 建立独立校准工作，不用未经标定的“算法参数”冒充画质优化。

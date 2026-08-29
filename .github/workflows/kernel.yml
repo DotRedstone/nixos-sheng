@@ -39,6 +39,12 @@ jobs:
       - name: Enable Nix cache
         uses: DeterminateSystems/magic-nix-cache-action@v13
 
+      - name: Validate generation menu renderer
+        run: |
+          nix --extra-experimental-features "nix-command flakes" \
+            build './nixos#checks.aarch64-linux.generationMenuRenderer' \
+            --no-link
+
       - name: Build boot image
         run: |
           set -o pipefail
@@ -105,11 +111,26 @@ jobs:
             -czf "out/kernel/sheng-linux-$kernel_version-modules.tar.gz" \
             "$kernel_version"
 
-          find "$modules_dir" -type f -name 'qcom-hv-haptics.ko*' -print -quit \
-            | grep -q . || {
-              echo "ERROR: qcom-hv-haptics module is missing"
+          grep -qxF 'CONFIG_INPUT_FPC1552=y' out/kernel-package/build.config || {
+              echo "ERROR: FPC1552 fingerprint resource driver is not built in"
               exit 1
             }
+
+          grep -qxF 'CONFIG_TOUCHSCREEN_NT36532E_SPI=m' out/kernel-package/build.config || {
+              echo "ERROR: NT36532E touchscreen driver is not built as a module"
+              exit 1
+            }
+
+          thp_module="$(find "$modules_dir" -type f -name 'nt36532e_ts.ko*' -print -quit)"
+          if [ -z "$thp_module" ]; then
+            echo "ERROR: NT36532E THP module is missing from the kernel package"
+            exit 1
+          fi
+
+          mkdir -p out/thp-module
+          cp "$thp_module" out/thp-module/
+          sha256sum out/thp-module/nt36532e_ts.ko* \
+            > out/thp-module/sha256sums.txt
 
           sha256sum out/kernel/* > out/kernel/sha256sums.txt
 
@@ -118,6 +139,13 @@ jobs:
         with:
           name: sheng-mobile-nixos-boot
           path: out/kernel/
+          retention-days: 14
+
+      - name: Upload standalone NT36532E THP module
+        uses: actions/upload-artifact@v4
+        with:
+          name: sheng-nt36532e-thp-module
+          path: out/thp-module/
           retention-days: 14
 
       - name: Create release
