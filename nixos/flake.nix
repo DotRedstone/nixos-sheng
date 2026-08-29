@@ -251,8 +251,8 @@
           }
 
           check_pixel 0 0 "11,10,8,0"
-          check_pixel 484 115 "199,210,115,0"
-          check_pixel 600 350 "67,67,35,0"
+          check_pixel 600 57 "199,210,115,0"
+          check_pixel 600 300 "67,67,35,0"
           check_pixel 2400 450 "29,27,24,0"
           test "$(sha256sum "$framebuffer" | cut -d' ' -f1)" = \
             "16eab7f3420f865c18e5398bb15d553d4d890357bf59820ed38bd71015465128"
