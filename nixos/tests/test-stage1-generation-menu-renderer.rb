@@ -159,13 +159,18 @@ menu.instance_variable_set(:@fb_bytes, 4)
 menu.instance_variable_set(:@fb_stride, 12288)
 menu.instance_variable_set(:@fb_ready, true)
 
+menu.instance_variable_set(:@fb_height, 2032.0)
+raise "floating framebuffer height produced a non-integer page size" unless menu.max_visible_generations() == 13
+raise "page size remained a float" unless menu.max_visible_generations().is_a?(Integer)
+menu.instance_variable_set(:@fb_height, 2032)
+
 started_at = Time.now.to_f
 generations = (1..63).to_a.reverse.map { |number| TestGeneration.new(number) }
 page_size = menu.max_visible_generations()
 raise "first page is unstable" unless menu.visible_range(generations.length, 0) == [0, page_size]
 raise "selection moved the first page" unless menu.visible_range(generations.length, page_size - 1) == [0, page_size]
 raise "next page did not begin at a page boundary" unless menu.visible_range(generations.length, page_size) == [page_size, page_size * 2]
-last_page_start = (generations.length / page_size) * page_size
+last_page_start = menu.last_page_start(generations.length, page_size)
 raise "last page escaped the generation list" unless menu.visible_range(generations.length, generations.length - 1) == [last_page_start, generations.length]
 
 selected, page_start = [0, 0]
@@ -177,6 +182,10 @@ selected, page_start = menu.move_selection(selected, page_start, :down, generati
 raise "selection did not switch page after its final row" unless selected == page_size && page_start == page_size
 selected, page_start = menu.move_selection(selected, page_start, :up, generations.length, page_size)
 raise "up navigation did not return to the previous page" unless selected == page_size - 1 && page_start == 0
+selected, page_start = menu.move_selection(26, 26, :up, generations.length, 13.0)
+raise "floating page size broke mirrored up navigation" unless selected == 25 && page_start == 13
+selected, page_start = menu.move_selection(selected, page_start, :up, generations.length, 13.0)
+raise "up navigation changed page inside the previous page" unless selected == 24 && page_start == 13
 selected, page_start = menu.move_selection(0, 0, :up, generations.length, page_size)
 raise "up navigation did not wrap to the last page" unless selected == generations.length - 1 && page_start == last_page_start
 selected, page_start = menu.move_selection(generations.length - 1, last_page_start, :down, generations.length, page_size)

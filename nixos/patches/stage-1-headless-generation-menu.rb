@@ -16,6 +16,7 @@ module ShengHeadlessGenerationMenu
   FB_PATH = "/dev/fb0"
   FB_SYSFS = "/sys/class/graphics/fb0"
   OUTER_MARGIN = 64
+  PANEL_MIN_Y = 24
   PANEL_MIN_WIDTH = 720
   PANEL_MAX_WIDTH = 2080
   PANEL_PADDING = 56
@@ -734,7 +735,7 @@ module ShengHeadlessGenerationMenu
 
   def panel_y(visible_count)
     framebuffer_info()
-    [(@fb_height - panel_height(visible_count)) / 2, 24].max
+    [(@fb_height - panel_height(visible_count)) / 2, PANEL_MIN_Y].max
   end
 
   def content_x()
@@ -747,15 +748,28 @@ module ShengHeadlessGenerationMenu
 
   def max_visible_generations()
     framebuffer_info()
-    available = @fb_height - OUTER_MARGIN * 2 - HEADER_HEIGHT - FOOTER_HEIGHT
-    clamp((available + ROW_GAP) / (ROW_HEIGHT + ROW_GAP), 1, 18)
+    available = @fb_height - PANEL_MIN_Y * 2 - HEADER_HEIGHT - FOOTER_HEIGHT
+    clamp((available + ROW_GAP) / (ROW_HEIGHT + ROW_GAP), 1, 18).to_i
+  end
+
+  def last_page_start(count, page_size)
+    page_size = [page_size.to_i, 1].max
+    start = 0
+    start += page_size while start + page_size < count
+    start
   end
 
   def visible_range(count, selected, page_start: nil)
-    visible = [count, max_visible_generations()].min
+    visible = [count, max_visible_generations()].min.to_i
     start =
       if count > visible
-        page_start.nil? ? (selected / visible) * visible : page_start
+        if page_start.nil?
+          derived_start = 0
+          derived_start += visible while derived_start + visible <= selected
+          derived_start
+        else
+          page_start.to_i
+        end
       else
         0
       end
@@ -766,21 +780,25 @@ module ShengHeadlessGenerationMenu
   def move_selection(selected, page_start, direction, count, page_size)
     return [0, 0] if count <= 1
 
+    page_size = [page_size.to_i, 1].max
+    page_start = page_start.to_i
     if direction == :down
       next_selected = (selected + 1) % count
       next_page =
         if next_selected == 0
           0
         elsif next_selected >= page_start + page_size
-          next_selected
+          page_start + page_size
         else
           page_start
         end
     else
       next_selected = (selected - 1) % count
       next_page =
-        if next_selected < page_start || next_selected >= page_start + page_size
-          (next_selected / page_size) * page_size
+        if selected == 0
+          last_page_start(count, page_size)
+        elsif next_selected < page_start
+          [page_start - page_size, 0].max
         else
           page_start
         end
@@ -1090,7 +1108,7 @@ module ShengHeadlessGenerationMenu
     width = panel_width()
     height = 380
     x = panel_x()
-    y = [(@fb_height - height) / 2, 24].max
+    y = [(@fb_height - height) / 2, PANEL_MIN_Y].max
     title, details = generation_parts(label, 0)
 
     draw_rect(0, 0, @fb_width, @fb_height, BG)
@@ -1147,7 +1165,7 @@ module ShengHeadlessGenerationMenu
     $logger.debug("Sheng generation menu initialization started.") if $logger.respond_to?(:debug)
     generations = Tasks::SwitchRoot::NixOSGeneration.generations()
     menu_length = generations.empty? ? 1 : generations.length
-    page_size = [menu_length, max_visible_generations()].min
+    page_size = [menu_length, max_visible_generations()].min.to_i
     selected = 0
     page_start = 0
     countdown_active = true

@@ -255,7 +255,7 @@
           check_pixel 600 350 "67,67,35,0"
           check_pixel 2400 450 "29,27,24,0"
           test "$(sha256sum "$framebuffer" | cut -d' ' -f1)" = \
-            "71cd4edf2f57ba00be6ddcf48ee5742814632befa7d6109c0eca64d4bff60d74"
+            "16eab7f3420f865c18e5398bb15d553d4d890357bf59820ed38bd71015465128"
 
           echo "native framebuffer render completed in ''${elapsed_ms}ms"
           touch $out
