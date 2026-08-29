@@ -5,14 +5,18 @@
 Sheng 使用固定的 Android `boot_b` 镜像作为启动基础，并从可写的 `linux`
 分区中选择 NixOS stage-2 世代。
 
-普通启动路径仍然不显示菜单。需要从正在运行的系统里打开一次性文本世代菜单：
+普通启动路径仍然不显示菜单。可以从正在运行的系统里打开一次性文本世代菜单：
 
 ```sh
 sudo sheng-reboot-generation-menu
 ```
 
 该命令会把一次性请求写入可写的 `linux` 分区并重启。Stage-1 在显示菜单前
-消费这个请求：
+消费这个请求。
+
+无法进入 stage-2 时，也可以等屏幕出现 NixOS 启动文字后，在 2 秒内快速按三次
+音量加键。Stage-1 会在正常启动任务间隙非阻塞地监听这个手势；没有按键时不会增加
+固定等待时间。只按了一两次时，才会短暂等待本次手势完成：
 
 ```text
 NixOS Sheng - Select stage-2 generation
@@ -36,8 +40,9 @@ Volume +/-: select    Power: boot
 - 每一行 generation 在重绘前都会清空，避免移动选择后留下反色视频残影。
 - 菜单始终使用已经刷入 `boot_b` 的 kernel、DTB、stage-1 initrd 和命令行。
 
-开机时不要按住音量下键。小米 bootloader 会在 Linux 启动前截获它并进入
-Fastboot 模式。
+按电源键开机时不要同时按住音量键。小米 bootloader 会在 Linux 启动前截获
+音量加键并进入 Recovery，或截获音量下键并进入 Fastboot。三击手势必须等到
+NixOS 启动文字出现后再操作。
 
 该菜单没有使用 Mobile NixOS 的 LVGL splash，因为之前启用图形 stage-1 路径会
 阻止 sheng 进入 stage-2。
@@ -53,7 +58,8 @@ Fastboot 模式。
 PAGER=cat nix-env --profile /nix/var/nix/profiles/system --list-generations
 ```
 
-执行 `sudo sheng-reboot-generation-menu`，选择较旧的世代，并用电源键确认。
+分别测试 `sudo sheng-reboot-generation-menu` 和 NixOS 启动文字出现后的三击音量
+加键入口，选择较旧的世代，并用电源键确认。
 启动后检查：
 
 ```sh

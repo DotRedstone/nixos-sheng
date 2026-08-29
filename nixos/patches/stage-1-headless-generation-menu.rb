@@ -123,6 +123,79 @@ module ShengHeadlessGenerationMenu
     (config()["timeout"] || 30).to_i
   end
 
+  def boot_gesture_config()
+    config()["boot_gesture"] || {}
+  end
+
+  def boot_gesture_enabled?()
+    boot_gesture_config()["enable"] == true
+  end
+
+  def boot_gesture_taps()
+    [(boot_gesture_config()["taps"] || 3).to_i, 1].max
+  end
+
+  def boot_gesture_window()
+    [(boot_gesture_config()["window_ms"] || 2000).to_i, 100].max / 1000.0
+  end
+
+  def boot_gesture_debounce()
+    [(boot_gesture_config()["debounce_ms"] || 80).to_i, 0].max / 1000.0
+  end
+
+  def monotonic_time()
+    Process.clock_gettime(Process::CLOCK_MONOTONIC)
+  end
+
+  def boot_gesture_press_times()
+    @boot_gesture_press_times ||= []
+  end
+
+  def prune_boot_gesture_presses(now = monotonic_time())
+    cutoff = now - boot_gesture_window()
+    @boot_gesture_press_times = boot_gesture_press_times().select { |time| time >= cutoff }
+  end
+
+  def record_boot_gesture_event(code, value)
+    return unless boot_gesture_enabled?()
+    return unless code == KEY_VOLUMEUP && value == 1
+    return if @boot_gesture_requested
+
+    now = monotonic_time()
+    prune_boot_gesture_presses(now)
+    last_press = boot_gesture_press_times().last
+    return if last_press && now - last_press < boot_gesture_debounce()
+
+    boot_gesture_press_times() << now
+    if boot_gesture_press_times().length >= boot_gesture_taps()
+      @boot_gesture_requested = true
+      $logger.info("Sheng generation menu requested by volume-up boot gesture")
+    end
+  end
+
+  def poll_boot_gesture(timeout = 0.0)
+    return if @boot_gesture_requested || !boot_gesture_enabled?()
+
+    poll_input_action(timeout)
+    prune_boot_gesture_presses()
+  rescue => error
+    $logger.warn("Ignoring sheng generation menu boot gesture polling failure: #{error}")
+  end
+
+  def boot_gesture_requested?()
+    poll_boot_gesture()
+    return true if @boot_gesture_requested
+    return false if boot_gesture_press_times().empty?
+
+    deadline = boot_gesture_press_times().first + boot_gesture_window()
+    while !@boot_gesture_requested && monotonic_time() < deadline
+      remaining = deadline - monotonic_time()
+      poll_boot_gesture([remaining, 0.05].min)
+    end
+
+    @boot_gesture_requested == true
+  end
+
   def requested?()
     File.exist?(REQUEST_PATH)
   end
@@ -244,6 +317,7 @@ module ShengHeadlessGenerationMenu
 
       type, code, value = event
       if type == EV_KEY
+        record_boot_gesture_event(code, value)
         input_held[path] ||= {}
         if value == 0
           input_held[path].delete(code)
@@ -828,15 +902,27 @@ module ShengHeadlessGenerationMenu
   end
 end
 
+class Task
+  alias_method :sheng_generation_menu_original_try_run_task, :_try_run_task
+
+  def _try_run_task()
+    ShengHeadlessGenerationMenu.poll_boot_gesture()
+    result = sheng_generation_menu_original_try_run_task()
+    ShengHeadlessGenerationMenu.poll_boot_gesture()
+    result
+  end
+end
+
 class Tasks::SwitchRoot
   def selected_generation()
     return @selected_generation if @selected_generation
 
     ShengEarlyChargeGuard.wait_if_critical()
     explicit_request = ShengHeadlessGenerationMenu.requested?()
+    boot_gesture_request = ShengHeadlessGenerationMenu.boot_gesture_requested?()
     wants_menu =
       !ShengEarlyChargeGuard.charger_mode?() &&
-      explicit_request
+      (explicit_request || boot_gesture_request)
 
     if wants_menu &&
        ShengHeadlessStage1.enabled? &&

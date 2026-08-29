@@ -102,7 +102,7 @@ the NixOS system closure and then runs its `init`.
 
 Because standard Android bootloaders cannot render GRUB or systemd-boot menus, this project implements a **custom framebuffer text menu** directly inside the `stage-1` initramfs.
 
-By running `sudo sheng-reboot-generation-menu` from the OS, the tablet will reboot into a lightweight pre-boot selector:
+Run `sudo sheng-reboot-generation-menu` from the OS, or press volume up three times within two seconds after NixOS boot text appears, to open a lightweight pre-boot selector:
 - Use **Volume Keys** to navigate through your NixOS history.
 - Use **Power Key** to confirm and boot.
 - Boots the default generation automatically after 30 seconds.

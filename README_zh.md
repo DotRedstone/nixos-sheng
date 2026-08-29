@@ -91,7 +91,7 @@ linux 分区
 
 由于 Android 设备的 Bootloader 无法直接引导标准的 GRUB/systemd-boot 菜单，本项目在 `stage-1` initramfs 中专门开发了一套**纯文本 framebuffer 启动菜单**。
 
-当你在系统中执行 `sudo sheng-reboot-generation-menu` 后，平板会重启并在屏幕上渲染一个轻量级的世代选择器：
+在系统中执行 `sudo sheng-reboot-generation-menu`，或在 NixOS 启动文字出现后于 2 秒内快速按三次音量加键，平板会显示轻量级的世代选择器：
 - 使用 **音量键** 上下切换历史 NixOS 世代。
 - 使用 **电源键** 确认启动。
 - 30秒无操作自动启动默认世代。

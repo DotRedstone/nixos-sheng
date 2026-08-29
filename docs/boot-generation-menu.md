@@ -5,15 +5,21 @@
 Sheng uses a fixed Android `boot_b` image and selectable NixOS stage-2
 generations from the writable `linux` partition.
 
-The normal boot path remains headless. Open the text generation menu from the
-running system:
+The normal boot path remains headless. The text generation menu can be opened
+from the running system:
 
 ```sh
 sudo sheng-reboot-generation-menu
 ```
 
 The command writes a one-time request to the writable `linux` partition and
-reboots. Stage-1 consumes the request before displaying the menu:
+reboots. Stage-1 consumes the request before displaying the menu.
+
+If stage-2 is unavailable, wait until NixOS boot text appears and then press
+volume up three times within two seconds. Stage-1 listens for this gesture
+non-blockingly between normal boot tasks, so an untouched boot has no fixed
+delay. It only allows a short completion window after the first one or two
+presses have already been detected:
 
 ```text
 NixOS Sheng - Select stage-2 generation
@@ -43,8 +49,9 @@ Volume +/-: select    Power: boot
 - The menu always keeps using the kernel, DTB, stage-1 initrd, and command line
   from the flashed `boot_b`.
 
-Do not hold volume down while powering on the tablet. The Xiaomi bootloader
-intercepts it before Linux starts and enters Fastboot mode.
+Do not hold either volume key while powering on the tablet. Before Linux starts,
+the Xiaomi bootloader interprets volume up as Recovery and volume down as
+Fastboot. Only perform the triple-press gesture after NixOS boot text appears.
 
 The menu is implemented without the Mobile NixOS LVGL splash because enabling
 the graphical stage-1 path previously blocked sheng from reaching stage-2.
@@ -61,8 +68,9 @@ Before testing the menu, confirm at least two generations exist:
 PAGER=cat nix-env --profile /nix/var/nix/profiles/system --list-generations
 ```
 
-Run `sudo sheng-reboot-generation-menu`, choose an older generation, and
-confirm with the power key. After boot:
+Test both `sudo sheng-reboot-generation-menu` and the volume-up triple press
+after NixOS boot text appears. Choose an older generation and confirm with the
+power key. After boot:
 
 ```sh
 readlink /nix/var/nix/profiles/system

@@ -138,6 +138,12 @@ in
       sheng_generation_menu = {
         enable = true;
         timeout = 30;
+        boot_gesture = {
+          enable = true;
+          taps = 3;
+          window_ms = 2000;
+          debounce_ms = 80;
+        };
       };
       sheng_early_charge_guard = {
         enable = true;
