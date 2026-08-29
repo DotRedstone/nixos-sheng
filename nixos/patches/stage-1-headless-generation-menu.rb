@@ -151,6 +151,8 @@ module ShengHeadlessGenerationMenu
 
   def monotonic_time()
     Process.clock_gettime(Process::CLOCK_MONOTONIC)
+  rescue NameError, NoMethodError
+    Time.now.to_f
   end
 
   def boot_gesture_press_times()
