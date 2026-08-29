@@ -81,8 +81,15 @@ After checking networking, the desktop, and hardware services, make it the
 default stage-2 generation:
 
 ```sh
-sudo nixos-rebuild switch --flake ./nixos#sheng-stage2
+sudo sheng-nixos-rebuild "$PWD/nixos#sheng-stage2"
 ```
+
+`sheng-nixos-rebuild` submits the complete build and activation as an
+independent transient systemd service. If a changed `adbd.service` restarts and
+drops the current ADB session, the update continues after the remote shell is
+gone. The command prints the unit name; follow it with
+`journalctl -fu <unit>.service`. From a local terminal, using
+`sudo nixos-rebuild switch --flake ./nixos#sheng-stage2` directly remains safe.
 
 ## Generations and rollback
 

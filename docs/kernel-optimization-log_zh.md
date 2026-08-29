@@ -43,8 +43,8 @@ adb shell 'chmod 755 /tmp/collect-hardware-baseline.sh && /tmp/collect-hardware-
 | GPU devfreq | `simple_ondemand`，220–680 MHz，空闲采样为 220 MHz |
 | UFS devfreq | `simple_ondemand`，75–300 MHz，空闲采样为 75 MHz |
 | UFS I/O scheduler | `mq-deadline`，read-ahead 2048 KiB |
-| CAMSS runtime PM | 被现有 workaround 强制为 `on/active`，开机后几乎全程 active |
-| CAMSS interconnect | idle 时仍保留 AHB 与 CAMNOC→DDR 各 2097152 kB/s 投票 |
+| CAMSS runtime PM | 已恢复 `auto/suspended`，启动服务会确认实际进入挂起 |
+| CAMSS interconnect | idle 时 AHB 与 CAMNOC→DDR 的 CAMSS 投票均为 0 |
 | ftrace | `current_tracer=nop` |
 | 温度 | SoC 约 31–36°C，PMIC 约 37°C，电池约 29.7°C |
 | ADSP | `running`，固件为 sheng 原厂 ADSP |
@@ -59,7 +59,7 @@ adb shell 'chmod 755 /tmp/collect-hardware-baseline.sh && /tmp/collect-hardware-
 
 GPU 和 UFS 在采样时也都降到了最低 OPP。虽然内核启用了 dynamic ftrace，运行时 tracer 为 `nop`，调用点处于动态 NOP 状态；在驱动仍处于审计阶段时，保留诊断能力比未经基准测试就删掉 ftrace 更合理。
 
-相机链路目前是明显的剩余功耗项。`sheng-camera-modules` 为规避历史上的 CAMSS runtime ICC/RPMh 超时，把 `acb7000.isp` 永久设为 `power/control=on`。实测 Titan Top GDSC 常开，虽然各 IFE 子域和相机时钟能关闭，但空闲时仍向 AHB 和 CAMNOC→DDR 各保留 2097152 kB/s 带宽投票。上游 SM8550 CAMSS 仍使用相同的固定带宽和 runtime suspend 实现，因此不能只改一个数字或直接删除 workaround；后续应在可恢复环境中测试 `auto`、抓取 RPMh/ICC trace，并同时验证 UFS I/O 和相机反复开关。
+相机链路曾为规避历史上的 CAMSS runtime ICC/RPMh 超时，把 `acb7000.isp` 永久设为 `power/control=on`。在 7.1.8 与 Q6V5 启动中断修复后的实机上，CAMSS 在持续读取 UFS 根分区时完成了 120 次 `active -> suspended` 循环，没有新增 RPMh、ICC 或 UFS 错误。切回 `auto` 后，AHB 与 CAMNOC→DDR 的 CAMSS 投票均从 2097152 kB/s 降为 0，Titan Top GDSC 从 `on` 进入 `off-0`。因此启动服务现在恢复 runtime PM，并等待 CAMSS 确认进入 suspended；不再为已经无法复现的旧故障永久保留相机互联与顶层电源域。
 
 ## 第一批修改
 
@@ -211,22 +211,108 @@ WirePlumber 把普通 BlueZ 音频与 BlueZ MIDI 定义为独立 monitor。本�
 - 正常重启不会生成虚假 crash 记录。
 - 若未来再次异常重启，第一时间保存 `/sys/fs/pstore/*` 后再做其他操作。
 
-### 14. 恢复 sheng 原厂 150 Hz 触觉频率
+### 14. 撤销不存在的 HV haptics 设备
 
-初版 HV haptics 移植同时带入了一段面向另一类 200 Hz LRA 的 workaround：启动时只接受 185--215 Hz，三次校准仍不在范围内就强制写成 205 Hz。sheng 原厂 DTBO 的设备节点却明确使用 `qcom,lra-period-us = <6667>`，对应约 150 Hz；小米公开的 `sheng-u-oss` 驱动在 `haptics_hw_init()` 中也没有这段强制校准。两份一手来源一致，说明该通用 workaround 不适用于本机。
+早期移植把 PM8550B 的通用 HV haptics 节点直接设为 `okay`，因此 Linux 能注册一个 force-feedback 输入设备，但注册成功并不等于机身内存在执行器。实机反复触发没有触感，驱动校准结果稳定为 `lra_impedance=Open circuit`。重新反编译 sheng 原厂 DTBO 后还确认：PM8550B HV haptics 与 SoundWire haptics 两套候选节点都保持 `status = "disabled"`，没有任何产品 overlay 将其启用。
 
-公开源码依据：[MiCode/Xiaomi_Kernel_OpenSource `sheng-u-oss`](https://github.com/MiCode/Xiaomi_Kernel_OpenSource/blob/sheng-u-oss/drivers/input/misc/qcom-hv-haptics.c)。本轮对照提交为 `29db5d592c5b`，对应 Xiaomi Pad 6S Pro Android U 发布分支。
+因此本轮删除 sheng DTS 中臆造的 haptics 节点，撤销 probe 阶段强制打开模块的改动，并停止自动加载 `qcom-hv-haptics`。这避免 PMIC 持续驱动开路输出，也避免桌面把一个不可用的 FF 设备误认为震动马达。若以后拆机或原理图证明存在独立执行器，应按真实总线、供电和校准数据新增驱动，不能继续用 PM8550B 通用节点猜测。
 
-内核提交 `11e0728a488e` 只移除了强制频率窗口，保留主线移植版的其余错误处理、FF 接口和生命周期修复，没有把 RichTap 私有 ABI、厂商异常上报和多机型条件宏重新引入。设备树中的 3600 mV、6667 us、闭环制动和 SDAM 描述继续与 sheng DTBO 一致。
+验证标准：
 
-预期验证：
+- 启动日志不再注册 `qcom-hv-haptics`，也不再出现 LRA 开路校准。
+- `/sys/class/input` 不再暴露虚假的 haptics/vibrator 设备。
+- 充电、PMIC 和待机链路不因该节点出现新的错误。
 
-- `qcom-hv-haptics` 成功注册 input force-feedback 设备。
-- 启动日志不再把约 150 Hz 判为异常并强制改成 205 Hz。
-- 短振、长振和连续触发均能停止，不出现过热、杂音或模块卸载崩溃。
-- 实机感受和强度只能在刷入后确认；源码一致性不替代执行器测试。
+### 15. 接入 FPC1553 指纹安全链路
+
+原厂 DTS 和 FPC 平台驱动表明，sheng 的侧边指纹使用 L9B 3.3 V 供电、GPIO41 复位和 GPIO40 上升沿中断。内核侧只负责这些电气资源；录入、匹配和模板管理全部在 Qualcomm TEE 中由 `fpcsheng` trusted application 完成，不能用普通 SPI libfprint 驱动替代。
+
+本轮新增精简的 `fpc1552` 资源驱动，提供原厂用户态需要的 `device_prepare`、`hw_reset`、`irq`、`fingerdown_wait` 和 `wakeup_enable` 接口；用户态采用已在 sheng 上完成录入、列举、删除和验证测试的 [ianchb/xiaomi-sheng-fingerprint](https://github.com/ianchb/xiaomi-sheng-fingerprint)，以私有 libfprint 方式接入 fprintd，同时启动 QTEE supplicant、文件系统和 RPMB listeners。`fpcsheng.elf` 固定 SHA-256 为 `269b403b81392c93036dfab37b2408570d98f7d900a0ab29799005b1a7ca08c4`，避免远端固件静默变化。
+
+实机联调还发现 FPC trusted application 会先用一个很短的 IRQ 表示 `FINGER_DOWN_SETUP` 命令完成，它并不代表手指已经按下。内核侧增加一次性 IRQ pending 锁存，避免用户态轮询错过这个边沿；用户态随后以 20 ms 退避查询 TA 的触摸资格状态，确认真实触摸后使用立即采集模式。修正前空闲录入会持续产生 `enroll-retry-scan`，修正后每次真实触摸只推进一个样本，空闲时不再触发采集或占满 CPU。
+
+刷入包含新 DTS/内建驱动的 boot 并更新 NixOS generation 后验证：
+
+```sh
+dmesg | grep -Ei 'fpc1552|fingerprint|qtee|tee0|rpmb'
+systemctl status qteesupplicant fprintd --no-pager
+ls -l /sys/bus/platform/devices/fingerprint_fpc
+fprintd-enroll
+fprintd-verify
+```
+
+在实机完成录入和验证前，状态保持“联调中”，不把构建成功写成硬件已经可用。
+
+### 16. 接入 NT36532E THP 触控与触控笔链路
+
+sheng 的 NT36532E 原厂固件输出完整的 THP 电容矩阵，不是普通 65 字节触摸/笔事件。旧驱动只读取 760 字节内部事件缓冲并在内核中做简化解析，虽然手指触摸可用，但其遗留的 `NVTCapacitivePen` 解析器与 sheng 帧格式不匹配，直接打开 DTS 的 `novatek,pen-support` 只会注册一个没有有效事件的空设备。
+
+本轮改为与原厂协议一致的分层实现：内核每次 IRQ 读取 5417 字节 THP 传输帧，通过 root-only FIFO 暴露时间戳、帧有效性和固件 epoch；用户态 [ianchb/xiaomi-sheng-thp](https://github.com/ianchb/xiaomi-sheng-thp) 负责多点追踪、掌拒、笔坐标、悬停、倾斜和压感，再通过 uinput 注册标准 Linux 输入设备。普通 Focus Pen 的压力范围为 0..8191，Focus Pen Pro 为 0..16383；蓝牙不可用时手指触控和笔坐标仍可工作，侧键、压力传输和 Pro 姿态功能按可用能力降级。
+
+内核切换到 OS3.0.7.0 原厂 `novatek_nt36532_n81a_fw_csot.bin`，Nix 包固定源码和固件提交及哈希。固件更新、WDT 恢复和面板 resume 后都会恢复笔扫描模式并标记新 epoch，用户态据此清空旧参考矩阵，避免恢复后坐标跳变或按键卡住。充电状态变化继续通过 Novatek 原厂命令同步，保留此前验证过的固件更新失败处理。
+
+THP 改动位于可加载的 `nt36532e_ts.ko` 中，不只在 boot 镜像内。即使新旧内核都显示 `7.1.8` 且 vermagic 相同，stage-2 rootfs 里的旧模块仍可能被成功加载并继续注册旧触控设备。因此部署顺序必须是：先安装工厂固件和用户态服务，再同步同一次 Action 构建的 NT36532E 模块，最后刷写对应的 boot_b。内核 CI 除完整模块归档外还会上传独立的小型 `sheng-nt36532e-thp-module` 产物，便于只更新这个模块并校验 SHA256。
+
+验证命令：
+
+```sh
+systemctl status xiaomi-sheng-thp --no-pager
+cat /proc/nvt_thp_status
+libinput list-devices | grep -A20 -E 'NVT|M80p|P81c'
+journalctl -b -u xiaomi-sheng-thp --no-pager
+```
+
+实机验收需要覆盖十指触控、掌拒、悬停、连续压感、两枚侧键、60/120 Hz 切换、屏幕熄灭/唤醒、插拔充电器和 WDT 恢复。上游明确笔扫描仅支持 60 Hz 与 120 Hz，因此其它刷新率下不把无笔事件判定为驱动回归。
 
 ## 已确认健康的链路
+
+### 15. 把 SSC 可查询作为 sensorspd 的启动完成条件
+
+一次 ext4 离线修复把 stage-1 拉长到约 48 秒后，现场复现了传感器链假启动：
+`remoteproc0` 和 `adsprpcd-sensorspd` 都显示 running，FastRPC 也成功打开
+`createstaticpd:sensorspd`，但 QRTR 服务表里没有 SSC，`ssccli` 持续返回
+`SSC QMI Service not found`。单纯重启 adsprpcd、pd-mapper、devauth 和 sensorspd
+不能恢复，证明进程存活和静态 PD 句柄都不是可用性门禁。
+
+旧 `libssc` 补丁还在异步回调里同步 sleep，并且找到 SSC 后没有跳出外层五次循环。
+因此一次本可立即成功的探测也固定多等数秒，外层 systemd 重试又把延迟继续放大，
+最后撞上 `TimeoutStartSec`。本轮删除这个阻塞补丁，每次短探测重新读取 QRTR 服务表；
+`adsprpcd-sensorspd` 通过 `ExecStartPost` 查询真实 SSC，成功后才完成启动，失败则由
+systemd 重启整个 sensor PD daemon。IIO 仍保留同一短门禁作为防御，但不再独自等待三分钟。
+
+`scripts/test-sensor-startup.sh` 会重复重启用户态 sensor PD 和 IIO，每轮同时要求
+SSC 查询成功、两个单元 active，并输出恢复耗时。该修复不会写 remoteproc sysfs，
+也不会在无人值守时重置 ADSP；若 DSP 内部状态已经卡死，仍应先保存日志并做冷启动验证。
+
+### 16. 低电量 charger 启动不再超时进入完整桌面
+
+设备在 1%、约 3.53 V 时复现了完整启动循环：bootloader 以
+`androidboot.mode=charger` 拉起 NixOS，stage-1 只预充 30 秒便切到 stage-2；
+GNOME、Wi-Fi 和蓝牙启动后，电池净电流转为放电，随后 brownout，又被 USB 再次拉起。
+这条循环没有 pstore 崩溃记录，也没有新的 ext4/UFS 错误，并非 A/B 分区损坏。
+
+本轮保留普通启动的 30 秒兜底，但 charger-mode 启动在外接电源在线时不再超时，
+而是保持黑屏、低功耗 stage-1，直到电量达到 5% 才进入桌面。充电器连续三次检测为
+离线时仍会直接关机，避免无外部供电时继续耗尽电池。这样不会要求 Android 根分区可写，
+也不会在关机充电场景中反复启动完整用户态。达到阈值并决定继续启动后，stage-1 会恢复
+此前保存的背光值，避免 charger-mode 成功进入桌面后仍继承黑屏状态。
+
+### 17. 只在 stage-1 离线检查并扩展 rootfs
+
+只读故障现场确认根分区目录元数据损坏：ext4 在读取 Nix store 源码目录时报告
+`EFSCORRUPTED`，随后按 `errors=remount-ro` 中止 journal 并切为只读。没有同时出现
+UFS timeout、abort 或 I/O error，因此现有证据不能把损坏归因于 UFS 驱动；下一次启动的
+stage-1 `e2fsck` 已成功修复文件系统。
+
+审计同时发现每次启动存在两套扩容：Mobile NixOS stage-1 已在挂载前比较 ext4 与
+`linux` 分区并按需扩展，stage-2 却仍启用面向云镜像的 `growpart` 和
+`systemd-growfs-root`。现场分区没有可扩空间，growpart 每次返回 `NOCHANGE`，growfs
+仍在线执行一次 `20379131 -> 20379131` 的同尺寸 resize。它尚不能被证明是损坏根因，
+但在 Android GPT 上反复探测分区表和触碰已满尺寸 ext4 元数据没有收益。
+
+本轮保留 stage-1 的离线 `e2fsck` 与首次按需扩展，明确关闭 stage-2 的 growpart，
+并 mask `systemd-growfs-root.service`。新镜像刷入较大的既有 `linux` 分区时仍会在首次
+挂载前扩满；后续启动不再操作 Android 分区表，也不再在线重复 resize。
 
 ```text
 ADSP remoteproc
@@ -283,8 +369,8 @@ charger_pd
 systemd-analyze time
 systemd-analyze blame --no-pager | head -30
 dmesg | grep -E 'pwrseq|qcom-pcie|PCIe Gen|wcn7850|vpbr-enable|cs35l43'
-dmesg | grep -Ei 'haptics|lra|pstore|ramoops'
-grep -H . /sys/class/input/event*/device/name | grep -Ei 'haptics|vibrator'
+dmesg | grep -Ei 'fpc1552|fingerprint|qtee|tee0|rpmb|pstore|ramoops'
+test ! -e /sys/bus/platform/drivers/qcom-hv-haptics
 lsmod | grep -E 'pwrseq_qcom_wcn|pci_pwrctrl_pwrseq'
 systemctl --failed
 ```
@@ -304,7 +390,7 @@ systemctl --failed
 
 ## 后续方向
 
-1. 刷入后完成三次冷启动、触觉短振/长振和扬声器播放/暂停恢复测试。
+1. 刷入后完成三次冷启动、指纹录入/验证和扬声器播放/暂停恢复测试。
 2. 在用户在场时执行多轮 deep suspend/resume，记录 wakeup source 和 ADSP/UCSI 恢复。
 3. 对比 Android live DT 与 Linux DTS 的 regulator consumer 映射，只合入能确认 rail 的 supply。
 4. 为 libcamera 缺少的 `ov02b1b`、`ov32d40` IPA tuning 建立独立校准工作，不用未经标定的“算法参数”冒充画质优化。

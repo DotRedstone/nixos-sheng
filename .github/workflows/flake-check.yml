@@ -49,6 +49,10 @@ jobs:
             --json
           nix flake check ./nixos --no-build
 
+      - name: Build Sheng touch and stylus processor
+        run: |
+          nix build ./nixos#xiaomiShengThp --no-link
+
       - name: Upload generated lock file
         uses: actions/upload-artifact@v4
         with:

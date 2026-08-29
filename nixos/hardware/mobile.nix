@@ -64,6 +64,24 @@ in
     location = "/rootfs.img";
     extraPadding = 1024 * 1024 * 1024;
 
+    # Mobile NixOS defaults to Android's legacy make_ext4fs. Use current
+    # e2fsprogs so new images carry checksums for directories, inodes, block
+    # bitmaps, and the journal instead of discovering damage only on access.
+    buildPhases.copyPhase = lib.mkForce ''
+      faketime -f "1970-01-01 00:00:01" \
+        mkfs.ext4 \
+          -F \
+          -b "$blockSize" \
+          -e remount-ro \
+          -m 0 \
+          -O metadata_csum,64bit,dir_index,extent,flex_bg,huge_file,extra_isize,dir_nlink \
+          -E lazy_itable_init=0,lazy_journal_init=0 \
+          -L linux \
+          -U ee8d3593-59b1-480e-a3b6-4fefb17ee7d8 \
+          -d . \
+          "$img"
+    '';
+
     # Keep this aligned with Mobile NixOS' default rootfs.nix populate logic.
     populateCommands = ''
       mkdir -p ./nix/store
@@ -123,8 +141,19 @@ in
     fsType = "ext4";
     neededForBoot = true;
     autoResize = true;
-    options = [ "noatime" ];
+    options = [
+      "noatime"
+      "data=ordered"
+      "barrier=1"
+      "errors=remount-ro"
+    ];
   };
+
+  # Mobile NixOS stage-1 already checks the offline filesystem and expands it
+  # to the existing linux partition. Do not run cloud-image partition growth
+  # or a second online ext4 resize after switch-root on this Android GPT.
+  boot.growPartition = lib.mkForce false;
+  systemd.units."systemd-growfs-root.service".enable = false;
 
   mobile.boot.stage-1 = {
     compression = "gzip";
@@ -149,7 +178,8 @@ in
         enable = true;
         critical_capacity = 2;
         boot_capacity = 5;
-        # Stage-2 starts the services that negotiate useful charging current.
+        # A normal boot may continue after this timeout. Charger-mode boots
+        # stay in low-power stage-1 until the battery reaches boot_capacity.
         max_wait_seconds = 30;
       };
     };
@@ -164,6 +194,7 @@ in
 
     extraUtils = [
       pkgs.kbd
+      pkgs.sheng-fb-painter
     ];
 
     shell.shellOnFail = true;

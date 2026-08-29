@@ -12,7 +12,11 @@
     ./modules/sheng-boot-slot.nix
     ./modules/sheng-devauth.nix
     ./modules/sheng-offline-charging.nix
+    ./modules/sheng-fingerprint.nix
+    ./modules/sheng-rootfs-health.nix
     ./modules/xiaomi-mipps-auth.nix
+    ./modules/xiaomi-pen-status.nix
+    ./modules/xiaomi-sheng-thp.nix
   ];
 
   nixpkgs.hostPlatform = "aarch64-linux";
@@ -30,12 +34,22 @@
     # Managing the P2P device can leave WCN7850 scans stuck after Wi-Fi is
     # toggled, making every 5 GHz BSS disappear until the driver is reloaded.
     unmanaged = [ "interface-name:p2p-dev-wlp1s0" ];
+    wifi = {
+      # The sheng firmware can stop returning off-channel 5 GHz scan results
+      # after a randomized scan or a power-save transition.
+      scanRandMacAddress = false;
+      powersave = false;
+    };
   };
   # Connectivity is managed asynchronously and no sheng boot service requires
   # network-online.target. Waiting for carrier delayed graphical.target by
   # roughly 18 seconds in the measured baseline.
   systemd.services.NetworkManager-wait-online.wantedBy = lib.mkForce [ ];
   networking.useDHCP = lib.mkDefault true;
+
+  # GNOME enables Avahi for local-network discovery. Keep its NSS side wired
+  # up as well so .local lookups do not fail despite the daemon being active.
+  services.avahi.nssmdns4 = true;
 
   time.timeZone = lib.mkDefault "Asia/Shanghai";
   services.timesyncd = {
@@ -86,6 +100,10 @@
   };
 
   services.xiaomi-mipps-auth.enable = true;
+  services.xiaomi-pen-status.enable = true;
+  services.xiaomi-sheng-thp.enable = true;
+  services.sheng-fingerprint.enable = true;
+  services.sheng-fingerprint.wakeUnlock = true;
 
   console = {
     earlySetup = true;
@@ -118,6 +136,57 @@
       sync
       systemctl reboot
     '';
+    sheng-nixos-rebuild = pkgs.writeShellScriptBin "sheng-nixos-rebuild" ''
+      set -eu
+
+      if [ "$(id -u)" -ne 0 ]; then
+        echo "Run this command with sudo." >&2
+        exit 1
+      fi
+
+      if [ "$#" -ne 1 ]; then
+        echo "Usage: sheng-nixos-rebuild PATH#CONFIGURATION" >&2
+        exit 2
+      fi
+
+      case "$1" in
+        *#*) flake_path="''${1%%#*}" ;;
+        *)
+          echo "The flake reference must include #CONFIGURATION." >&2
+          exit 2
+          ;;
+      esac
+
+      flake_path="$(realpath "$flake_path")"
+      flake_ref="$flake_path#''${1#*#}"
+      repo_root="$(${pkgs.gitMinimal}/bin/git -c safe.directory='*' \
+        -C "$flake_path" rev-parse --show-toplevel)"
+
+      export HOME=/root
+      mkdir -p "$HOME"
+      if ! ${pkgs.gitMinimal}/bin/git config --global --get-all safe.directory \
+          | grep -Fxq "$repo_root"; then
+        ${pkgs.gitMinimal}/bin/git config --global --add safe.directory "$repo_root"
+      fi
+
+      unit="sheng-nixos-rebuild-$(date +%Y%m%d-%H%M%S)"
+      echo "Starting $unit.service"
+      echo "Follow progress with: journalctl -fu $unit.service"
+
+      # Activation restarts adbd when its unit changes. Run the complete rebuild
+      # under PID 1 so losing the invoking ADB session cannot abort the switch.
+      systemd-run \
+        --unit="$unit" \
+        --description="Build and activate a sheng stage-2 generation" \
+        --collect \
+        --property=Type=exec \
+        --property=TimeoutStartSec=infinity \
+        --setenv=HOME=/root \
+        --setenv=USER=root \
+        --setenv=LOGNAME=root \
+        --setenv=PATH=${lib.makeBinPath [ pkgs.coreutils pkgs.gitMinimal pkgs.nix pkgs.systemd ]} \
+        ${config.system.build.nixos-rebuild}/bin/nixos-rebuild switch --flake "$flake_ref"
+    '';
     sheng-alsa-ucm = pkgs.runCommand "sheng-alsa-ucm" { } ''
       install -Dm0644 ${./hardware/audio/ucm2/conf.d/sm8550/Xiaomi-Pad6SPro.conf} \
         $out/share/alsa/ucm2/conf.d/sm8550/Xiaomi-Pad6SPro.conf
@@ -126,6 +195,7 @@
     '';
   in with pkgs; [
     sheng-check
+    sheng-nixos-rebuild
     sheng-reboot-generation-menu
     sheng-alsa-ucm
     alsa-ucm-conf

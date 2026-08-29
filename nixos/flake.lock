@@ -100,16 +100,16 @@
     "shengKernelSrc": {
       "flake": false,
       "locked": {
-        "lastModified": 1786695436,
-        "narHash": "sha256-XlEUk2DTK3MlXEqgRetwA7Z3SHnGLyqcujLYtirmBBk=",
+        "lastModified": 1787918760,
+        "narHash": "sha256-U96RPTPuctbtzUxmqcyjW/Av+UO+s/XfyA4cGT/zaoU=",
         "owner": "DotRedstone",
         "repo": "linux-sheng",
-        "rev": "bb2af7b1bcd70fcc564ce9654058688f8d5cb472",
+        "rev": "c09befc761265bd3e139bbef77d3e95003bfa21a",
         "type": "github"
       },
       "original": {
         "owner": "DotRedstone",
-        "ref": "audit/sheng-hardware-optimization",
+        "ref": "feat/stylus-thp",
         "repo": "linux-sheng",
         "type": "github"
       }

@@ -5,8 +5,8 @@
 Sheng uses a fixed Android `boot_b` image and selectable NixOS stage-2
 generations from the writable `linux` partition.
 
-The normal boot path remains headless. The text generation menu can be opened
-from the running system:
+The normal boot path remains headless. Open the one-shot generation menu from
+the running system:
 
 ```sh
 sudo sheng-reboot-generation-menu
@@ -21,14 +21,11 @@ non-blockingly between normal boot tasks, so an untouched boot has no fixed
 delay. It only allows a short completion window after the first one or two
 presses have already been detected:
 
-```text
-NixOS Sheng - Select stage-2 generation
-
-> NixOS #2 (2026-06-06 - 26.11pre-git)
-  NixOS #1 (2026-06-06 - 26.11pre-git)
-
-Volume +/-: select    Power: boot
-```
+The framebuffer UI presents generation details on two levels together with the
+current position, button icons, and an automatic-boot progress indicator. The
+selected generation has a high-contrast highlight and direction marker. After
+confirmation, the handoff screen identifies the generation and version that is
+about to enter stage-2.
 
 - Volume up/down or an external keyboard's up/down arrows change the
   highlighted stage-2 generation.
@@ -37,15 +34,23 @@ Volume +/-: select    Power: boot
   a delayed key-release event.
 - Power or an external keyboard's Enter key confirms the selection.
 - The highlighted entry boots automatically after 30 seconds.
-- The menu uses a 16x32 console font and padded full redraws when visible state
-  changes, avoiding stale rows, coordinate drift, and periodic screen flicker.
+- The menu draws directly to the framebuffer and adapts its panel and visible
+  row count to the display dimensions.
+- Generation numbers and date/version details use separate visual levels, so a
+  long version does not compete with the row title.
+- The timeout uses both a status label and progress bar. Moving the selection
+  changes it to a clearly paused state.
+- If framebuffer rendering is unavailable, the menu falls back to a tty text
+  interface instead of accepting input on a blank display.
+- Only changed selections, scroll windows, or timeout state are redrawn,
+  avoiding periodic full-screen writes and flicker.
 - Console input echo and VT keyboard translation are disabled while the menu is
   active, preventing physical volume keys from printing escape sequences over
   the menu.
 - Kernel console logging is temporarily suppressed while the menu is active,
   preventing asynchronous driver logs from overwriting it.
-- Each generation row is cleared before redraw to avoid inverse-video remnants
-  after moving the selection.
+- Each generation row is cleared before redraw to avoid display remnants after
+  moving the selection.
 - The menu always keeps using the kernel, DTB, stage-1 initrd, and command line
   from the flashed `boot_b`.
 

@@ -1,0 +1,81 @@
+# ---
+# Module: Boot Artifact Extraction Workflow
+# Description: Repackage a verified boot image without the matching module archive
+# Scope: CI
+# ---
+
+name: Extract Sheng Boot Artifact
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_run_id:
+        description: "Successful kernel workflow run ID"
+        required: true
+        type: string
+
+jobs:
+  extract:
+    name: Extract verified boot image
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+
+    steps:
+      - name: Select kernel run
+        id: source
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REQUESTED_RUN: ${{ inputs.kernel_run_id }}
+        run: |
+          set -euo pipefail
+          run_id="$REQUESTED_RUN"
+          if [ -z "$run_id" ]; then
+            run_id="$(
+              gh run list \
+                --repo "$GITHUB_REPOSITORY" \
+                --workflow kernel.yml \
+                --branch "$GITHUB_REF_NAME" \
+                --status success \
+                --limit 1 \
+                --json databaseId \
+                --jq '.[0].databaseId'
+            )"
+          fi
+          test -n "$run_id"
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+
+      - name: Download kernel artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: sheng-mobile-nixos-boot
+          path: kernel-artifact
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.source.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify and select boot image
+        run: |
+          set -euo pipefail
+          cd kernel-artifact
+          for file in boot_sheng_nixos.img sheng-linux-*-modules.tar.gz; do
+            test -f "$file"
+            expected="$(awk -v name="/$file" '$2 ~ name "$" { print $1 }' sha256sums.txt)"
+            test -n "$expected"
+            actual="$(sha256sum "$file" | awk '{ print $1 }')"
+            test "$actual" = "$expected"
+          done
+          test -f boot_sheng_nixos.img
+          mkdir -p ../boot-only
+          cp boot_sheng_nixos.img ../boot-only/
+          sha256sum boot_sheng_nixos.img > ../boot-only/sha256sums.txt
+
+      - name: Upload boot-only artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sheng-mobile-nixos-boot-only
+          path: boot-only/
+          retention-days: 14

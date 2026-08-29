@@ -12,10 +12,6 @@ stdenv.mkDerivation {
 
   src = ../../../vendor/libssc;
 
-  patches = [
-    ./wait_for_qmi_service.patch
-  ];
-
   nativeBuildInputs = [ meson ninja pkg-config protobufc protobuf ];
   buildInputs = [ glib protobufc libqmi libmbim ];
 
