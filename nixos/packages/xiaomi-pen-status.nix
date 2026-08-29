@@ -12,8 +12,8 @@ stdenv.mkDerivation {
   src = fetchFromGitHub {
     owner = "DotRedstone";
     repo = "xiaomi-pen-status";
-    rev = "b70ba9a9ed8fa82a6578c6608b0de91567e85278";
-    hash = "sha256-qxo6u6a3/ElsGnj3CZGJRf7HhEZgI3o75P6qbvSHRPA=";
+    rev = "22f762b5dda09b8cba2a8682e76cdb5176786b3a";
+    hash = "sha256-fq5uCMFfmAR0K6AmwzL7IlQj7MyR7EWskTW2n1/zXZo=";
   };
 
   nativeBuildInputs = [
