@@ -160,7 +160,9 @@ in
     crashToBootloader = false;
 
     bootConfig = {
-      log.level = "DEBUG";
+      # Keep normal boot output concise while retaining filesystem progress,
+      # warnings, and errors. Kernel and systemd logs remain available later.
+      log.level = "INFO";
       boot.fail.shell = true;
       gui.enable = false;
       splash.disabled = true;
