@@ -4,12 +4,8 @@ raise "usage: #{$0} MENU_SOURCE COMMAND_OUTPUT" unless menu_source && command_pa
 
 Configuration = {
   "sheng_generation_menu" => {
-    "boot_gesture" => {
-      "enable" => true,
-      "taps" => 3,
-      "window_ms" => 2000,
-      "debounce_ms" => 0
-    }
+    "enable" => true,
+    "timeout" => 3
   }
 }
 
@@ -106,13 +102,15 @@ module ShengHeadlessGenerationMenu
 end
 
 menu = ShengHeadlessGenerationMenu
-menu.record_boot_gesture_event(menu::KEY_VOLUMEUP, 1)
-menu.record_boot_gesture_event(menu::KEY_VOLUMEUP, 2)
-raise "key repeat incorrectly counted as a boot tap" unless menu.boot_gesture_press_times().length == 1
-menu.record_boot_gesture_event(menu::KEY_VOLUMEUP, 1)
-menu.record_boot_gesture_event(menu::KEY_VOLUMEUP, 1)
-raise "volume-up triple press did not request the menu" unless menu.boot_gesture_requested?()
-raise "volume-up triple press was not logged" unless $logger.messages.length == 1
+raise "unexpected default menu timeout" unless menu.timeout() == 3
+raise "keyboard up is not mapped" unless menu.input_action_for_code(menu::KEY_UP) == :up
+raise "keyboard down is not mapped" unless menu.input_action_for_code(menu::KEY_DOWN) == :down
+raise "keyboard Enter is not mapped" unless menu.input_action_for_code(menu::KEY_ENTER) == :confirm
+raise "volume up is not mapped" unless menu.input_action_for_code(menu::KEY_VOLUMEUP) == :up
+raise "volume down is not mapped" unless menu.input_action_for_code(menu::KEY_VOLUMEDOWN) == :down
+raise "navigation repeated before its delay" if menu.navigation_repeat_due?(10.0, 10.0, 10.39)
+raise "navigation did not repeat after its delay" unless menu.navigation_repeat_due?(10.0, 10.0, 10.4)
+raise "navigation repeated faster than its interval" if menu.navigation_repeat_due?(10.0, 10.35, 10.4)
 
 menu.instance_variable_set(:@fb_width, 3048)
 menu.instance_variable_set(:@fb_height, 2032)
@@ -123,7 +121,14 @@ menu.instance_variable_set(:@fb_ready, true)
 
 started_at = Time.now.to_f
 generations = (1..63).to_a.reverse.map { |number| TestGeneration.new(number) }
-menu.render_framebuffer(generations, 0, remaining: 30)
+page_size = menu.max_visible_generations()
+raise "first page is unstable" unless menu.visible_range(generations.length, 0) == [0, page_size]
+raise "selection moved the first page" unless menu.visible_range(generations.length, page_size - 1) == [0, page_size]
+raise "next page did not begin at a page boundary" unless menu.visible_range(generations.length, page_size) == [page_size, page_size * 2]
+last_page_start = (generations.length / page_size) * page_size
+raise "last page escaped the generation list" unless menu.visible_range(generations.length, generations.length - 1) == [last_page_start, generations.length]
+
+menu.render_framebuffer(generations, 0, remaining: 3)
 elapsed = Time.now.to_f - started_at
 operations = menu.captured_operations
 
@@ -164,7 +169,7 @@ menu.render_framebuffer(
   1,
   previous_selected: 0,
   remaining: nil,
-  previous_remaining: 30
+  previous_remaining: 3
 )
 partial_operations = menu.captured_operations
 raise "partial redraw queued too many operations" if partial_operations.length > 250

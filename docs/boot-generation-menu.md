@@ -5,21 +5,16 @@
 Sheng uses a fixed Android `boot_b` image and selectable NixOS stage-2
 generations from the writable `linux` partition.
 
-The normal boot path remains headless. Open the one-shot generation menu from
-the running system:
+Every boot displays the generation menu and automatically enters the newest
+generation after three seconds without input. Pressing a navigation key pauses
+the countdown. The running system can also reboot directly back to the menu:
 
 ```sh
 sudo sheng-reboot-generation-menu
 ```
 
-The command writes a one-time request to the writable `linux` partition and
-reboots. Stage-1 consumes the request before displaying the menu.
-
-If stage-2 is unavailable, wait until NixOS boot text appears and then press
-volume up three times within two seconds. Stage-1 listens for this gesture
-non-blockingly between normal boot tasks, so an untouched boot has no fixed
-delay. It only allows a short completion window after the first one or two
-presses have already been detected:
+The command reboots the device; opening the menu no longer depends on a
+timing-sensitive triple-press gesture.
 
 The framebuffer UI presents generation details on two levels together with the
 current position, button icons, and an automatic-boot progress indicator. The
@@ -33,7 +28,8 @@ about to enter stage-2.
 - Volume key handling is edge-triggered, so selection redraw does not wait for
   a delayed key-release event.
 - Power or an external keyboard's Enter key confirms the selection.
-- The highlighted entry boots automatically after 30 seconds.
+- The highlighted entry boots automatically after three seconds; moving the
+  selection pauses the countdown.
 - The menu draws directly to the framebuffer and adapts its panel and visible
   row count to the display dimensions.
 - Generation numbers and date/version details use separate visual levels, so a
@@ -56,7 +52,7 @@ about to enter stage-2.
 
 Do not hold either volume key while powering on the tablet. Before Linux starts,
 the Xiaomi bootloader interprets volume up as Recovery and volume down as
-Fastboot. Only perform the triple-press gesture after NixOS boot text appears.
+Fastboot. Wait for the generation menu before using the volume keys.
 
 The menu is implemented without the Mobile NixOS LVGL splash because enabling
 the graphical stage-1 path previously blocked sheng from reaching stage-2.
@@ -73,9 +69,9 @@ Before testing the menu, confirm at least two generations exist:
 PAGER=cat nix-env --profile /nix/var/nix/profiles/system --list-generations
 ```
 
-Test both `sudo sheng-reboot-generation-menu` and the volume-up triple press
-after NixOS boot text appears. Choose an older generation and confirm with the
-power key. After boot:
+Test both a normal boot and `sudo sheng-reboot-generation-menu`. Choose an older
+generation and confirm with the power key. Also connect a USB keyboard and test
+the arrow keys and Enter. After boot:
 
 ```sh
 readlink /nix/var/nix/profiles/system

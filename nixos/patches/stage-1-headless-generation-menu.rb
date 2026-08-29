@@ -57,6 +57,8 @@ module ShengHeadlessGenerationMenu
   KEY_KPENTER = 96
   INPUT_EVENT_SIZE = 24
   INPUT_SCAN_INTERVAL = 0.25
+  NAVIGATION_REPEAT_DELAY = 0.4
+  NAVIGATION_REPEAT_INTERVAL = 0.1
   INPUT_ACTION_CODES = {
     up: [KEY_VOLUMEUP, KEY_UP],
     down: [KEY_VOLUMEDOWN, KEY_DOWN],
@@ -126,27 +128,7 @@ module ShengHeadlessGenerationMenu
   end
 
   def timeout()
-    (config()["timeout"] || 30).to_i
-  end
-
-  def boot_gesture_config()
-    config()["boot_gesture"] || {}
-  end
-
-  def boot_gesture_enabled?()
-    boot_gesture_config()["enable"] == true
-  end
-
-  def boot_gesture_taps()
-    [(boot_gesture_config()["taps"] || 3).to_i, 1].max
-  end
-
-  def boot_gesture_window()
-    [(boot_gesture_config()["window_ms"] || 2000).to_i, 100].max / 1000.0
-  end
-
-  def boot_gesture_debounce()
-    [(boot_gesture_config()["debounce_ms"] || 80).to_i, 0].max / 1000.0
+    [(config()["timeout"] || 3).to_i, 1].max
   end
 
   def monotonic_time()
@@ -155,53 +137,17 @@ module ShengHeadlessGenerationMenu
     Time.now.to_f
   end
 
-  def boot_gesture_press_times()
-    @boot_gesture_press_times ||= []
+  def countdown_remaining(deadline)
+    remaining = deadline - monotonic_time()
+    return 0 if remaining <= 0
+
+    whole_seconds = remaining.to_i
+    whole_seconds + (remaining > whole_seconds ? 1 : 0)
   end
 
-  def prune_boot_gesture_presses(now = monotonic_time())
-    cutoff = now - boot_gesture_window()
-    @boot_gesture_press_times = boot_gesture_press_times().select { |time| time >= cutoff }
-  end
-
-  def record_boot_gesture_event(code, value)
-    return unless boot_gesture_enabled?()
-    return unless code == KEY_VOLUMEUP && value == 1
-    return if @boot_gesture_requested
-
-    now = monotonic_time()
-    prune_boot_gesture_presses(now)
-    last_press = boot_gesture_press_times().last
-    return if last_press && now - last_press < boot_gesture_debounce()
-
-    boot_gesture_press_times() << now
-    if boot_gesture_press_times().length >= boot_gesture_taps()
-      @boot_gesture_requested = true
-      $logger.info("Sheng generation menu requested by volume-up boot gesture")
-    end
-  end
-
-  def poll_boot_gesture(timeout = 0.0)
-    return if @boot_gesture_requested || !boot_gesture_enabled?()
-
-    poll_input_action(timeout)
-    prune_boot_gesture_presses()
-  rescue => error
-    $logger.warn("Ignoring sheng generation menu boot gesture polling failure: #{error}")
-  end
-
-  def boot_gesture_requested?()
-    poll_boot_gesture()
-    return true if @boot_gesture_requested
-    return false if boot_gesture_press_times().empty?
-
-    deadline = boot_gesture_press_times().first + boot_gesture_window()
-    while !@boot_gesture_requested && monotonic_time() < deadline
-      remaining = deadline - monotonic_time()
-      poll_boot_gesture([remaining, 0.05].min)
-    end
-
-    @boot_gesture_requested == true
+  def navigation_repeat_due?(pressed_at, last_repeat, now)
+    now - pressed_at >= NAVIGATION_REPEAT_DELAY &&
+      now - last_repeat >= NAVIGATION_REPEAT_INTERVAL
   end
 
   def requested?()
@@ -325,13 +271,15 @@ module ShengHeadlessGenerationMenu
 
       type, code, value = event
       if type == EV_KEY
-        record_boot_gesture_event(code, value)
         input_held[path] ||= {}
         if value == 0
           input_held[path].delete(code)
         elsif value == 1 || value == 2
           input_held[path][code] = true
-          action ||= input_action_for_code(code)
+          # Kernel key-repeat rates differ between the tablet buttons and USB
+          # keyboards. Emit only the press edge here; choose() provides one
+          # predictable repeat clock for every navigation device.
+          action ||= input_action_for_code(code) if value == 1
         end
       end
 
@@ -800,15 +748,8 @@ module ShengHeadlessGenerationMenu
 
   def visible_range(count, selected)
     visible = [count, max_visible_generations()].min
-    start = 0
-
-    if count > visible
-      start = selected - visible / 2
-      start = 0 if start < 0
-      start = count - visible if start > count - visible
-    end
-
-    [start, start + visible]
+    start = count > visible ? (selected / visible) * visible : 0
+    [start, [start + visible, count].min]
   end
 
   def generation_parts(label, index)
@@ -1057,7 +998,7 @@ module ShengHeadlessGenerationMenu
       lines << "#{marker} #{label}"
     end
     lines << ""
-    lines << "Volume +/-: select    Power: boot"
+    lines << "Volume +/- or Up/Down: select    Power or Enter: boot"
     lines << (remaining ? "Automatic boot in #{remaining}s" : "Automatic boot paused")
     console.write("\e[2J\e[H#{lines.join("\n")}\n")
     console.flush
@@ -1147,7 +1088,6 @@ module ShengHeadlessGenerationMenu
     $logger.debug("Sheng generation menu initialization started.") if $logger.respond_to?(:debug)
     generations = Tasks::SwitchRoot::NixOSGeneration.generations()
     selected = 0
-    deadline = Time.now.to_i + timeout()
     countdown_active = true
     activate_console()
     unblank_framebuffer()
@@ -1160,17 +1100,18 @@ module ShengHeadlessGenerationMenu
     input_held.clear
     wait_for_release(VOLUME_UP + VOLUME_DOWN + CONFIRM)
     $logger.debug("Sheng generation menu input ready.") if $logger.respond_to?(:debug)
+    deadline = monotonic_time() + timeout()
     last_selected = nil
     last_remaining = nil
-    volume_up_was_pressed = false
-    volume_down_was_pressed = false
+    up_was_pressed = false
+    down_was_pressed = false
     up_pressed_time = 0.0
     up_last_repeat = 0.0
     down_pressed_time = 0.0
     down_last_repeat = 0.0
 
     loop do
-      remaining = countdown_active ? [deadline - Time.now.to_i, 0].max : nil
+      remaining = countdown_active ? countdown_remaining(deadline) : nil
       needs_redraw = (selected != last_selected) || (remaining != last_remaining)
 
       if needs_redraw
@@ -1186,31 +1127,31 @@ module ShengHeadlessGenerationMenu
       end
 
       input_action = poll_input_action(0.01)
-      volume_up_pressed = input_held?(VOLUME_UP)
-      volume_down_pressed = input_held?(VOLUME_DOWN)
+      up_pressed = input_held?(VOLUME_UP)
+      down_pressed = input_held?(VOLUME_DOWN)
 
       action_up = input_action == :up
       action_down = input_action == :down
       confirm_pressed = input_action == :confirm
-      now_t = Time.now.to_f
+      now_t = monotonic_time()
 
-      if volume_up_pressed
-        if !volume_up_was_pressed
+      if up_pressed
+        if !up_was_pressed
           up_pressed_time = now_t
           up_last_repeat = now_t
           action_up = true
-        elsif now_t - up_pressed_time > 0.4 && now_t - up_last_repeat > 0.1
+        elsif navigation_repeat_due?(up_pressed_time, up_last_repeat, now_t)
           action_up = true
           up_last_repeat = now_t
         end
       end
 
-      if volume_down_pressed
-        if !volume_down_was_pressed
+      if down_pressed
+        if !down_was_pressed
           down_pressed_time = now_t
           down_last_repeat = now_t
           action_down = true
-        elsif now_t - down_pressed_time > 0.4 && now_t - down_last_repeat > 0.1
+        elsif navigation_repeat_due?(down_pressed_time, down_last_repeat, now_t)
           action_down = true
           down_last_repeat = now_t
         end
@@ -1227,12 +1168,12 @@ module ShengHeadlessGenerationMenu
       elsif confirm_pressed
         wait_for_release(CONFIRM)
         break
-      elsif countdown_active && Time.now.to_i >= deadline
+      elsif countdown_active && monotonic_time() >= deadline
         break
       end
 
-      volume_up_was_pressed = volume_up_pressed
-      volume_down_was_pressed = volume_down_pressed
+      up_was_pressed = up_pressed
+      down_was_pressed = down_pressed
     end
 
     chosen_generation =
@@ -1250,27 +1191,12 @@ module ShengHeadlessGenerationMenu
   end
 end
 
-class Task
-  alias_method :sheng_generation_menu_original_try_run_task, :_try_run_task
-
-  def _try_run_task()
-    ShengHeadlessGenerationMenu.poll_boot_gesture()
-    result = sheng_generation_menu_original_try_run_task()
-    ShengHeadlessGenerationMenu.poll_boot_gesture()
-    result
-  end
-end
-
 class Tasks::SwitchRoot
   def selected_generation()
     return @selected_generation if @selected_generation
 
     ShengEarlyChargeGuard.wait_if_critical()
-    explicit_request = ShengHeadlessGenerationMenu.requested?()
-    boot_gesture_request = ShengHeadlessGenerationMenu.boot_gesture_requested?()
-    wants_menu =
-      (explicit_request || boot_gesture_request) &&
-      ShengEarlyChargeGuard.interactive_boot_safe?()
+    wants_menu = ShengEarlyChargeGuard.interactive_boot_safe?()
 
     if wants_menu &&
        ShengHeadlessStage1.enabled? &&
