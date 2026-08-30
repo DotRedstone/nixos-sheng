@@ -7,8 +7,8 @@
 
 ## 当前结论
 
-**暂不发布新 Release。** 普通启动候选版已经健康，但手动世代选择交接仍需构建并刷入
-实机验证；内核和 NixOS 功能分支也应先合并，再生成正式产物。
+**暂不发布新 Release。** 普通启动和手动世代选择交接均已通过实机验证；剩余阻断项是
+把 NixOS audit 分支审查后合并到 `sheng`，再从该合并提交生成并核验同源正式产物。
 
 ## 源码门禁
 
@@ -16,10 +16,10 @@
   并把 `shengKernelSrc` 锁定到该维护 ref。
 - [ ] 从当前 NixOS audit 分支向 `sheng` 创建并审查 PR，确认没有无关的分支改名或
   历史重写。
-- [ ] `nix flake lock ./nixos` 不产生意外 lock 漂移。
-- [ ] `nix flake check ./nixos --no-build` 通过。
-- [ ] 世代菜单 Ruby 语法、渲染边界、命令流、分页、长按重复和待启动选择测试通过。
-- [ ] `git diff --check`、Markdown 链接、YAML 解析、许可证/第三方声明和已跟踪文件
+- [x] `nix flake lock ./nixos` 不产生意外 lock 漂移。
+- [x] `nix flake check ./nixos --no-build` 通过。
+- [x] 世代菜单 Ruby 语法、渲染边界、命令流、分页、长按重复和待启动选择测试通过。
+- [x] `git diff --check`、Markdown 链接、YAML 解析、许可证/第三方声明和已跟踪文件
   凭据扫描通过。
 
 ## 实机门禁
@@ -27,10 +27,10 @@
 必须使用同一个发布候选提交对应的 boot 和 rootfs。
 
 - [ ] 连续 3 次普通启动均为 0 failed unit，且没有新 coredump。
-- [ ] 在世代菜单停留至少 15 秒，选择旧世代；确认只快速重启一次，下一次跳过菜单。
-- [ ] `adsprpcd-sensorspd` 和 `iio-sensor-proxy` active、`NRestarts=0`，直接 SSC
+- [x] 在世代菜单停留至少 15 秒，选择旧世代；确认只快速重启一次，下一次跳过菜单。
+- [x] `adsprpcd-sensorspd` 和 `iio-sensor-proxy` active、`NRestarts=0`，直接 SSC
   查询成功。
-- [ ] 根分区可写、ext4 clean、`errors_count=0`，无 UFS reset、timeout、abort 或
+- [x] 根分区可写、ext4 clean、`errors_count=0`，无 UFS reset、timeout、abort 或
   block I/O error。
 - [ ] 2.4 GHz 与 5 GHz 无需重启即可连接；若低概率首次刷入问题出现，应先保存日志。
 - [ ] 标准 PD 与 MiPPS 分开测试；电脑 USB 数据口充电也与纯充电器场景分开表述。
@@ -69,6 +69,13 @@ sheng-rootfs-status
 userspace 11.990 秒，`graphical.target` 在 userspace 11.006 秒到达。系统状态为
 `running`、0 failed unit，两个 SSC 服务均 active 且 `NRestarts=0`。
 
-另一次启动的 `e2fsck -p` 约 0.18 秒，但在 `Tasks::SwitchRoot` 停留约 29 秒，随后
-复现 SSC QMI 服务缺失和 sensor daemon 反复重启。因此手动选择交接是必须实机验证的
-发版阻断项，不只是文档优化。
+另一次旧实现启动的 `e2fsck -p` 约 0.18 秒，但在 `Tasks::SwitchRoot` 停留约 29 秒，
+随后复现 SSC QMI 服务缺失和 sensor daemon 反复重启。
+
+2026-08-30 使用提交 `86c2b22` 的 boot image 完成修复后回归：第一次启动在菜单内
+停留约 24 秒并手动确认，随后发生一次快速重启；第二次启动跳过菜单，一次性选择标记
+已删除。第二次启动总计 18.075 秒，`graphical.target` 在 userspace 11.216 秒到达；
+系统为 `running`、0 failed unit、无 coredump，root 为可写 ext4 且
+`errors_count=0`。`adsprpcd`、`pd-mapper`、`adsprpcd-sensorspd` 和
+`iio-sensor-proxy` 均 active、`NRestarts=0`。这解除菜单交接的实机阻断，但不替代
+合并提交正式产物的完整回归。

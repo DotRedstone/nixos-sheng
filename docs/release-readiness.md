@@ -8,10 +8,10 @@ itself a release approval.
 
 ## Current decision
 
-**Not ready to publish a new release yet.** The normal-boot candidate is healthy,
-but the manual generation-selection handoff must be built and verified on the
-tablet. Kernel and NixOS feature branches also need to be merged before final
-artifacts are produced.
+**Not ready to publish a new release yet.** Normal boot and the manual
+generation-selection handoff have passed on-device validation. The remaining
+blockers are review and merge of the NixOS audit branch into `sheng`, followed
+by provenance checks on final artifacts built from that merge commit.
 
 ## Source gates
 
@@ -19,11 +19,11 @@ artifacts are produced.
   PR #1 and locked `shengKernelSrc` to that maintained ref.
 - [ ] Open and review a pull request from the current NixOS audit branch to
   `sheng`; confirm no unrelated branch renames or history rewrites.
-- [ ] `nix flake lock ./nixos` produces no unexpected lock drift.
-- [ ] `nix flake check ./nixos --no-build` passes.
-- [ ] Generation-menu Ruby syntax, renderer bounds, command stream, paging,
+- [x] `nix flake lock ./nixos` produces no unexpected lock drift.
+- [x] `nix flake check ./nixos --no-build` passes.
+- [x] Generation-menu Ruby syntax, renderer bounds, command stream, paging,
   key-repeat, and pending-selection tests pass.
-- [ ] `git diff --check`, Markdown links, YAML parsing, license/notices, and a
+- [x] `git diff --check`, Markdown links, YAML parsing, license/notices, and a
   tracked-file credential scan pass.
 
 ## Hardware gates
@@ -31,11 +31,11 @@ artifacts are produced.
 Use the exact release-candidate boot and rootfs commit.
 
 - [ ] Three normal boots complete with zero failed units and no new coredumps.
-- [ ] Stay in the generation menu for at least 15 seconds, choose an older
+- [x] Stay in the generation menu for at least 15 seconds, choose an older
   generation, and verify exactly one quick reboot followed by a menu skip.
-- [ ] `adsprpcd-sensorspd` and `iio-sensor-proxy` are active with
+- [x] `adsprpcd-sensorspd` and `iio-sensor-proxy` are active with
   `NRestarts=0`; direct SSC queries work.
-- [ ] Root is writable, ext4 is clean, `errors_count=0`, and no UFS reset,
+- [x] Root is writable, ext4 is clean, `errors_count=0`, and no UFS reset,
   timeout, abort, or block I/O error appears.
 - [ ] 2.4 GHz and 5 GHz Wi-Fi connect without a required reboot. Preserve logs
   before reboot if the rare post-flash 5 GHz issue occurs.
@@ -84,7 +84,17 @@ A normal boot using commit `0151b29`'s boot image completed in 21.066 seconds:
 reached after 11.006 seconds userspace. The system was `running`, had zero
 failed units, and both SSC services were active with `NRestarts=0`.
 
-A separate boot spent about 29 seconds in `Tasks::SwitchRoot` after a roughly
-0.18-second `e2fsck -p`. It then reproduced missing SSC QMI service and repeated
-sensor daemon restarts. This is why the unverified manual-selection handoff is
-a release blocker rather than a documentation-only change.
+A separate boot with the old behavior spent about 29 seconds in
+`Tasks::SwitchRoot` after a roughly 0.18-second `e2fsck -p`. It then reproduced
+missing SSC QMI service and repeated sensor daemon restarts.
+
+On 2026-08-30, commit `86c2b22`'s boot image passed the fixed-path regression.
+The first boot remained in the menu for about 24 seconds before manual
+confirmation, then performed exactly one quick reboot. The second boot skipped
+the menu and removed the one-shot selection marker. It completed in 18.075
+seconds, with `graphical.target` reached after 11.216 seconds userspace. The
+system was `running`, had zero failed units and no coredump, mounted root as
+writable ext4 with `errors_count=0`, and kept `adsprpcd`, `pd-mapper`,
+`adsprpcd-sensorspd`, and `iio-sensor-proxy` active with `NRestarts=0`. This
+clears the handoff's device-validation blocker, but does not replace the final
+merged-artifact regression.

@@ -56,9 +56,9 @@ enabled in a kernel configuration.
 
 ## Release Blockers
 
-- [ ] Validate the manual generation-selection reboot handoff on hardware:
-  remain in the menu, choose an older generation, then confirm that the next
-  boot skips the menu and SSC/IIO both start with `NRestarts=0`.
+- [x] Validated the manual generation-selection reboot handoff on hardware:
+  remained in the menu for about 24 seconds, confirmed a selection, and verified
+  that the next boot skipped the menu while SSC/IIO started with `NRestarts=0`.
 - [x] Merged `DotRedstone/linux-sheng:feat/stylus-thp` into the maintained 7.1.8
   branch through PR #1 and locked `shengKernelSrc` to that maintained ref.
 - [ ] Merge this audit branch into the default `sheng` branch through a reviewed
@@ -66,8 +66,9 @@ enabled in a kernel configuration.
 - [ ] Build boot, minimal rootfs, and GNOME rootfs from the exact same merged
   commit; verify run `headSha`, checksums, boot partition size, matching kernel
   modules, and ext4 features before publishing.
-- [ ] Run three normal boots plus one deliberately delayed generation-menu boot
-  on the release candidate; retain `systemd-analyze`, failed-unit, coredump,
+- [~] Completed one deliberately delayed generation-menu handoff regression;
+  still run three normal boots on the merged release candidate and retain
+  `systemd-analyze`, failed-unit, coredump,
   SSC, charging, rootfs, and kernel-warning evidence.
 - [ ] Review proprietary firmware and binary redistribution for every release.
   Source availability is not redistribution permission.
