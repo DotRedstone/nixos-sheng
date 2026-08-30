@@ -8,17 +8,17 @@ itself a release approval.
 
 ## Current decision
 
-**Not ready to publish a new release yet.** Normal boot and the manual
-generation-selection handoff have passed on-device validation. The remaining
-blockers are review and merge of the NixOS audit branch into `sheng`, followed
-by provenance checks on final artifacts built from that merge commit.
+**Not ready to publish a new release yet.** Normal boot, the manual
+generation-selection handoff, and source review in PR #25 have passed. The
+remaining blockers are provenance checks on final artifacts built from the
+`sheng` merge commit and the unchecked peripheral regressions below.
 
 ## Source gates
 
 - [x] Merged `linux-sheng:feat/stylus-thp` into the maintained 7.1.8 branch via
   PR #1 and locked `shengKernelSrc` to that maintained ref.
-- [ ] Open and review a pull request from the current NixOS audit branch to
-  `sheng`; confirm no unrelated branch renames or history rewrites.
+- [x] Reviewed the current NixOS audit branch in PR #25 and confirmed there
+  were no unrelated branch renames or history rewrites.
 - [x] `nix flake lock ./nixos` produces no unexpected lock drift.
 - [x] `nix flake check ./nixos --no-build` passes.
 - [x] Generation-menu Ruby syntax, renderer bounds, command stream, paging,

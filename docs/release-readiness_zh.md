@@ -7,14 +7,14 @@
 
 ## 当前结论
 
-**暂不发布新 Release。** 普通启动和手动世代选择交接均已通过实机验证；剩余阻断项是
-把 NixOS audit 分支审查后合并到 `sheng`，再从该合并提交生成并核验同源正式产物。
+**暂不发布新 Release。** 普通启动、手动世代选择交接和 PR #25 源码审查均已通过；
+剩余阻断项是从 `sheng` 合并提交生成并核验同源正式产物，再完成未勾选的外设回归。
 
 ## 源码门禁
 
 - [x] 已通过 PR #1 将 `linux-sheng:feat/stylus-thp` 合并到维护中的 7.1.8 分支，
   并把 `shengKernelSrc` 锁定到该维护 ref。
-- [ ] 从当前 NixOS audit 分支向 `sheng` 创建并审查 PR，确认没有无关的分支改名或
+- [x] 通过 PR #25 审查当前 NixOS audit 分支，确认没有无关的分支改名或
   历史重写。
 - [x] `nix flake lock ./nixos` 不产生意外 lock 漂移。
 - [x] `nix flake check ./nixos --no-build` 通过。

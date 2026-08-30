@@ -61,8 +61,8 @@ enabled in a kernel configuration.
   that the next boot skipped the menu while SSC/IIO started with `NRestarts=0`.
 - [x] Merged `DotRedstone/linux-sheng:feat/stylus-thp` into the maintained 7.1.8
   branch through PR #1 and locked `shengKernelSrc` to that maintained ref.
-- [ ] Merge this audit branch into the default `sheng` branch through a reviewed
-  pull request. Do not publish directly from an audit branch.
+- [x] Merged this audit branch into the default `sheng` branch through reviewed
+  PR #25 using a merge commit. No release was published from the audit branch.
 - [ ] Build boot, minimal rootfs, and GNOME rootfs from the exact same merged
   commit; verify run `headSha`, checksums, boot partition size, matching kernel
   modules, and ext4 features before publishing.

@@ -50,8 +50,8 @@
   下一次启动跳过菜单，且 SSC/IIO 均为 `NRestarts=0`。
 - [x] 已通过 PR #1 将 `DotRedstone/linux-sheng:feat/stylus-thp` 合并到维护中的
   7.1.8 分支，并把 `shengKernelSrc` 锁定到该维护分支。
-- [ ] 通过经过审查的 PR 把当前 audit 分支合并进默认 `sheng` 分支；不要直接从
-  audit 分支发布。
+- [x] 当前 audit 分支已经 PR #25 审查并以 merge commit 合入默认 `sheng` 分支；
+  未直接从 audit 分支发布。
 - [ ] boot、minimal rootfs、GNOME rootfs 必须来自同一个合并提交；发布前核对
   workflow `headSha`、校验和、boot 分区大小、内核模块版本和 ext4 特性。
 - [~] 已完成 1 次故意长时间停留菜单的交接回归；合并提交候选版仍需做 3 次普通
