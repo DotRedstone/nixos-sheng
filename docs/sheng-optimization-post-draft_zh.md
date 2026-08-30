@@ -1,85 +1,107 @@
-# 把一台 Android 平板的 NixOS 启动链重新理顺
+# 把一台 Android 平板变成可回滚的 NixOS 设备
 
-> 状态：草稿。文中“修改后”数据必须在刷入新 boot、rebuild 新系统后实测填写，不能用预期值代替结果。
+> 发布前草稿，数据采集于 2026-08-30。菜单交接补丁仍需刷入后的最终实机验收；
+> 正式发布时应把单次健康启动替换为三次冷启动中位数，并附对应提交与校验和。
 
-## 问题不是三个孤立故障
+## 项目做了什么
 
-Xiaomi Pad 6S Pro（sheng）上的传感器、MiPPS 快充和桌面登录异常，最初看起来互不相关。沿启动时间线检查后，三者都经过 Qualcomm 的远端处理器和用户态服务链：
+`nixos-sheng` 是 Xiaomi Pad 6S Pro 12.4（`sheng`，Snapdragon 8 Gen 2 / SM8550）
+的 Mobile NixOS 移植。它保留 Android bootloader 和 A/B slot：NixOS kernel、DTB 与
+stage-1 initramfs 放在非活动 `boot` slot，可写 NixOS 系统放在独立 ext4 `linux`
+分区。Android 分区不需要被改成可写。
+
+真正有价值的不只是“Linux 能开机”，而是把 NixOS 的系统世代带到移动设备：普通
+用户态更新可以直接在平板内 `nixos-rebuild`，失败时从 stage-1 framebuffer 菜单选择
+旧世代；只有 kernel、DTS、stage-1 和 boot cmdline 变化才需要重刷 boot image。
+
+当前实机已经覆盖：GNOME、触控、四向旋转、屏幕键盘、2.4/5 GHz Wi-Fi、USB-C
+role/OTG、Qualcomm SSC 传感器、前后摄 RAW10、标准 PD、小米 MiPPS 认证、
+NT36532E THP 触控笔，以及 FPC1553 指纹录入和验证。
+
+## 三个故障其实是一条时序链
+
+最初的现象是：initramfs 停久后传感器消失、快充偶尔不恢复，登录桌面又可能出现
+下游错误。它们并不是完全独立：
 
 ```text
 ADSP remoteproc
   -> FastRPC / pd-mapper
   -> sensor_pd / charger_pd
-  -> iio-sensor-proxy / UCSI / MiPPS
-  -> GNOME 会话
+  -> SSC / UCSI / PD-PPS
+  -> iio-sensor-proxy / MiPPS / desktop session
 ```
 
-stage-1 菜单曾在正常启动时无条件等待，后面的服务又普遍假设底层已经就绪。于是上游多等几十秒，传感器和快充就可能在错误时间开始一次性初始化。修复思路不是给每个症状分别加睡眠，而是先消除无意义等待，再让每一层只在依赖真正可用时继续，并在暂时失败时可恢复。
+用户态服务过去只检查进程或设备节点是否出现，没有确认 SSC 能否真实查询；MiPPS 也
+可能在 Type-C、SVID 和 PDO 尚未稳定时过早放弃。修复后，`sensorspd` 必须通过一次
+真实 SSC 查询才能完成启动，失败由 systemd 重启整条 sensor PD daemon；MiPPS 在握手
+前等待 PD/PPS、Xiaomi SVID 和 PDO，并对早期临时状态重试。
 
-## 先测，再改
+发布审计又找到更隐蔽的一层：一次启动中 `e2fsck -p` 只用了约 0.18 秒，真正的
+29 秒停留发生在世代菜单。该样本随后稳定复现 `SSC QMI Service not found`，
+`adsprpcd-sensorspd` 重启超过 18 次。普通重启则恢复为两个传感器服务
+`NRestarts=0`。
 
-基线内核为 `Linux 7.0.0`，一次启动结果如下：
+最终方案没有删掉菜单，也没有继续给用户态叠加 sleep：3 秒无操作仍直接启动；用户
+手动选择后，stage-1 原子保存目标世代并快速重启，下一次启动一次性消费选择并跳过
+菜单。用户可以慢慢挑世代，硬件仍得到一次干净、短时序的启动。
 
-| 指标 | 修改前 | 修改后（三次中位数） |
+## 从“能跑”到“可恢复”
+
+- 根分区每次挂载前执行 `e2fsck -p`，自动修复失败才回退到 `-fy`；不再因一次硬重启
+  无条件全盘 `-f` 扫描。
+- rootfs 只由 stage-1 在离线状态按需扩到 `linux` 分区；stage-2 不再对 Android GPT
+  运行 `growpart`，也不再做同尺寸在线 resize。
+- ext4 以 `errors=remount-ro` 保护数据；运行时检测到实际只读后同步并请求正常重启，
+  让下一次 stage-1 离线修复，而不是强行 remount 继续写。
+- 低电量 charger-mode 留在黑屏低功耗 stage-1 充到 5% 再进桌面，避免“进系统耗电
+  -> brownout -> USB 再拉起”的循环。
+- ramoops 按原厂 DTBO 恢复 4 MiB 持久区，异常重启后终于能留下 kernel console/pmsg。
+
+## 驱动和功耗审计
+
+- WCN7850 power sequencer 与 PCI power control 改为 built-in，缩短 PCIe deferred
+  probe 窗口；ath12k 仍保持模块化。
+- 六颗 CS35L43 恢复原厂 standby 策略，并修正 DT 布尔属性写法；音质结论仍必须用
+  同一 PipeWire/EQ 状态做 A/B，不拿主观记忆当算法测试。
+- PS5169 补齐 I2C client data，修复 unbind/remove 的空指针风险。
+- Novatek WDT 恢复路径删除会阻止状态机推进的错误 ReK 前置等待。
+- CAMSS 在 7.1.8 上完成 120 次 runtime-PM 循环后恢复 `auto`；空闲时 AHB 与
+  CAMNOC->DDR 投票降为 0，Titan Top GDSC 能进入 off。
+- pd-mapper 易失固件集从约 46 MiB 收窄到约 180 KiB，只保留服务映射和 devauth。
+- WirePlumber 只隔离曾触发崩溃的 BlueZ MIDI monitor，普通蓝牙音频 monitor 保留。
+
+没有硬件证据的 regulator 没有被随意映射。CS35L43、PS5169、WCN7850、PCIe 和 GPU
+仍可能报告 dummy regulator；原厂 DT 也未给出相应 rail 时，保留可解释告警比把一个
+“电压看起来差不多”的 PMIC 输出硬接上更安全。
+
+## 当前数据
+
+| 指标 | 旧基线 | 当前候选单次健康启动 |
 | --- | ---: | ---: |
-| 内核阶段 | 6.126 s | 待测 |
-| 用户态阶段 | 25.791 s | 待测 |
-| 总启动时间 | 31.918 s | 待测 |
-| graphical.target | 18.964 s | 待测 |
-| NetworkManager-wait-online | 17.926 s | 不再进入启动事务 |
-| PCIe Gen2 x2 link up | 8.162 s | 待测 |
-| systemd 失败单元 | 0 | 待测 |
+| Kernel | 6.126 s | 9.075 s |
+| Userspace | 25.791 s | 11.990 s |
+| 总启动 | 31.918 s | 21.066 s |
+| `graphical.target` | 18.964 s | 11.006 s |
+| 失败单元 | 0 | 0 |
+| `adsprpcd-sensorspd` / `iio-sensor-proxy` 重启 | 未记录 | 0 / 0 |
 
-CPU 三个 cluster 已经使用 `schedutil`，GPU 和 UFS 空闲时也能降到最低 OPP，8 个 CPU 都能进入深空闲。因此本轮没有换 governor、锁大核或抬最低频率。那些改法容易让短跑分变好，却会直接损害平板的温度和续航。
+旧基线和当前内核版本不同，因此这张表只能说明整个系统候选版的结果，不能把差值全部
+归因于某一条内核提交。正式帖子应补三次相近电量、室温和供电状态的冷启动中位数。
+故意停留旧菜单产生的 58.880 秒失败样本也应保留，它证明了为什么需要手动选择交接。
 
-仓库中的 `scripts/collect-hardware-baseline.sh` 会一次保存启动关键链、频率、cpuidle、温度、UFS、充电、ADSP、USB-C、相机 runtime PM、硬件服务重启次数、当次启动 coredump 和内核告警，并脱敏 Android 序列号。
+## 仍然不承诺什么
 
-## 第一批实际修改
+- MiPPS 能解锁不等于持续 120 W；功率受电池电量、温度、线材、充电器和充电曲线限制。
+- 电脑 C-to-C 数据口受 USB 枚举与 charger firmware 电流限制，不能把 Type-C source
+  通告直接当作平板实际可取电流。
+- 相机已抓到前后摄 RAW10，不等于 libcamera、自动曝光、HDR 和厂商画质算法已经完成。
+- ALSA 设备枚举不等于音质已调完；蓝牙控制器存在不等于所有音频 profile 已验证。
+- 触控笔和指纹已经可用，但仍需要更多绘画软件、熄屏唤醒和 suspend/resume 覆盖。
+- 闭源 firmware、TA 和二进制的获取不自动授予镜像再分发权限。
 
-### 启动路径
+## 发帖建议素材
 
-- 只有用户明确请求，或确实需要选择多个 generation 时才显示 stage-1 菜单。
-- charger 模式且电量不高于 2% 时留在低功耗 stage-1 充到 5%，不再 30 秒后强行启动桌面并触发 brownout 循环。
-- rootfs 仅由 stage-1 在离线 fsck 后按需扩到既有 `linux` 分区；stage-2 不再对 Android GPT 运行 growpart，也不再对同尺寸 ext4 做在线 resize。
-- 移除没有消费者的 `NetworkManager-wait-online`，网络继续异步连接。
-- 把 WCN7850 power-sequencer 和 PCI power-control 编进内核，避免 PCIe 从约 0.2 秒开始反复 deferred probe，直到 rootfs 在约 7.7 秒加载模块。
-- 恢复 pd-mapper 正常读取 firmware-class 路径，不再用无效文件描述符制造两条假错误。
-- 将 pd-mapper 的启动解压集从整个 sheng 固件目录收窄到服务映射 JSON 和 `devauth.mbn`。旧系统每次启动在 tmpfs 生成约 46 MiB 重复固件；用设备当前固件复现后，新集合只占 180 KiB。源码审计和二进制字符串确认其余 ADSP/CDSP/VPU 镜像既不由 pd-mapper 读取，也不参与 devauth FastRPC 加载。
-
-### 恢复能力
-
-- `sensorspd` 只有在 SSC 已经出现在 QRTR 并能完成真实查询后才算启动成功；失败时重启整个 sensor PD daemon，IIO 再做一次短门禁，不再由 IIO 独自等待三分钟。
-- MiPPS 在握手前检查 Type-C、PD/PPS、SVID 和 PDO，暂时未就绪时继续重试。
-- 电脑 C-to-C 接入时，UCSI 报告 5 V/3 A，但 DWC3 原先没有连接到 `qcom-battmgr-usb`，固件 ICL 因而一直停在 USB 未配置状态的 100 mA。补上 DWC3 电源接口并刷入实测后，USB gadget 完成枚举时会把 ICL 稳定更新为 500 mA，电池状态由未充电变为充电，静置时电池端约有 0.24--0.30 A 正向电流。尝试把 UCSI 的 3 A CC 通告直接写入 ICL 时，charger firmware 始终将 SDP 连接钳回 500 mA；负值撤销 ICL 投票也得到相同结果。因此已删除无效的 3 A 强推和重试告警，保留符合原厂驱动职责边界的 USB 枚举路径。UCSI 通告代表 Type-C source 能力，不等于小米充电固件已经允许使用全部电流。
-- FastRPC 服务私有映射 `/odm/etc/sensors/config`，兼容原厂 ADSP 路径，但不污染根目录，也不把 Android persist 分区改为可写。
-- 移除 FastRPC 服务过早执行的 `ConditionPathExists`。现在节点稍晚出现时会进入明确的 remoteproc/FastRPC 稳定等待，而不是在等待脚本运行前就被 systemd 永久跳过。
-- Novatek 触控固件 WDT 自恢复必须遵循下载流程的状态边界：下载函数返回时已经确认 `RESET_STATE_INIT (0xA0)`，随后应立即发送 baseline/doze 命令。曾加入的 ReK 前置等待在实机约 5 分半后的固件复位中持续读到 `0xA0` 并超时，因为它阻止了推进恢复流程所需的命令，形成状态自锁。现在保留固件下载失败检查，但不再在这些命令前等待 `RESET_STATE_REK (0xA1)`。
-- 按原厂 DTBO 恢复 `0xa7000000` 的 4 MiB ramoops 区域。此前内核虽启用 pstore，DTS 却没有后端，异常重启后 `/sys/fs/pstore` 永远为空；以后可以跨重启保存最后的 kernel console/pmsg。
-
-### 驱动正确性
-
-- 六颗 CS35L43 恢复原厂 DTBO 明确使用的 standby 策略，并修正布尔属性写法。
-- PS5169 probe 保存 I2C 私有数据，避免 unbind/remove 路径取到空指针。
-- 触觉驱动不再套用 185--215 Hz 的通用 LRA 窗口。sheng 原厂 DTBO 明确给出 6667 us，约为 150 Hz，小米公开的 `sheng-u-oss` 驱动也不会在启动时把它强制改成 205 Hz。这里保留精简后的 Linux FF 接口，只删除与本机执行器冲突的机型专用 workaround。
-
-这些修改都刻意避开了没有硬件依据的 regulator 映射。CS35L43、PS5169、WCN7850、PCIe 和 GPU 仍有 dummy regulator 告警，但原厂 DT 也没有给出对应 rail；随手指向一个“看起来电压差不多”的 PMIC 输出，比保留告警危险得多。
-
-## 意外发现的续航大项
-
-当前系统过去为规避历史 CAMSS/RPMh 超时，把相机子系统永久设为 runtime active。更新到 7.1.8 并修复 Q6V5 启动中断后，在持续读取 UFS 根分区的同时完成了 120 次 CAMSS runtime PM 循环，没有出现新的 RPMh、ICC 或 UFS 错误。恢复 `auto` 后，AHB 与 CAMNOC→DDR 的 CAMSS 投票都从 2097152 kB/s 降为 0，Titan Top GDSC 也从常开进入 `off-0`。启动服务因此不再保留旧 workaround，并会确认 CAMSS 已真正挂起。
-
-音频模块还有一个值得继续追踪的延迟：`q6apm` 首次查询 `APM_CMD_GET_SPF_STATE` 时等待 DSP 回包并超时，旧系统因此让 `sheng-audio-modules` 用时 3.517 秒。审计还发现查询错误被丢弃后，负 errno 会经 `bool` 转换反而表示“ADSP 已就绪”。本轮已修正错误传播并删除 probe 中结果无人使用的重复查询，但保留 `q6prm` 真正的同步就绪门禁；所有图管理命令共享的 5 秒超时没有被激进缩短。
-
-历史日志还保留了两次 WirePlumber `SIGSEGV`。它们都发生在 BlueZ MIDI 反复注册 GATT 服务失败之后，core 栈也经过 PipeWire 的 D-Bus SPA 层。系统现在只关闭独立的 BLE MIDI monitor，普通蓝牙音频 monitor、ALSA 声卡和 libcamera monitor 均保持启用。这解释了“音频设备突然消失但重启用户态又恢复”的一部分现象，也避免把用户态会话管理器崩溃误归因于 codec 驱动。
-
-## 刷入后的验证方式
-
-1. 在相近电量、充电状态和室温下做至少三次冷启动，文章只使用中位数。
-2. 检查传感器方向、光线、距离和触觉短振/长振，重复登录 GNOME，确认没有 failed unit 和 coredump。
-3. 做扬声器播放、暂停、再次播放，确认六颗功放恢复无首帧丢失；音质使用同一 PipeWire/EQ 配置做 AB，不用主观记忆跨版本比较。
-4. 低电量下用同一充电器和线材分别测试 USB-PD/PPS、MiPPS 与电脑 C-to-C，记录协商档位、`input_current_limit` 和电池端功率；电脑枚举后 ICL 不应继续停在 100 mA。
-5. 用户在场时再做多轮 deep suspend/resume、PS5169 unbind/bind 和 CAMSS runtime-PM 实验。
-
-## 当前结论
-
-这轮工作的重点不是把 dmesg 变得干净，也不是堆“性能参数”，而是把启动依赖、错误恢复和原厂硬件时序变成可解释、可复现的系统。代码已经在 `audit/sheng-hardware-optimization` 分支完成首批修改；启动速度、稳定性和续航的最终结论，要等新 boot 与 rootfs 上机后用同一套脚本补完数据。
+建议正文展示四类证据：stage-1 世代菜单实拍；`systemd-analyze` 与服务
+`NRestarts=0`；触控笔压感/倾斜和指纹录入；低电量、MiPPS、电脑 C-to-C 三种充电
+场景的分开记录。附上仓库、准确 commit、release 校验和以及
+[`release-readiness_zh.md`](release-readiness_zh.md)，比只写“基本完美”更有说服力。

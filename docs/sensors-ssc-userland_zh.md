@@ -48,6 +48,11 @@ ADSP / sensor_pd
 - 为 `ACCEL_MOUNT_MATRIX` 设置 sheng 横屏原生面板对应的方向矩阵，避免 GNOME 自动旋转结果偏移 90°
 - 在启动 `iio-sensor-proxy` 前等待 SSC 可查询，避免开机太早导致代理退出
 
+这些等待用于处理短暂抖动，不应掩盖 stage-1 的长时间停留。2026-08-30 的干净启动
+约 21 秒完成，`adsprpcd-sensorspd` 和 `iio-sensor-proxy` 均为 `NRestarts=0`；在世代
+菜单停留约 29 秒则能复现 SSC QMI 服务缺失和 daemon 反复重启。因此手动选择世代后
+会先保存选择并快速重启，下一次 stage-1 跳过菜单，在 SSC 注册窗口内进入 stage-2。
+
 上游 `iio-sensor-proxy` 默认只给 `fastrpc-adsp` 启用 `ssc-light ssc-compass`，不会默认启用 `ssc-accel` 和 `ssc-proximity`。sheng 需要显式补充 udev 规则，否则加速度计和距离传感器不会被 `monitor-sensor` 看到。
 
 ## 验证结果
@@ -109,7 +114,10 @@ journalctl -b -u adsprpcd -u pd-mapper -u adsprpcd-sensorspd -u iio-sensor-proxy
 - `/sys/bus/iio/devices/iio:device*` 仍为空。当前方案走 SSC 用户态和 D-Bus，不创建 kernel IIO sysfs 设备。
 - proximity 会出现 `Failed to unpack Xiaomi Davinci proximity measurement message` 日志，但 `monitor-sensor --proximity` 仍能看到 FAR/near 状态。
 - gyroscope 尚未作为单独的 `monitor-sensor` 能力暴露。当前 compass 来自 SSC rotation vector / magnetometer 路线，加速度计可用于屏幕方向判断。
-- `sheng-devauth.service` 目前会因 `/dev/nanosic_auth` 缺失失败。该服务更偏键盘/触控笔认证链路，不是当前传感器可用性的必要条件。
+- 当前测试镜像上的 `sheng-devauth.service` 保持 active，等待小米配件认证 challenge；
+  它服务于键盘/触控笔配件认证，不是 SSC 传感器样本来源。
+- 使用旧 boot image 并在 stage-1 菜单长时间停留时仍可能错过 SSC 注册。应先升级到
+  带手动选择交接的 boot image，并检查单调时钟启动日志，不要继续叠加用户态 sleep。
 
 ## 常见失败判断
 
@@ -127,6 +135,8 @@ No sensors or missing kernel drivers for the sensors. Exiting
 4. `fastrpc-adsp` 的 udev 属性是否包含：
    `ssc-accel ssc-proximity ssc-light ssc-compass`
 5. `/usr/share/qcom/sm8550/Xiaomi/sheng` 和 `/vendor/etc/sensors` 相关 registry/config 是否存在。
+6. Stage-1 挂载根分区到 switch-root 之间是否出现异常长停留。可将
+   `journalctl -b -o short-monotonic` 与 Mobile NixOS 导入的 boot log 对照。
 
 ## 后续方向
 

@@ -19,8 +19,10 @@ It does not relicense third-party material.
 | QRTR | https://github.com/linux-msm/qrtr | BSD-3-Clause |
 | PD Mapper | https://github.com/linux-msm/pd-mapper | BSD-3-Clause |
 | libssc | https://codeberg.org/DylanVanAssche/libssc | Source files predominantly declare AGPL-3.0-or-later; exact vendored origin is recorded in `nixos/vendor/libssc/ORIGIN.md` |
-| Xiaomi Sheng THP | https://github.com/ianchb/xiaomi-sheng-thp | Apache-2.0 |
-| Xiaomi Pen Status | https://github.com/ianchb/xiaomi-pen-status | GPL-2.0-only |
+| Xiaomi Sheng THP | https://github.com/DotRedstone/xiaomi-sheng-thp | Apache-2.0; derived from `ianchb/xiaomi-sheng-thp` |
+| Xiaomi Pen Status | https://github.com/DotRedstone/xiaomi-pen-status | GPL-2.0-only; derived from `ianchb/xiaomi-pen-status` |
+| Xiaomi Sheng fingerprint integration | https://github.com/ianchb/xiaomi-sheng-fingerprint | Mixed source and native binaries; source portions include Apache-2.0, BSD-3-Clause, and LGPL-2.1-or-later components |
+| libfprint | https://gitlab.freedesktop.org/libfprint/libfprint | LGPL-2.1-or-later |
 | Sheng sensor configuration | https://github.com/alghiffaryfa19/sheng-sensors-file | No upstream license published; treated as unfree |
 
 Kernel source modifications remain subject to the Linux kernel's GPL-2.0-only
@@ -41,6 +43,12 @@ with their respective owners.
 The factory NT36532E firmware used by the THP pipeline is fetched from
 `ianchb/sheng-firmware` at a fixed revision and is subject to the same
 proprietary firmware terms.
+
+The fingerprint package includes the device-specific `fpcsheng.elf` trusted
+application plus prebuilt QTEE supplicant/listener binaries. These are native
+proprietary components, are fixed by source revision and SHA-256 in the Nix
+package, and are not relicensed by this repository. A working fingerprint
+stack does not imply permission to redistribute those binaries.
 
 The public rootfs and boot images may include redistributable firmware selected
 by Nixpkgs as well as device-specific proprietary files from

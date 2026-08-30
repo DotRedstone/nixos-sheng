@@ -61,6 +61,14 @@ sensor stack:
 - sets `ACCEL_MOUNT_MATRIX` for the sheng landscape-native panel orientation
 - waits for SSC to become queryable before starting `iio-sensor-proxy`
 
+The ordering guards are recovery mechanisms, not permission for stage-1 to
+wait indefinitely. A clean 2026-08-30 boot reached the graphical target in
+about 20 seconds and started `adsprpcd-sensorspd` and `iio-sensor-proxy` with
+`NRestarts=0`. Delaying the generation menu by about 29 seconds reproduced a
+missing SSC QMI service and repeated daemon restarts. Manual generation
+selection therefore persists the choice and performs a clean quick reboot;
+the next stage-1 skips the menu and enters stage-2 inside the SSC window.
+
 Upstream `iio-sensor-proxy` only enables `ssc-light ssc-compass` for
 `fastrpc-adsp` by default. sheng needs explicit udev properties for
 accelerometer and proximity support.
@@ -128,9 +136,12 @@ journalctl -b -u adsprpcd -u pd-mapper -u adsprpcd-sensorspd -u iio-sensor-proxy
 - The gyroscope is not exposed as a separate `monitor-sensor` capability yet.
   Compass data currently comes through the SSC rotation-vector / magnetometer
   path, and the accelerometer is enough for display orientation.
-- `sheng-devauth.service` currently fails when `/dev/nanosic_auth` is missing.
-  That service is for keyboard/stylus authentication and is not required for
-  the current sensor path.
+- `sheng-devauth.service` is active on the tested image and waits for the
+  Xiaomi accessory authentication challenge. It supports keyboard/stylus
+  accessories but is not the source of SSC sensor samples.
+- A boot that spends a long time in an older boot image's stage-1 menu can miss
+  SSC registration. Use a boot image with the manual-selection handoff and
+  inspect monotonic stage-1 logs before adding more userspace sleep loops.
 
 ## Troubleshooting
 
@@ -149,6 +160,9 @@ Check these first:
    `ssc-accel ssc-proximity ssc-light ssc-compass`.
 5. `/usr/share/qcom/sm8550/Xiaomi/sheng` and `/vendor/etc/sensors`
    registry/config files exist.
+6. The time between stage-1 root mount and switch-root is not unexpectedly
+   long. Compare `journalctl -b -o short-monotonic` with the boot log imported
+   by Mobile NixOS.
 
 ## Future Work
 
