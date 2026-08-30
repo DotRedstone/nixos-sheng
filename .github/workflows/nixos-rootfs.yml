@@ -50,7 +50,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install host tools
         run: |
@@ -135,7 +135,7 @@ jobs:
           done
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nixos-sheng-rootfs-${{ github.event.inputs.rootfs_flake_attr }}
           path: out/nixos-sheng-*.img

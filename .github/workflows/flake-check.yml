@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Nix
         uses: cachix/install-nix-action@v27
@@ -54,7 +54,7 @@ jobs:
           nix build ./nixos#xiaomiShengThp --no-link
 
       - name: Upload generated lock file
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nixos-flake-lock
           path: nixos/flake.lock
