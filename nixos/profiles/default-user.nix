@@ -10,6 +10,7 @@
 
 let
   userHasPassword = vars.userPasswordHash != null || vars.userPassword != null;
+  localTestAccess = vars.publicTestImage or false;
 in
 {
   users.users.${vars.username} = {
@@ -37,14 +38,14 @@ in
       initialPassword = vars.rootPassword;
     };
 
-  services.getty.autologinUser = lib.mkIf (!userHasPassword) vars.username;
+  services.getty.autologinUser = lib.mkIf (!userHasPassword || localTestAccess) vars.username;
   services.displayManager.autoLogin = {
-    enable = !userHasPassword;
+    enable = !userHasPassword || localTestAccess;
     user = vars.username;
   };
-  security.sudo.wheelNeedsPassword = userHasPassword;
+  security.sudo.wheelNeedsPassword = userHasPassword && !localTestAccess;
   services.openssh.settings = {
     PermitRootLogin = "no";
-    PasswordAuthentication = userHasPassword;
+    PasswordAuthentication = userHasPassword && !localTestAccess;
   };
 }

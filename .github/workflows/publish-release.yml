@@ -16,13 +16,13 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: "Tag name for the release (e.g., v0.1.2)"
+        description: "Tag name for the release (e.g., v0.3.0)"
         required: true
-        default: "v0.1.2"
+        default: "v0.3.0"
       release_name:
         description: "Release name"
         required: true
-        default: "NixOS Sheng v0.1.2 (kernel 7.1.8)"
+        default: "NixOS Sheng v0.3.0 (kernel 7.1.8)"
       kernel_run_id:
         description: "Run ID for the kernel build (leave empty for latest)"
         required: false
@@ -248,16 +248,24 @@ jobs:
           sha256sum -- ./* > sha256sums.txt
           cd ..
 
-          cat > release-body.md <<EOF
-          # $RELEASE_NAME
-
+          notes_file="docs/releases/${tag}.md"
+          if [ -f "$notes_file" ]; then
+            cp "$notes_file" release-body.md
+          else
+            cat > release-body.md <<EOF
           This release contains the boot image, minimal rootfs, optional GNOME
           rootfs, checksums, license, and third-party notices for Xiaomi Pad 6S
           Pro 12.4 (sheng).
+          EOF
+          fi
 
-          All release artifacts were built from commit $RELEASE_SHA.
+          cat >> release-body.md <<EOF
 
-          Release notes are maintained directly on the GitHub Release page.
+          ## Build provenance
+
+          All release artifacts were built from commit \`$RELEASE_SHA\`.
+          The boot image, minimal rootfs, and GNOME rootfs workflow runs were
+          required to report that exact commit before publication.
           EOF
 
       - name: Create Combined Release

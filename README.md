@@ -359,7 +359,10 @@ The workflow writes only the hash to `initialHashedPassword`. Hashes can still
 be attacked offline, so use a strong random password. The repository default
 has no password: it enables local auto-login and passwordless sudo for
 development evaluation while keeping SSH password and root login disabled.
-Release builds require supplied hashes and disable that local auto-login mode.
+Release builds require supplied random hashes to lock unknown password entry,
+but retain local auto-login and passwordless sudo for the disposable test user.
+SSH password authentication and root login remain disabled. Long-term users
+should replace this profile with users from a private downstream flake.
 
 ## Disclaimer
 

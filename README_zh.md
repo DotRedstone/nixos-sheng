@@ -314,7 +314,9 @@ mkpasswd -m yescrypt
 
 工作流只接收该 hash，并写入 `initialHashedPassword`。Hash 仍可能被离线猜测，必须使用
 强随机密码。仓库默认不设置密码：本地开发求值使用自动登录与 passwordless sudo，
-同时关闭 SSH 密码和 root 登录；正式构建必须提供 hash，并自动关闭本地自动登录模式。
+同时关闭 SSH 密码和 root 登录。正式构建必须提供随机 hash 来锁住未知密码入口，但
+公开测试用户仍保留设备本地自动登录和免密 sudo；SSH 密码登录与 root 登录保持关闭。
+长期使用应通过私人下游 flake 替换这个测试用户配置。
 
 ## 免责声明
 

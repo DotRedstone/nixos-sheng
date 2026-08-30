@@ -89,6 +89,7 @@ jobs:
             rootPassword = null;
             userPasswordHash = $user_hash_json;
             rootPasswordHash = $root_hash_json;
+            publicTestImage = true;
           }
           EOF
 
