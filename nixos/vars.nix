@@ -10,4 +10,5 @@
   rootPassword = null;
   userPasswordHash = null;
   rootPasswordHash = null;
+  publicTestImage = true;
 }

@@ -8,10 +8,11 @@ itself a release approval.
 
 ## Current decision
 
-**Not ready to publish a new release yet.** Normal boot, the manual
-generation-selection handoff, and source review in PR #25 have passed. The
-remaining blockers are provenance checks on final artifacts built from the
-`sheng` merge commit and the unchecked peripheral regressions below.
+**v0.3.0 source is frozen for release-candidate builds.** Normal boot, the
+manual generation-selection handoff, source review in PR #25, and the final
+source checks have passed. Publication still requires the automated provenance
+and filesystem checks below. Items under hardware gates that remain unchecked
+are documented validation gaps, not claims of verified support.
 
 ## Source gates
 
