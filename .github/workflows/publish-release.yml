@@ -82,6 +82,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Download artifacts using gh CLI
+        id: artifacts
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -93,7 +94,18 @@ jobs:
           if [ -n "$requested_kernel_run" ]; then
             expected_sha="$(gh run view "$requested_kernel_run" --json headSha -q .headSha)"
           fi
+          [[ "$expected_sha" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "Invalid release commit SHA: $expected_sha" >&2
+            exit 1
+          }
           echo "Expected artifact SHA: $expected_sha"
+          printf 'head_sha=%s\n' "$expected_sha" >> "$GITHUB_OUTPUT"
+
+          # License, notices, and release metadata must come from the same
+          # reviewed commit as every binary artifact, even when a manual run
+          # selects an older successful build.
+          git fetch --no-tags origin "$expected_sha"
+          git checkout --detach "$expected_sha"
 
           find_run_with_artifact() {
             workflow="$1"
@@ -159,6 +171,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_NAME: ${{ steps.release_info.outputs.name }}
+          RELEASE_SHA: ${{ steps.artifacts.outputs.head_sha }}
         run: |
           set -euo pipefail
 
@@ -242,6 +255,8 @@ jobs:
           rootfs, checksums, license, and third-party notices for Xiaomi Pad 6S
           Pro 12.4 (sheng).
 
+          All release artifacts were built from commit $RELEASE_SHA.
+
           Release notes are maintained directly on the GitHub Release page.
           EOF
 
@@ -249,7 +264,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.release_info.outputs.tag }}
-          target_commitish: ${{ github.sha }}
+          target_commitish: ${{ steps.artifacts.outputs.head_sha }}
           name: ${{ steps.release_info.outputs.name }}
           files: release-upload/*
           draft: false
