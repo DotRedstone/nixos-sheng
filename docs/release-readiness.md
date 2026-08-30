@@ -15,8 +15,8 @@ artifacts are produced.
 
 ## Source gates
 
-- [ ] Merge `linux-sheng:feat/stylus-thp` into the maintained 7.1.8 branch and
-  lock `shengKernelSrc` to that maintained ref.
+- [x] Merged `linux-sheng:feat/stylus-thp` into the maintained 7.1.8 branch via
+  PR #1 and locked `shengKernelSrc` to that maintained ref.
 - [ ] Open and review a pull request from the current NixOS audit branch to
   `sheng`; confirm no unrelated branch renames or history rewrites.
 - [ ] `nix flake lock ./nixos` produces no unexpected lock drift.

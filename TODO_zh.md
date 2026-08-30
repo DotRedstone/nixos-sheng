@@ -48,8 +48,8 @@
 
 - [ ] 实机验证“手动选世代后的快速重启交接”：在菜单停留后选旧世代，确认
   下一次启动跳过菜单，且 SSC/IIO 均为 `NRestarts=0`。
-- [ ] 将 `DotRedstone/linux-sheng:feat/stylus-thp` 合并到维护中的 7.1.8
-  分支，再把 `shengKernelSrc` 更新并锁定到该维护分支。
+- [x] 已通过 PR #1 将 `DotRedstone/linux-sheng:feat/stylus-thp` 合并到维护中的
+  7.1.8 分支，并把 `shengKernelSrc` 锁定到该维护分支。
 - [ ] 通过经过审查的 PR 把当前 audit 分支合并进默认 `sheng` 分支；不要直接从
   audit 分支发布。
 - [ ] boot、minimal rootfs、GNOME rootfs 必须来自同一个合并提交；发布前核对

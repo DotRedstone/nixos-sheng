@@ -12,8 +12,8 @@
 
 ## 源码门禁
 
-- [ ] 将 `linux-sheng:feat/stylus-thp` 合并到维护中的 7.1.8 分支，并把
-  `shengKernelSrc` 锁定到该维护 ref。
+- [x] 已通过 PR #1 将 `linux-sheng:feat/stylus-thp` 合并到维护中的 7.1.8 分支，
+  并把 `shengKernelSrc` 锁定到该维护 ref。
 - [ ] 从当前 NixOS audit 分支向 `sheng` 创建并审查 PR，确认没有无关的分支改名或
   历史重写。
 - [ ] `nix flake lock ./nixos` 不产生意外 lock 漂移。

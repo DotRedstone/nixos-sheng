@@ -64,7 +64,7 @@ Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的 Mobile NixOS 移植项目�
 内核源码在 `nixos/flake.nix` 中配置：
 
 ```nix
-shengKernelSrc.url = "github:DotRedstone/linux-sheng/feat/stylus-thp";
+shengKernelSrc.url = "github:DotRedstone/linux-sheng/upgrade/sheng-7.1.8";
 ```
 
 ## 启动原理

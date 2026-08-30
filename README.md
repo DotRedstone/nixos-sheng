@@ -72,7 +72,7 @@ issues before flashing.
 The kernel source is configured in `nixos/flake.nix`:
 
 ```nix
-shengKernelSrc.url = "github:DotRedstone/linux-sheng/feat/stylus-thp";
+shengKernelSrc.url = "github:DotRedstone/linux-sheng/upgrade/sheng-7.1.8";
 ```
 
 ## How Boot Works

@@ -59,8 +59,8 @@ enabled in a kernel configuration.
 - [ ] Validate the manual generation-selection reboot handoff on hardware:
   remain in the menu, choose an older generation, then confirm that the next
   boot skips the menu and SSC/IIO both start with `NRestarts=0`.
-- [ ] Merge `DotRedstone/linux-sheng:feat/stylus-thp` into the maintained 7.1.8
-  branch, then update and lock `shengKernelSrc` to that maintained ref.
+- [x] Merged `DotRedstone/linux-sheng:feat/stylus-thp` into the maintained 7.1.8
+  branch through PR #1 and locked `shengKernelSrc` to that maintained ref.
 - [ ] Merge this audit branch into the default `sheng` branch through a reviewed
   pull request. Do not publish directly from an audit branch.
 - [ ] Build boot, minimal rootfs, and GNOME rootfs from the exact same merged
