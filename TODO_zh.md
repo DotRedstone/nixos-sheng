@@ -52,7 +52,7 @@
   7.1.8 分支，并把 `shengKernelSrc` 锁定到该维护分支。
 - [x] 当前 audit 分支已经 PR #25 审查并以 merge commit 合入默认 `sheng` 分支；
   未直接从 audit 分支发布。
-- [ ] boot、minimal rootfs、GNOME rootfs 必须来自同一个合并提交；发布前核对
+- [x] boot、minimal rootfs、GNOME rootfs 已从同一个合并提交构建；发布前已核对
   workflow `headSha`、校验和、boot 分区大小、内核模块版本和 ext4 特性。
 - [~] 已完成 1 次故意长时间停留菜单的交接回归；合并提交候选版仍需做 3 次普通
   启动并保留

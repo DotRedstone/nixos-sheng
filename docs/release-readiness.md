@@ -8,11 +8,10 @@ itself a release approval.
 
 ## Current decision
 
-**v0.3.0 source is frozen for release-candidate builds.** Normal boot, the
-manual generation-selection handoff, source review in PR #25, and the final
-source checks have passed. Publication still requires the automated provenance
-and filesystem checks below. Items under hardware gates that remain unchecked
-are documented validation gaps, not claims of verified support.
+**v0.3.0 was published from reviewed commit `25c8463`.** Normal boot, the
+manual generation-selection handoff, source review, and automated artifact
+provenance/filesystem gates passed. Items that remain unchecked are documented
+validation or redistribution gaps, not claims of verified support.
 
 ## Source gates
 
@@ -64,16 +63,16 @@ not replace a privacy check.
 
 ## Artifact gates
 
-- [ ] Kernel, minimal rootfs, and GNOME rootfs workflow runs all have the same
+- [x] Kernel, minimal rootfs, and GNOME rootfs workflow runs all have the same
   `headSha`, matching the reviewed merge commit.
-- [ ] The boot image is smaller than the `boot_b` partition and its module
+- [x] The boot image is smaller than the `boot_b` partition and its module
   archive has the same `modDirVersion`.
-- [ ] Rootfs images pass read-only `e2fsck` and contain `metadata_csum`, `64bit`,
+- [x] Rootfs images pass read-only `e2fsck` and contain `metadata_csum`, `64bit`,
   and `dir_index`.
 - [ ] Release archives extract to directly flashable images; every asset is in
   `sha256sums.txt`.
-- [ ] Release assets include `LICENSE` and `THIRD_PARTY_NOTICES.md`.
-- [ ] Rootfs candidates use strong yescrypt password hashes, never repository
+- [x] Release assets include `LICENSE` and `THIRD_PARTY_NOTICES.md`.
+- [x] Rootfs candidates use strong yescrypt password hashes, never repository
   development passwords or plaintext workflow inputs.
 - [ ] Firmware and proprietary binary redistribution has been reviewed for the
   actual artifact contents.
@@ -99,3 +98,10 @@ writable ext4 with `errors_count=0`, and kept `adsprpcd`, `pd-mapper`,
 `adsprpcd-sensorspd`, and `iio-sensor-proxy` active with `NRestarts=0`. This
 clears the handoff's device-validation blocker, but does not replace the final
 merged-artifact regression.
+
+The v0.3.0 artifacts were built from merge commit `25c8463` by kernel run
+`33312231001`, minimal-rootfs run `33312236690`, and GNOME-rootfs run
+`33312241560`. Release run `33315331473` verified the shared commit, checked and
+shrunk both ext4 images, generated split ZIP archives and checksums, and
+published nine uploaded assets. Full end-user extraction of every split archive
+and proprietary-binary redistribution review remain explicitly open above.

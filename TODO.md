@@ -63,9 +63,9 @@ enabled in a kernel configuration.
   branch through PR #1 and locked `shengKernelSrc` to that maintained ref.
 - [x] Merged this audit branch into the default `sheng` branch through reviewed
   PR #25 using a merge commit. No release was published from the audit branch.
-- [ ] Build boot, minimal rootfs, and GNOME rootfs from the exact same merged
-  commit; verify run `headSha`, checksums, boot partition size, matching kernel
-  modules, and ext4 features before publishing.
+- [x] Built boot, minimal rootfs, and GNOME rootfs from the exact same merged
+  commit; verified run `headSha`, checksums, boot partition size, matching
+  kernel modules, and ext4 features before publishing.
 - [~] Completed one deliberately delayed generation-menu handoff regression;
   still run three normal boots on the merged release candidate and retain
   `systemd-analyze`, failed-unit, coredump,
