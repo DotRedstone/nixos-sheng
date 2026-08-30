@@ -11,6 +11,7 @@ module ShengHeadlessGenerationMenu
   VOLUME_DOWN = [:KEY_VOLUMEDOWN, :KEY_DOWN]
   CONFIRM = [:KEY_POWER, :KEY_ENTER, :KEY_KPENTER]
   REQUEST_PATH = "/mnt/var/lib/sheng-boot-menu/requested"
+  PENDING_SELECTION_PATH = "/mnt/var/lib/sheng-boot-menu/pending-generation"
   MENU_CONSOLE_PATH = "/dev/tty2"
   FALLBACK_CONSOLE_PATH = "/dev/tty0"
   FB_PATH = "/dev/fb0"
@@ -157,6 +158,67 @@ module ShengHeadlessGenerationMenu
 
   def consume_request()
     File.delete(REQUEST_PATH) if requested?()
+  end
+
+  def pending_selection_path()
+    PENDING_SELECTION_PATH
+  end
+
+  def persist_pending_selection(generation)
+    path = pending_selection_path()
+    directory = File.dirname(path)
+    temporary = "#{path}.tmp"
+    FileUtils.mkdir_p(directory)
+    File.open(temporary, "w", 0600) do |file|
+      file.write("#{generation.path}\n")
+      file.flush
+    end
+    File.rename(temporary, path)
+  ensure
+    File.delete(temporary) if temporary && File.exist?(temporary)
+  end
+
+  def consume_pending_selection(switch_root)
+    path = pending_selection_path()
+    return nil unless File.exist?(path)
+
+    requested_path = File.read(path, 4096).strip
+    File.delete(path)
+    return nil if requested_path.empty?
+
+    generation = Tasks::SwitchRoot::NixOSGeneration.generations().find do |candidate|
+      candidate.path == requested_path
+    end
+
+    if generation.nil? && requested_path == switch_root.default_selection_path()
+      candidate = Tasks::SwitchRoot::NixOSGeneration.new(requested_path)
+      generation = candidate if candidate.exist?()
+    end
+
+    if generation
+      $logger.info("Booting the pending sheng generation '#{requested_path}'.")
+    else
+      $logger.warn("Ignoring stale sheng generation selection '#{requested_path}'.")
+    end
+    generation
+  rescue => error
+    begin
+      File.delete(path) if path && File.exist?(path)
+    rescue
+    end
+    $logger.warn("Ignoring invalid pending sheng generation selection: #{error}")
+    nil
+  end
+
+  def reboot_with_pending_selection(generation)
+    persist_pending_selection(generation)
+    System.run("sync")
+    $logger.info(
+      "Saved sheng generation '#{generation.path}'; rebooting so stage-2 starts within the Qualcomm SSC registration window."
+    )
+    System.exec("reboot", "-f")
+  ensure
+    raise "Failed to reboot after saving sheng generation '#{generation.path}'"
   end
 
   def wait_for_release(keys)
@@ -1097,7 +1159,7 @@ module ShengHeadlessGenerationMenu
     render_console(generations, selected, remaining) unless rendered
   end
 
-  def render_booting(label = "NixOS - Default")
+  def render_booting(label = "NixOS - Default", status = "HANDING OFF TO STAGE 2")
     if @framebuffer_failed
       console.write("\e[2J\e[HNixOS Sheng\n\nStarting selected generation...\n")
       console.flush
@@ -1149,7 +1211,7 @@ module ShengHeadlessGenerationMenu
       y + 292,
       width - PANEL_PADDING * 2,
       28,
-      "HANDING OFF TO STAGE 2",
+      status,
       BOOT_FG,
       PANEL_BG,
       scale: SUBTITLE_FONT_SCALE
@@ -1190,6 +1252,7 @@ module ShengHeadlessGenerationMenu
     up_last_repeat = 0.0
     down_pressed_time = 0.0
     down_last_repeat = 0.0
+    manual_selection = false
 
     loop do
       remaining = countdown_active ? countdown_remaining(deadline) : nil
@@ -1245,15 +1308,18 @@ module ShengHeadlessGenerationMenu
 
       if action_up
         countdown_active = false
+        manual_selection = true
         selected, page_start = move_selection(
           selected, page_start, :up, menu_length, page_size
         )
       elsif action_down
         countdown_active = false
+        manual_selection = true
         selected, page_start = move_selection(
           selected, page_start, :down, menu_length, page_size
         )
       elsif confirm_pressed
+        manual_selection = true
         wait_for_release(CONFIRM)
         break
       elsif countdown_active && monotonic_time() >= deadline
@@ -1280,8 +1346,9 @@ module ShengHeadlessGenerationMenu
     set_console_keyboard(true)
     restore_console_logs()
     set_console_echo(true)
-    render_booting(generation_label(chosen_generation, selected))
-    chosen_generation
+    boot_status = manual_selection ? "SELECTION SAVED - RESTARTING" : "HANDING OFF TO STAGE 2"
+    render_booting(generation_label(chosen_generation, selected), boot_status)
+    [chosen_generation, manual_selection]
   end
 end
 
@@ -1291,12 +1358,18 @@ class Tasks::SwitchRoot
 
     ShengEarlyChargeGuard.wait_if_critical()
     wants_menu = ShengEarlyChargeGuard.interactive_boot_safe?()
+    pending_generation = ShengHeadlessGenerationMenu.consume_pending_selection(self)
 
-    if wants_menu &&
+    if pending_generation
+      @selected_generation = pending_generation
+    elsif wants_menu &&
        ShengHeadlessStage1.enabled? &&
        ShengHeadlessGenerationMenu.enabled?
       ShengHeadlessGenerationMenu.consume_request()
-      @selected_generation = ShengHeadlessGenerationMenu.choose(self)
+      @selected_generation, manual_selection = ShengHeadlessGenerationMenu.choose(self)
+      if manual_selection
+        ShengHeadlessGenerationMenu.reboot_with_pending_selection(@selected_generation)
+      end
     elsif wants_menu && !ShengHeadlessStage1.enabled?
       Tasks::Splash.instance.quit("Continuing to recovery menu")
       @selected_generation = choose_generation()

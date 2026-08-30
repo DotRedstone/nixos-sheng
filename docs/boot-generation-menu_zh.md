@@ -15,8 +15,7 @@ sudo sheng-reboot-generation-menu
 该命令会重启设备；菜单本身不再依赖需要卡时机完成的三击手势。
 
 菜单会在 framebuffer 上显示两层世代信息、当前选择位置、按键图标和自动启动
-进度。选中的世代使用高对比色块和方向标记强调，确认后会显示即将交给
-stage-2 的世代编号与版本。
+进度。选中的世代使用高对比色块和方向标记强调。
 
 - 音量上下键或外接键盘上下方向键用于切换高亮的 stage-2 世代。
 - 高亮会在当前页内逐行移动；越过本页最后一项时才切换到下一页。
@@ -36,6 +35,21 @@ stage-2 的世代编号与版本。
 - 每一行 generation 在重绘前都会清空，避免移动选择后留下显示残影。
 - 菜单始终使用已经刷入 `boot_b` 的 kernel、DTB、stage-1 initrd 和命令行。
 
+## 手动选择交接
+
+Qualcomm SSC 服务存在启动注册窗口。如果用户在 stage-1 慢慢翻阅世代，直接从这次
+长启动进入 stage-2 可能让 `sensor_pd` 暂时不可用，即使所选 NixOS 世代本身没有问题。
+
+因此，3 秒无操作的自动启动仍然直接进入系统；任何手动确认则使用两次启动交接：
+
+1. Stage-1 将所选世代的精确路径写入
+   `/var/lib/sheng-boot-menu/pending-generation`，同步已挂载的 rootfs，然后快速重启。
+2. 下一次 stage-1 检查该路径仍对应一个现存世代，在使用前删除标记，跳过菜单并立即
+   进入所选世代。
+
+标记只消费一次，过期或非法路径会被忽略，因此不会形成持续重启循环。额外重启只在
+用户手动操作后发生，普通自动启动仍然只有一次。
+
 按电源键开机时不要同时按住音量键。小米 bootloader 会在 Linux 启动前截获
 音量加键并进入 Recovery，或截获音量下键并进入 Fastboot。等世代菜单出现后
 再使用音量键。
@@ -54,14 +68,18 @@ stage-2 的世代编号与版本。
 PAGER=cat nix-env --profile /nix/var/nix/profiles/system --list-generations
 ```
 
-测试普通开机和 `sudo sheng-reboot-generation-menu`，选择较旧的世代，并用电源键
-确认；也要连接 USB 键盘验证上下方向键与 Enter。
+测试普通开机和 `sudo sheng-reboot-generation-menu`。在菜单里停留至少 15 秒，选择
+较旧世代并用电源键确认；应只快速重启一次，随后跳过菜单进入所选世代。也要连接
+USB 键盘验证上下方向键与 Enter。
 启动后检查：
 
 ```sh
 readlink /nix/var/nix/profiles/system
 readlink -f /run/current-system
 systemctl --failed --no-pager
+systemctl show adsprpcd-sensorspd iio-sensor-proxy \
+  -p Id -p ActiveState -p NRestarts
+test ! -e /var/lib/sheng-boot-menu/pending-generation
 ```
 
 如果菜单无法出现，回滚方式是刷回上一份确认可用的 `boot_b` 镜像。

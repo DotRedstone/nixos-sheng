@@ -1,3 +1,13 @@
+module FileUtils
+  def self.mkdir_p(path)
+    return if File.directory?(path)
+
+    parent = File.dirname(path)
+    mkdir_p(parent) unless parent == path
+    Dir.mkdir(path) unless File.directory?(path)
+  end
+end
+
 menu_source = ARGV[0]
 command_path = ARGV[1]
 raise "usage: #{$0} MENU_SOURCE COMMAND_OUTPUT" unless menu_source && command_path
@@ -66,8 +76,15 @@ $logger = TestLogger.new
 eval(File.read(menu_source), nil, menu_source)
 
 class TestGeneration
+  attr_reader :path
+
   def initialize(number)
     @number = number
+    @path = "/nix/var/nix/profiles/system-#{number}-link"
+  end
+
+  def exist?()
+    true
   end
 
   def label()
@@ -117,6 +134,19 @@ class WouldBlockError
   end
 end
 raise "EAGAIN was not recognized as a normal empty read" unless menu.input_would_block?(WouldBlockError.new)
+
+pending_test_path = "#{command_path}.pending"
+menu.define_singleton_method(:pending_selection_path) { pending_test_path }
+pending_generation = TestGeneration.new(42)
+Tasks::SwitchRoot::NixOSGeneration.define_singleton_method(:generations) { [pending_generation] }
+switch_root = Object.new
+switch_root.define_singleton_method(:default_selection_path) { pending_generation.path }
+menu.persist_pending_selection(pending_generation)
+raise "pending generation was not persisted atomically" unless File.read(pending_test_path).strip == pending_generation.path
+consumed_generation = menu.consume_pending_selection(switch_root)
+raise "pending generation was not consumed" unless consumed_generation.equal?(pending_generation)
+raise "pending generation marker was not one-shot" if File.exist?(pending_test_path)
+raise "missing pending generation did not return nil" unless menu.consume_pending_selection(switch_root).nil?
 
 def input_event(code, value)
   bytes = Array.new(24, 0)
