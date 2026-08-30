@@ -22,8 +22,10 @@
 struct target {
   int fd;
   uint8_t *map;
+  uint8_t *surface;
   uint8_t *row_buffer;
   size_t map_length;
+  size_t surface_stride;
   unsigned int width;
   unsigned int height;
   unsigned int stride;
@@ -33,6 +35,10 @@ struct target {
   struct fb_bitfield red;
   struct fb_bitfield green;
   struct fb_bitfield blue;
+  unsigned int surface_x;
+  unsigned int surface_y;
+  unsigned int surface_width;
+  unsigned int surface_height;
   int framebuffer;
 };
 
@@ -90,9 +96,9 @@ static int paint_rectangle(struct target *target, const uint8_t *record,
   if (height > target->height - y)
     height = target->height - y;
 
-  destination = target->map +
-                (size_t)(y + target->yoffset) * target->stride +
-                (size_t)(x + target->xoffset) * target->bytes_per_pixel;
+  destination = target->surface +
+                (size_t)(y - target->surface_y) * target->surface_stride +
+                (size_t)(x - target->surface_x) * target->bytes_per_pixel;
   row_bytes = (size_t)width * target->bytes_per_pixel;
 
   for (column = 0; column < width; column++)
@@ -102,7 +108,7 @@ static int paint_rectangle(struct target *target, const uint8_t *record,
                 target->bytes_per_pixel);
 
   for (row = 0; row < height; row++) {
-    memcpy(destination + (size_t)row * target->stride,
+    memcpy(destination + (size_t)row * target->surface_stride,
            target->row_buffer, row_bytes);
     if ((row & 63U) == 0U && elapsed_ms(started_at) > RENDER_TIMEOUT_MS)
       return -1;
@@ -226,7 +232,89 @@ static void close_target(struct target *target) {
     munmap(target->map, target->map_length);
   if (target->fd >= 0)
     close(target->fd);
+  free(target->surface);
   free(target->row_buffer);
+}
+
+static int prepare_surface(struct target *target, const uint8_t *commands,
+                           size_t count) {
+  unsigned int min_x = target->width;
+  unsigned int min_y = target->height;
+  unsigned int max_x = 0;
+  unsigned int max_y = 0;
+  size_t index;
+  unsigned int row;
+
+  for (index = 0; index < count; index++) {
+    const uint8_t *record = commands + COMMAND_HEADER_SIZE +
+                            index * COMMAND_RECORD_SIZE;
+    unsigned int x = read_le16(record);
+    unsigned int y = read_le16(record + 2);
+    unsigned int width = read_le16(record + 4);
+    unsigned int height = read_le16(record + 6);
+
+    if (x >= target->width || y >= target->height || width == 0 || height == 0)
+      continue;
+    if (width > target->width - x)
+      width = target->width - x;
+    if (height > target->height - y)
+      height = target->height - y;
+    if (x < min_x)
+      min_x = x;
+    if (y < min_y)
+      min_y = y;
+    if (x + width > max_x)
+      max_x = x + width;
+    if (y + height > max_y)
+      max_y = y + height;
+  }
+
+  if (min_x >= max_x || min_y >= max_y) {
+    fprintf(stderr, "framebuffer command list has no visible rectangles\n");
+    return -1;
+  }
+
+  target->surface_x = min_x;
+  target->surface_y = min_y;
+  target->surface_width = max_x - min_x;
+  target->surface_height = max_y - min_y;
+  target->surface_stride =
+      (size_t)target->surface_width * target->bytes_per_pixel;
+  target->surface = malloc(target->surface_stride * target->surface_height);
+  if (!target->surface) {
+    perror("allocate framebuffer composition surface");
+    return -1;
+  }
+
+  for (row = 0; row < target->surface_height; row++) {
+    const uint8_t *source = target->map +
+                            (size_t)(target->surface_y + row + target->yoffset) *
+                                target->stride +
+                            (size_t)(target->surface_x + target->xoffset) *
+                                target->bytes_per_pixel;
+    memcpy(target->surface + (size_t)row * target->surface_stride,
+           source, target->surface_stride);
+  }
+  return 0;
+}
+
+static int commit_surface(struct target *target,
+                          const struct timespec *started_at) {
+  unsigned int row;
+
+  for (row = 0; row < target->surface_height; row++) {
+    uint8_t *destination = target->map +
+                           (size_t)(target->surface_y + row + target->yoffset) *
+                               target->stride +
+                           (size_t)(target->surface_x + target->xoffset) *
+                               target->bytes_per_pixel;
+    memcpy(destination,
+           target->surface + (size_t)row * target->surface_stride,
+           target->surface_stride);
+    if ((row & 63U) == 0U && elapsed_ms(started_at) > RENDER_TIMEOUT_MS)
+      return -1;
+  }
+  return elapsed_ms(started_at) > RENDER_TIMEOUT_MS ? -1 : 0;
 }
 
 static unsigned long parse_number(const char *value, const char *name) {
@@ -256,6 +344,7 @@ int main(int argc, char **argv) {
 
   target.fd = -1;
   target.map = NULL;
+  target.surface = NULL;
   if (argc == 2) {
     command_path = argv[1];
     if (map_framebuffer_target(&target, "/dev/fb0") < 0)
@@ -318,6 +407,10 @@ int main(int argc, char **argv) {
   }
 
   clock_gettime(CLOCK_MONOTONIC, &started_at);
+  if (prepare_surface(&target, commands, count) < 0) {
+    munmap(commands, command_length);
+    goto out;
+  }
   for (index = 0; index < count; index++) {
     const uint8_t *record = commands + COMMAND_HEADER_SIZE +
                             index * COMMAND_RECORD_SIZE;
@@ -328,6 +421,13 @@ int main(int argc, char **argv) {
       result = 124;
       goto out;
     }
+  }
+  if (commit_surface(&target, &started_at) < 0) {
+    fprintf(stderr, "framebuffer commit exceeded %ld ms\n",
+            RENDER_TIMEOUT_MS);
+    munmap(commands, command_length);
+    result = 124;
+    goto out;
   }
   munmap(commands, command_length);
   __sync_synchronize();

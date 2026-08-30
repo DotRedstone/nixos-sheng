@@ -6,19 +6,45 @@
 # - Downstream dotfiles should define their own users instead of importing this profile.
 # ---
 
-{ vars, ... }:
+{ lib, vars, ... }:
 
+let
+  userHasPassword = vars.userPasswordHash != null || vars.userPassword != null;
+in
 {
   users.users.${vars.username} = {
     isNormalUser = true;
+    extraGroups = [
+      "wheel"
+      "networkmanager"
+      "audio"
+      "video"
+      "input"
+      "render"
+    ];
+  }
+  // lib.optionalAttrs (vars.userPasswordHash != null) {
+    initialHashedPassword = vars.userPasswordHash;
+  }
+  // lib.optionalAttrs (vars.userPasswordHash == null && vars.userPassword != null) {
     initialPassword = vars.userPassword;
-    extraGroups = [ "wheel" "networkmanager" "audio" "video" "input" "render" ];
   };
-  users.users.root.initialPassword = vars.rootPassword;
+  users.users.root =
+    lib.optionalAttrs (vars.rootPasswordHash != null) {
+      initialHashedPassword = vars.rootPasswordHash;
+    }
+    // lib.optionalAttrs (vars.rootPasswordHash == null && vars.rootPassword != null) {
+      initialPassword = vars.rootPassword;
+    };
 
-  services.getty.autologinUser = vars.username;
+  services.getty.autologinUser = lib.mkIf (!userHasPassword) vars.username;
+  services.displayManager.autoLogin = {
+    enable = !userHasPassword;
+    user = vars.username;
+  };
+  security.sudo.wheelNeedsPassword = userHasPassword;
   services.openssh.settings = {
-    PermitRootLogin = "yes";
-    PasswordAuthentication = true;
+    PermitRootLogin = "no";
+    PasswordAuthentication = userHasPassword;
   };
 }

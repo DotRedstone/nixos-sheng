@@ -9,8 +9,9 @@
 - 基线内核：`Linux 7.0.0 #1-mobile-nixos SMP PREEMPT`
 - 基线系统：NixOS 26.11 pre-release
 - 分支：`audit/sheng-hardware-optimization`
-- 本轮不刷写设备、不改 Android 分区、不执行 suspend/reboot。
-- 采样时电池 96%，正在充电，因此充电功率不适合作为峰值快充基线。
+- 初始基线采样时电池 96%，正在充电，因此该次数据不作为峰值快充基线。
+- 后续验证只刷写非活动 slot 的 NixOS `boot` 镜像，并通过 ADB 做普通重启、一次
+  受控强制重启和用户态检查；没有写 Android system/vendor 分区。
 
 完整采集可在平板本机执行：
 
@@ -130,17 +131,21 @@ PS5169 的 `remove()` 通过 `i2c_get_clientdata()` 获取驱动私有结构，�
 - 正常启动和 USB-C 正反插、device/host role 切换无回归。
 - 在用户在场、没有数据传输时单独测试 PS5169 unbind/bind，不再出现 kernel oops。
 
-### 6. 补齐 Novatek 固件复位后的 ReK 等待
+### 6. 修正 Novatek 固件复位后的状态自锁
 
-长时运行约 89 分钟后，NT36532E 触控固件曾触发一次 WDT 自恢复。驱动成功重新下载固件，但紧接着发送 `0xBF` 自定义命令时连续失败。对照正常 resume 路径后发现，WDT 和 boot update 路径都少了 `RESET_STATE_REK` 等待，可能在固件尚未完成基线重建时过早发送 idle/doze 配置。
+长时运行约 89 分钟后，NT36532E 触控固件曾触发一次 WDT 自恢复。早期修复曾在
+发送 baseline/doze 命令前等待 `RESET_STATE_REK (0xA1)`，但实机固件下载函数返回时
+稳定处于已确认的 `RESET_STATE_INIT (0xA0)`。推进到下一状态恰好需要后续命令，前置
+等待反而阻止状态机继续，形成自锁。
 
-本轮让这两条恢复路径与正常 resume 保持一致：固件下载失败或未进入 ReK 状态时停止发送后续模式命令，成功时才恢复 idle baseline 和 doze 配置。没有改变触控坐标、SPI 频率或手势参数。
+最终修复保留固件下载和 `RESET_STATE_INIT` 失败检查，删除这两个路径中错误的 ReK
+前置等待，并立即发送 baseline/doze 命令。没有改变触控坐标、SPI 频率或手势参数。
 
 预期验证：
 
 - 长时间亮屏、熄屏/唤醒后触控保持正常。
 - 若固件再次发生 WDT 复位，日志不再紧跟 `send cmd failed, buf[1] = 0xBF`。
-- 复位失败时保留明确错误，便于区分固件下载失败和 ReK 超时。
+- 复位失败时保留明确错误，便于区分固件下载失败和后续命令失败。
 
 ### 7. 提供传感器 DSP 需要的 ODM 配置别名
 
@@ -241,13 +246,14 @@ fprintd-enroll
 fprintd-verify
 ```
 
-在实机完成录入和验证前，状态保持“联调中”，不把构建成功写成硬件已经可用。
+实机已经完成图形化录入、`fprintd-list` 列举和验证。当前继续观察的是熄屏唤醒解锁
+与多轮 suspend/resume，不再把指纹状态标记为“不支持”或“仅构建成功”。
 
 ### 16. 接入 NT36532E THP 触控与触控笔链路
 
 sheng 的 NT36532E 原厂固件输出完整的 THP 电容矩阵，不是普通 65 字节触摸/笔事件。旧驱动只读取 760 字节内部事件缓冲并在内核中做简化解析，虽然手指触摸可用，但其遗留的 `NVTCapacitivePen` 解析器与 sheng 帧格式不匹配，直接打开 DTS 的 `novatek,pen-support` 只会注册一个没有有效事件的空设备。
 
-本轮改为与原厂协议一致的分层实现：内核每次 IRQ 读取 5417 字节 THP 传输帧，通过 root-only FIFO 暴露时间戳、帧有效性和固件 epoch；用户态 [ianchb/xiaomi-sheng-thp](https://github.com/ianchb/xiaomi-sheng-thp) 负责多点追踪、掌拒、笔坐标、悬停、倾斜和压感，再通过 uinput 注册标准 Linux 输入设备。普通 Focus Pen 的压力范围为 0..8191，Focus Pen Pro 为 0..16383；蓝牙不可用时手指触控和笔坐标仍可工作，侧键、压力传输和 Pro 姿态功能按可用能力降级。
+本轮改为与原厂协议一致的分层实现：内核每次 IRQ 读取 5417 字节 THP 传输帧，通过 root-only FIFO 暴露时间戳、帧有效性和固件 epoch；用户态 [DotRedstone/xiaomi-sheng-thp](https://github.com/DotRedstone/xiaomi-sheng-thp) 负责多点追踪、掌拒、笔坐标、悬停、倾斜和压感，再通过 uinput 注册标准 Linux 输入设备。普通 Focus Pen 的压力范围为 0..8191，Focus Pen Pro 为 0..16383；蓝牙不可用时手指触控和笔坐标仍可工作，侧键、压力传输和 Pro 姿态功能按可用能力降级。
 
 内核切换到 OS3.0.7.0 原厂 `novatek_nt36532_n81a_fw_csot.bin`，Nix 包固定源码和固件提交及哈希。固件更新、WDT 恢复和面板 resume 后都会恢复笔扫描模式并标记新 epoch，用户态据此清空旧参考矩阵，避免恢复后坐标跳变或按键卡住。充电状态变化继续通过 Novatek 原厂命令同步，保留此前验证过的固件更新失败处理。
 
@@ -266,7 +272,7 @@ journalctl -b -u xiaomi-sheng-thp --no-pager
 
 ## 已确认健康的链路
 
-### 15. 把 SSC 可查询作为 sensorspd 的启动完成条件
+### 17. 把 SSC 可查询作为 sensorspd 的启动完成条件
 
 一次 ext4 离线修复把 stage-1 拉长到约 48 秒后，现场复现了传感器链假启动：
 `remoteproc0` 和 `adsprpcd-sensorspd` 都显示 running，FastRPC 也成功打开
@@ -284,7 +290,7 @@ systemd 重启整个 sensor PD daemon。IIO 仍保留同一短门禁作为防御
 SSC 查询成功、两个单元 active，并输出恢复耗时。该修复不会写 remoteproc sysfs，
 也不会在无人值守时重置 ADSP；若 DSP 内部状态已经卡死，仍应先保存日志并做冷启动验证。
 
-### 16. 低电量 charger 启动不再超时进入完整桌面
+### 18. 低电量 charger 启动不再超时进入完整桌面
 
 设备在 1%、约 3.53 V 时复现了完整启动循环：bootloader 以
 `androidboot.mode=charger` 拉起 NixOS，stage-1 只预充 30 秒便切到 stage-2；
@@ -297,7 +303,7 @@ GNOME、Wi-Fi 和蓝牙启动后，电池净电流转为放电，随后 brownout
 也不会在关机充电场景中反复启动完整用户态。达到阈值并决定继续启动后，stage-1 会恢复
 此前保存的背光值，避免 charger-mode 成功进入桌面后仍继承黑屏状态。
 
-### 17. 只在 stage-1 离线检查并扩展 rootfs
+### 19. 只在 stage-1 离线检查并扩展 rootfs
 
 只读故障现场确认根分区目录元数据损坏：ext4 在读取 Nix store 源码目录时报告
 `EFSCORRUPTED`，随后按 `errors=remount-ro` 中止 journal 并切为只读。没有同时出现
@@ -313,6 +319,19 @@ stage-1 `e2fsck` 已成功修复文件系统。
 本轮保留 stage-1 的离线 `e2fsck` 与首次按需扩展，明确关闭 stage-2 的 growpart，
 并 mask `systemd-growfs-root.service`。新镜像刷入较大的既有 `linux` 分区时仍会在首次
 挂载前扩满；后续启动不再操作 Android 分区表，也不再在线重复 resize。
+
+### 20. 分离世代菜单停留与硬件启动窗口
+
+2026-08-30 的复核把“磁盘检查慢”和“菜单停留慢”拆开测量：`e2fsck -p` 约
+0.18 秒完成，stage-1 却在 `Tasks::SwitchRoot` 中停留约 29 秒。该次用户手动暂停
+菜单后，`adsprpcd-sensorspd` 重启超过 18 次，`ssccli` 报
+`SSC QMI Service not found`；随后一次普通重启在约 21.07 秒完成，两个传感器单元
+均为 active 且 `NRestarts=0`。
+
+这说明强制全盘 fsck 会放大问题，但不是唯一入口：用户正常地花时间挑世代也会拖过
+Qualcomm SSC 注册窗口。最终设计保留每次启动的 3 秒菜单；无操作时直接启动，一旦
+手动导航或确认，则原子保存所选世代、同步 rootfs 并快速重启。下一次 stage-1 验证并
+一次性消费选择，跳过菜单进入 stage-2。这样选择时间不再参与硬件初始化时序。
 
 ```text
 ADSP remoteproc
@@ -343,7 +362,7 @@ charger_pd
 
 - 六颗 CS35L43 的 `vpbr-enable` 布尔属性格式告警。
 - WCN power-sequencer 模块加载过晚导致的 PCIe 重复探测窗口。
-- Novatek 固件恢复路径缺少 ReK 等待。
+- Novatek 固件恢复路径的错误 ReK 前置等待。
 - ADSP 预期的 `/odm/etc/sensors/config` 兼容路径缺失。
 
 ### 有线索，但暂不猜测
@@ -370,7 +389,7 @@ systemd-analyze time
 systemd-analyze blame --no-pager | head -30
 dmesg | grep -E 'pwrseq|qcom-pcie|PCIe Gen|wcn7850|vpbr-enable|cs35l43'
 dmesg | grep -Ei 'fpc1552|fingerprint|qtee|tee0|rpmb|pstore|ramoops'
-test ! -e /sys/bus/platform/drivers/qcom-hv-haptics
+test -z "$(find /sys/bus/platform/drivers/qcom-hv-haptics -mindepth 1 -maxdepth 1 -type l -print -quit 2>/dev/null)"
 lsmod | grep -E 'pwrseq_qcom_wcn|pci_pwrctrl_pwrseq'
 systemctl --failed
 ```
@@ -379,12 +398,22 @@ systemctl --failed
 
 | 指标 | 修改前 | 修改后 | 变化 |
 | --- | ---: | ---: | ---: |
-| 总启动时间 | 31.918 s | 待测 | 待测 |
-| 用户态启动 | 25.791 s | 待测 | 待测 |
-| graphical.target | 18.964 s | 待测 | 待测 |
+| 总启动时间 | 31.918 s | 21.066 s（单次健康启动） | -10.852 s |
+| 用户态启动 | 25.791 s | 11.990 s（单次健康启动） | -13.801 s |
+| graphical.target | 18.964 s | 11.006 s（单次健康启动） | -7.958 s |
 | PCIe link up | 8.162 s | 待测 | 待测 |
 | UCSI 注册 | 3.235 s | 待测 | 待测 |
-| systemd 失败单元 | 0 | 待测 | 待测 |
+| systemd 失败单元 | 0 | 0（单次健康启动） | 0 |
+
+当前数值用于说明候选版已经进入正确量级，不替代正式三次冷启动中位数。故意在旧菜单
+停留约 29 秒的故障样本总启动为 58.880 秒，它是时序缺陷的复现证据，不能从报告中
+删除后只展示最好结果。
+
+2026-08-30 的菜单交接实机回归使用提交 `86c2b22` 的 boot image：在 stage-1 菜单
+停留约 24 秒后确认，boot ID 随一次快速重启改变；第二次启动跳过菜单且一次性标记
+消失。该次启动总计 18.075 秒，`graphical.target` 在 userspace 11.216 秒到达，
+SSC/IIO 均 active、`NRestarts=0`，root 为可写 ext4 且 `errors_count=0`。因此旧实现的
+长菜单停留故障已被隔离，但正式发布仍需使用合并提交产物完成完整外设回归。
 
 音质、快充峰值和续航不能只用启动日志下结论：音质至少要做相同 PipeWire/EQ 配置下的 AB 测试；快充需要低电量、同一充电器和线材；续航需要固定亮度、网络状态和 30 分钟以上的稳定工作负载。
 

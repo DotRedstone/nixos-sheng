@@ -42,7 +42,7 @@ jobs:
       actions: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install release packaging tools
         run: |
@@ -51,22 +51,38 @@ jobs:
 
       - name: Determine Release Info
         id: release_info
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag_name }}
+          INPUT_NAME: ${{ inputs.release_name }}
+          INPUT_KERNEL_RUN: ${{ inputs.kernel_run_id }}
+          INPUT_MINIMAL_ROOTFS_RUN: ${{ inputs.minimal_rootfs_run_id }}
+          INPUT_GNOME_ROOTFS_RUN: ${{ inputs.gnome_rootfs_run_id }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "tag=${{ github.event.inputs.tag_name }}" >> $GITHUB_OUTPUT
-            echo "name=${{ github.event.inputs.release_name }}" >> $GITHUB_OUTPUT
-            echo "kernel_run=${{ github.event.inputs.kernel_run_id }}" >> $GITHUB_OUTPUT
-            echo "minimal_rootfs_run=${{ github.event.inputs.minimal_rootfs_run_id }}" >> $GITHUB_OUTPUT
-            echo "gnome_rootfs_run=${{ github.event.inputs.gnome_rootfs_run_id }}" >> $GITHUB_OUTPUT
-          else
-            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "name=NixOS Sheng ${{ github.ref_name }} (kernel 7.1.8)" >> $GITHUB_OUTPUT
-            echo "kernel_run=" >> $GITHUB_OUTPUT
-            echo "minimal_rootfs_run=" >> $GITHUB_OUTPUT
-            echo "gnome_rootfs_run=" >> $GITHUB_OUTPUT
-          fi
+          set -euo pipefail
+          case "$INPUT_TAG$INPUT_NAME" in
+            *$'\n'*) echo "Release tag and name must be single-line values" >&2; exit 1 ;;
+          esac
+
+          {
+            if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+              printf 'tag=%s\n' "$INPUT_TAG"
+              printf 'name=%s\n' "$INPUT_NAME"
+              printf 'kernel_run=%s\n' "$INPUT_KERNEL_RUN"
+              printf 'minimal_rootfs_run=%s\n' "$INPUT_MINIMAL_ROOTFS_RUN"
+              printf 'gnome_rootfs_run=%s\n' "$INPUT_GNOME_ROOTFS_RUN"
+            else
+              printf 'tag=%s\n' "$REF_NAME"
+              printf 'name=NixOS Sheng %s (kernel 7.1.8)\n' "$REF_NAME"
+              printf 'kernel_run=\n'
+              printf 'minimal_rootfs_run=\n'
+              printf 'gnome_rootfs_run=\n'
+            fi
+          } >> "$GITHUB_OUTPUT"
 
       - name: Download artifacts using gh CLI
+        id: artifacts
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -78,7 +94,18 @@ jobs:
           if [ -n "$requested_kernel_run" ]; then
             expected_sha="$(gh run view "$requested_kernel_run" --json headSha -q .headSha)"
           fi
+          [[ "$expected_sha" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "Invalid release commit SHA: $expected_sha" >&2
+            exit 1
+          }
           echo "Expected artifact SHA: $expected_sha"
+          printf 'head_sha=%s\n' "$expected_sha" >> "$GITHUB_OUTPUT"
+
+          # License, notices, and release metadata must come from the same
+          # reviewed commit as every binary artifact, even when a manual run
+          # selects an older successful build.
+          git fetch --no-tags origin "$expected_sha"
+          git checkout --detach "$expected_sha"
 
           find_run_with_artifact() {
             workflow="$1"
@@ -143,6 +170,8 @@ jobs:
       - name: Prepare directly flashable files
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_NAME: ${{ steps.release_info.outputs.name }}
+          RELEASE_SHA: ${{ steps.artifacts.outputs.head_sha }}
         run: |
           set -euo pipefail
 
@@ -216,15 +245,17 @@ jobs:
           cp LICENSE THIRD_PARTY_NOTICES.md release-upload/
 
           cd release-upload
-          sha256sum * > sha256sums.txt
+          sha256sum -- ./* > sha256sums.txt
           cd ..
 
           cat > release-body.md <<EOF
-          # ${{ steps.release_info.outputs.name }}
+          # $RELEASE_NAME
 
           This release contains the boot image, minimal rootfs, optional GNOME
           rootfs, checksums, license, and third-party notices for Xiaomi Pad 6S
           Pro 12.4 (sheng).
+
+          All release artifacts were built from commit $RELEASE_SHA.
 
           Release notes are maintained directly on the GitHub Release page.
           EOF
@@ -233,7 +264,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.release_info.outputs.tag }}
-          target_commitish: ${{ github.sha }}
+          target_commitish: ${{ steps.artifacts.outputs.head_sha }}
           name: ${{ steps.release_info.outputs.name }}
           files: release-upload/*
           draft: false

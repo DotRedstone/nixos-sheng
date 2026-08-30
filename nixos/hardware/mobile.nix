@@ -160,13 +160,15 @@ in
     crashToBootloader = false;
 
     bootConfig = {
-      log.level = "DEBUG";
+      # Keep normal boot output concise while retaining filesystem progress,
+      # warnings, and errors. Kernel and systemd logs remain available later.
+      log.level = "INFO";
       boot.fail.shell = true;
       gui.enable = false;
       splash.disabled = true;
       sheng_generation_menu = {
         enable = true;
-        timeout = 30;
+        timeout = 3;
       };
       sheng_early_charge_guard = {
         enable = true;

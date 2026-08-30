@@ -5,7 +5,7 @@
 Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的 Mobile NixOS 移植项目。
 
 ![设备](https://img.shields.io/badge/device-Xiaomi%20Pad%206S%20Pro%2012.4-blue)
-![内核](https://img.shields.io/badge/kernel-sheng--7.0-blueviolet)
+![内核](https://img.shields.io/badge/kernel-7.1.8-blueviolet)
 ![NixOS](https://img.shields.io/badge/NixOS-Mobile%20NixOS-5277c3)
 ![许可证](https://img.shields.io/badge/license-MIT%20%2B%20third--party%20terms-orange)
 
@@ -23,6 +23,7 @@ Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的 Mobile NixOS 移植项目�
 - 可选 GNOME 镜像，集成触屏键盘、自动旋转和盖板开合处理
 - 可通过音量键和电源键操作的 stage-1 NixOS 世代菜单
 - Wi-Fi、USB-C role/OTG、SSC 传感器、RAW 相机抓取与 MiPPS 快充认证已可用
+- NT36532E THP 触控/触控笔与 FPC1553 指纹已完成实机接入
 
 ## 当前状态
 
@@ -38,13 +39,14 @@ Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的 Mobile NixOS 移植项目�
 | RootFS | Mobile NixOS 生成的 rootfs | 面向 `linux` 分区的 ext4 镜像 |
 | 显示/桌面 | 可用 | 3048x2032 面板、GNOME shell、gjs-osk 屏幕键盘、物理电源键息屏唤醒、四向旋转与盖板开合亮灭屏均可用 |
 | 调试访问 | Bring-up | Stage-1/stage-2 的 ADB 已通过 Mobile NixOS 启用 |
-| Wi-Fi | 可用 | 2.4GHz 与 5GHz 扫描、连接和联网已验证；**首次冷启动刷入后，必须软重启一次才能稳定激活 5GHz。** |
-| 蓝牙 | 部分可用 | hci0 与 bluetooth.service 正常；扫描、配对、重连和音频待验证 |
-| 音频 | 部分可用 | ALSA 声卡与播放/录音 PCM 已枚举；实际播放和录音待验证 |
+| Wi-Fi | 可用 | 2.4GHz 与 5GHz 扫描、连接和联网已验证；全新刷入后的首次启动曾低概率缺失 5GHz，软重启可恢复，仍在收集不可复现现场 |
+| 蓝牙 | 部分可用 | hci0、bluetooth.service 与 Focus Pen HID 重连已验证；普通配对、蓝牙音频和休眠恢复仍需扩大测试 |
+| 音频 | 部分可用 | ALSA 播放/录音 PCM 与用户态链路已接入；发布镜像仍需重复播放、录音和受控音质对比 |
 | 相机 | 部分可用 | 前后摄 RAW10 实际画面已抓取；libcamera、自动曝光与桌面相机应用待完善 |
 | 传感器 | 用户态可用 | 加速度计、距离传感器、光感、指南针已通过 SSC + iio-sensor-proxy D-Bus 路径验证 |
-| 指纹 | 联调中 | 已接入 FPC1553 供电/IRQ 资源驱动及基于 QTEE 的私有 libfprint 驱动，录入和验证仍需在发布镜像上实测 |
-| 充电 | 可用 | 支持标准 PD 与小米 120W MiPPS 私有快充协议 |
+| 触控与触控笔 | 可用 | NT36532E THP 多点触控、压感、倾斜、悬停和 Focus Pen 按键事件已验证；应用兼容性仍需扩大测试 |
+| 指纹 | 可用 | FPC1553 已通过 QTEE 私有 libfprint 驱动完成图形化录入与验证；熄屏唤醒解锁仍需长期测试 |
+| 充电 | 可用 | 支持标准 PD 与小米 MiPPS 私有快充认证；实际功率受电量、温度、充电器和线材影响，不承诺固定 120W |
 
 ## 上游项目
 
@@ -62,7 +64,7 @@ Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的 Mobile NixOS 移植项目�
 内核源码在 `nixos/flake.nix` 中配置：
 
 ```nix
-shengKernelSrc.url = "github:DotRedstone/linux-sheng/sheng-7.0";
+shengKernelSrc.url = "github:DotRedstone/linux-sheng/upgrade/sheng-7.1.8";
 ```
 
 ## 启动原理
@@ -87,16 +89,21 @@ linux 分区
 
 这里的 rootfs 镜像故意没有采用标准的 PC 风格根目录。对于 Mobile NixOS 生成的 rootfs 而言，顶层只有 `nix/store` 和 `nix-path-registration` 是正常的现象：stage-1 会使用这些注册数据来寻找 NixOS 系统闭包并运行其 `init`。
 
-### 🌟 特色功能：Stage-1 世代回滚菜单 (Boot Generation Menu)
+### Stage-1 世代回滚菜单
 
 由于 Android 设备的 Bootloader 无法直接引导标准的 GRUB/systemd-boot 菜单，本项目在 `stage-1` initramfs 中专门开发了一套**纯文本 framebuffer 启动菜单**。
 
-当你在系统中执行 `sudo sheng-reboot-generation-menu` 后，平板会重启并在屏幕上渲染一个轻量级的世代选择器：
-- 使用 **音量键** 上下切换历史 NixOS 世代。
-- 使用 **电源键** 确认启动。
-- 30秒无操作自动启动默认世代。
+每次启动都会短暂显示菜单，3 秒无操作后自动进入最新世代。也可以在系统中执行
+`sudo sheng-reboot-generation-menu` 主动重启到菜单：
 
-这使得你在移动设备上也能享受到完整的 NixOS 原子化升级与“无限后悔药”回滚体验！详细文档请参阅 [`docs/boot-generation-menu_zh.md`](docs/boot-generation-menu_zh.md)。
+- 使用音量键或外接键盘上下方向键切换高亮项，长按可连续移动。
+- 使用电源键或 Enter 确认。
+- 一旦手动操作，倒计时暂停；确认后会保存选择并快速重启一次，下一次 stage-1
+  直接进入所选世代。该交接让用户可以慢慢选择，同时避免 Qualcomm SSC 注册窗口
+  被长时间菜单停留拖过。
+
+这使移动设备也能使用 NixOS 的原子升级与回滚。详细文档见
+[`docs/boot-generation-menu_zh.md`](docs/boot-generation-menu_zh.md)。
 
 ## 仓库结构
 
@@ -235,7 +242,9 @@ fastboot flash linux out/mobile-rootfs/rootfs.img
 
 如果 stage-1 代码或 Android 启动配置发生了变化，请重新构建并刷入 `boot_b`。如果只有 NixOS userspace/rootfs 发生了变化，请重新构建并刷入 `linux`。
 
-**重要提醒**：在刷入全新的系统镜像并通过 fastboot 首次冷启动后，可能会遭遇硬件初始化时序的竞争问题（例如 ADSP 调制解调器在 Wi-Fi 驱动之后才加载完毕），导致 5GHz Wi-Fi 等功能失效。**在首次刷机开机后，您必须执行一次软重启 (`systemctl reboot`) 来解决这些初始化怪癖，以确保所有驱动程序都能稳定加载。**
+全新刷入后的首次启动曾低概率出现 5GHz 网络未暴露，普通软重启可恢复。由于该问题
+尚未稳定复现，不把“首次必须重启”写成正常步骤；若遇到，请在重启前先保存
+`dmesg`、`journalctl -b -u NetworkManager` 和 `iw dev` 输出，便于继续定位。
 
 不要刷入 `userdata`。固件、软件包、systemd 单元、用户和其他 rootfs 内容都位于 `linux` 分区；仅刷入 `boot_b` 并不会更新 `/lib/firmware`。
 
@@ -263,6 +272,8 @@ sheng 上的 USB-C 主机模式和各类传感器均强依赖于完整的 Qualco
 - [docs/boot-generation-menu_zh.md](docs/boot-generation-menu_zh.md)
 - [docs/camera-raw-capture_zh.md](docs/camera-raw-capture_zh.md)
 - [docs/mipps-120w_zh.md](docs/mipps-120w_zh.md)
+- [docs/release-readiness_zh.md](docs/release-readiness_zh.md)
+- [docs/sheng-optimization-post-draft_zh.md](docs/sheng-optimization-post-draft_zh.md)
 
 ## 许可证与第三方材料
 
@@ -291,33 +302,24 @@ scripts/inspect-bootimg.sh out/mobile-bootimg
 
 该辅助脚本会打印 `/etc/boot/config`、initrd applets 以及关键的启动标志（如 `boot_as_recovery`、`splash.disabled`、rootfs 挂载设置和 USB 特性）。
 
-## 动态凭据与默认登录
+## 测试镜像凭据
 
-为了避免将敏感密码硬编码进开源仓库中，我们的 `vars.nix` 会在系统构建期进行**参数动态注入**。
+本仓库构建的 rootfs 是公开测试镜像；下游用户和凭据应由私人 flake 定义。
+Actions 不再接收明文密码，也不再使用公开的弱密码生成候选版。运行
+`Build NixOS RootFS` 前先在可信本机生成 yescrypt hash：
 
-这些凭据只用于本仓库构建的测试镜像。通过 `mkShengSystem` 或
-`mkShengMinimalSystem` 创建的系统，其用户和凭据完全由下游 flake 定义。
+```bash
+mkpasswd -m yescrypt
+```
 
-- **云端构建**：在 GitHub Actions 手动触发 `Build NixOS RootFS` 工作流时，您可以**直接输入**自定义的用户名、用户密码和 Root 密码。Actions 运行时会生成携带您专属密码的专属镜像。
-- **本地开发**：您可以直接在本地创建或修改 `nixos/vars.nix`。
-
-如果在 Actions 中留空或未做修改，当前测试镜像将回落到预设体验凭据：
-
-- 用户名：`luser`
-- 密码：`1`
-- root 密码：`123456`
+工作流只接收该 hash，并写入 `initialHashedPassword`。Hash 仍可能被离线猜测，必须使用
+强随机密码。仓库默认不设置密码：本地开发求值使用自动登录与 passwordless sudo，
+同时关闭 SSH 密码和 root 登录；正式构建必须提供 hash，并自动关闭本地自动登录模式。
 
 ## 免责声明
 
 本项目是实验性 Mobile NixOS 移植。正常按照文档操作通常不会导致问题，但刷机、
 分区和 slot 切换仍然具有风险。操作前请备份数据，并确认你理解每一条命令。
 
-本项目不对以下情况负责：
-
-- 因个人误操作、跳过文档步骤、刷错分区等原因导致设备无法启动或分区数据异常
-- 因沉迷折腾 NixOS、反复调试 boot image、上课还在研究 flake 导致期末挂科
-- 因沉迷 rice、反复调整透明终端、窗口圆角和状态栏间距导致没时间找女朋友
-
-但如果你因此感受到了原子系统的优雅，从此远离 Debian，避免成为小男娘，请感谢本项目。
-
-本项目的源代码、说明文档、镜像和其他产物均不提供担保。
+本项目不对因误操作、跳过文档步骤、刷错分区、设备差异或实验性驱动造成的无法启动、
+数据丢失或硬件异常负责。源代码、说明文档、镜像和其他产物均按现状提供，不附带担保。

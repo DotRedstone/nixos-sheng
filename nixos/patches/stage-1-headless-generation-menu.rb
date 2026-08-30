@@ -11,11 +11,13 @@ module ShengHeadlessGenerationMenu
   VOLUME_DOWN = [:KEY_VOLUMEDOWN, :KEY_DOWN]
   CONFIRM = [:KEY_POWER, :KEY_ENTER, :KEY_KPENTER]
   REQUEST_PATH = "/mnt/var/lib/sheng-boot-menu/requested"
+  PENDING_SELECTION_PATH = "/mnt/var/lib/sheng-boot-menu/pending-generation"
   MENU_CONSOLE_PATH = "/dev/tty2"
   FALLBACK_CONSOLE_PATH = "/dev/tty0"
   FB_PATH = "/dev/fb0"
   FB_SYSFS = "/sys/class/graphics/fb0"
   OUTER_MARGIN = 64
+  PANEL_MIN_Y = 24
   PANEL_MIN_WIDTH = 720
   PANEL_MAX_WIDTH = 2080
   PANEL_PADDING = 56
@@ -57,6 +59,8 @@ module ShengHeadlessGenerationMenu
   KEY_KPENTER = 96
   INPUT_EVENT_SIZE = 24
   INPUT_SCAN_INTERVAL = 0.25
+  NAVIGATION_REPEAT_DELAY = 0.4
+  NAVIGATION_REPEAT_INTERVAL = 0.1
   INPUT_ACTION_CODES = {
     up: [KEY_VOLUMEUP, KEY_UP],
     down: [KEY_VOLUMEDOWN, KEY_DOWN],
@@ -126,7 +130,26 @@ module ShengHeadlessGenerationMenu
   end
 
   def timeout()
-    (config()["timeout"] || 30).to_i
+    [(config()["timeout"] || 3).to_i, 1].max
+  end
+
+  def monotonic_time()
+    Process.clock_gettime(Process::CLOCK_MONOTONIC)
+  rescue NameError, NoMethodError
+    Time.now.to_f
+  end
+
+  def countdown_remaining(deadline)
+    remaining = deadline - monotonic_time()
+    return 0 if remaining <= 0
+
+    whole_seconds = remaining.to_i
+    whole_seconds + (remaining > whole_seconds ? 1 : 0)
+  end
+
+  def navigation_repeat_due?(pressed_at, last_repeat, now)
+    now - pressed_at >= NAVIGATION_REPEAT_DELAY &&
+      now - last_repeat >= NAVIGATION_REPEAT_INTERVAL
   end
 
   def requested?()
@@ -135,6 +158,67 @@ module ShengHeadlessGenerationMenu
 
   def consume_request()
     File.delete(REQUEST_PATH) if requested?()
+  end
+
+  def pending_selection_path()
+    PENDING_SELECTION_PATH
+  end
+
+  def persist_pending_selection(generation)
+    path = pending_selection_path()
+    directory = File.dirname(path)
+    temporary = "#{path}.tmp"
+    FileUtils.mkdir_p(directory)
+    File.open(temporary, "w", 0600) do |file|
+      file.write("#{generation.path}\n")
+      file.flush
+    end
+    File.rename(temporary, path)
+  ensure
+    File.delete(temporary) if temporary && File.exist?(temporary)
+  end
+
+  def consume_pending_selection(switch_root)
+    path = pending_selection_path()
+    return nil unless File.exist?(path)
+
+    requested_path = File.read(path, 4096).strip
+    File.delete(path)
+    return nil if requested_path.empty?
+
+    generation = Tasks::SwitchRoot::NixOSGeneration.generations().find do |candidate|
+      candidate.path == requested_path
+    end
+
+    if generation.nil? && requested_path == switch_root.default_selection_path()
+      candidate = Tasks::SwitchRoot::NixOSGeneration.new(requested_path)
+      generation = candidate if candidate.exist?()
+    end
+
+    if generation
+      $logger.info("Booting the pending sheng generation '#{requested_path}'.")
+    else
+      $logger.warn("Ignoring stale sheng generation selection '#{requested_path}'.")
+    end
+    generation
+  rescue => error
+    begin
+      File.delete(path) if path && File.exist?(path)
+    rescue
+    end
+    $logger.warn("Ignoring invalid pending sheng generation selection: #{error}")
+    nil
+  end
+
+  def reboot_with_pending_selection(generation)
+    persist_pending_selection(generation)
+    System.run("sync")
+    $logger.info(
+      "Saved sheng generation '#{generation.path}'; rebooting so stage-2 starts within the Qualcomm SSC registration window."
+    )
+    System.exec("reboot", "-f")
+  ensure
+    raise "Failed to reboot after saving sheng generation '#{generation.path}'"
   end
 
   def wait_for_release(keys)
@@ -237,15 +321,18 @@ module ShengHeadlessGenerationMenu
     nil
   end
 
+  def input_would_block?(error)
+    error.respond_to?(:errno) && error.errno == 11
+  end
+
   def read_input_events(path, dev)
     action = nil
-    reads = 0
+    data = dev.sysread(INPUT_EVENT_SIZE * 32)
+    offset = 0
 
-    loop do
-      data = dev.sysread(INPUT_EVENT_SIZE)
-      break unless data && data.bytesize == INPUT_EVENT_SIZE
-
-      event = unpack_input_event(data)
+    while data && offset + INPUT_EVENT_SIZE <= data.bytesize
+      event = unpack_input_event(data[offset, INPUT_EVENT_SIZE])
+      offset += INPUT_EVENT_SIZE
       next unless event
 
       type, code, value = event
@@ -255,18 +342,23 @@ module ShengHeadlessGenerationMenu
           input_held[path].delete(code)
         elsif value == 1 || value == 2
           input_held[path][code] = true
-          action ||= input_action_for_code(code)
+          # Kernel key-repeat rates differ between the tablet buttons and USB
+          # keyboards. Emit only the press edge here; choose() provides one
+          # predictable repeat clock for every navigation device.
+          action ||= input_action_for_code(code) if value == 1
         end
       end
 
-      reads += 1
-      break if reads >= 32 || !@input_nonblocking
     end
 
     action
-  rescue Errno::EAGAIN
+  rescue SystemCallError => error
+    return action if input_would_block?(error)
+
+    $logger.warn("Removing stale sheng generation menu input device #{path}: #{error}")
+    remove_input_device(path)
     action
-  rescue EOFError, Errno::ENOENT, Errno::ENODEV, IOError, SystemCallError => error
+  rescue EOFError, IOError => error
     $logger.warn("Removing stale sheng generation menu input device #{path}: #{error}")
     remove_input_device(path)
     action
@@ -705,7 +797,7 @@ module ShengHeadlessGenerationMenu
 
   def panel_y(visible_count)
     framebuffer_info()
-    [(@fb_height - panel_height(visible_count)) / 2, 24].max
+    [(@fb_height - panel_height(visible_count)) / 2, PANEL_MIN_Y].max
   end
 
   def content_x()
@@ -718,21 +810,63 @@ module ShengHeadlessGenerationMenu
 
   def max_visible_generations()
     framebuffer_info()
-    available = @fb_height - OUTER_MARGIN * 2 - HEADER_HEIGHT - FOOTER_HEIGHT
-    clamp((available + ROW_GAP) / (ROW_HEIGHT + ROW_GAP), 1, 18)
+    available = @fb_height - PANEL_MIN_Y * 2 - HEADER_HEIGHT - FOOTER_HEIGHT
+    clamp((available + ROW_GAP) / (ROW_HEIGHT + ROW_GAP), 1, 18).to_i
   end
 
-  def visible_range(count, selected)
-    visible = [count, max_visible_generations()].min
+  def last_page_start(count, page_size)
+    page_size = [page_size.to_i, 1].max
     start = 0
+    start += page_size while start + page_size < count
+    start
+  end
 
-    if count > visible
-      start = selected - visible / 2
-      start = 0 if start < 0
-      start = count - visible if start > count - visible
+  def visible_range(count, selected, page_start: nil)
+    visible = [count, max_visible_generations()].min.to_i
+    start =
+      if count > visible
+        if page_start.nil?
+          derived_start = 0
+          derived_start += visible while derived_start + visible <= selected
+          derived_start
+        else
+          page_start.to_i
+        end
+      else
+        0
+      end
+    start = clamp(start, 0, [count - 1, 0].max)
+    [start, [start + visible, count].min]
+  end
+
+  def move_selection(selected, page_start, direction, count, page_size)
+    return [0, 0] if count <= 1
+
+    page_size = [page_size.to_i, 1].max
+    page_start = page_start.to_i
+    if direction == :down
+      next_selected = (selected + 1) % count
+      next_page =
+        if next_selected == 0
+          0
+        elsif next_selected >= page_start + page_size
+          page_start + page_size
+        else
+          page_start
+        end
+    else
+      next_selected = (selected - 1) % count
+      next_page =
+        if selected == 0
+          last_page_start(count, page_size)
+        elsif next_selected < page_start
+          [page_start - page_size, 0].max
+        else
+          page_start
+        end
     end
 
-    [start, start + visible]
+    [next_selected, next_page]
   end
 
   def generation_parts(label, index)
@@ -862,7 +996,15 @@ module ShengHeadlessGenerationMenu
     draw_rect(track_x, thumb_y, SCROLLBAR_WIDTH, thumb_height, ACCENT)
   end
 
-  def render_framebuffer(generations, selected, previous_selected: nil, remaining: nil, previous_remaining: nil)
+  def render_framebuffer(
+    generations,
+    selected,
+    previous_selected: nil,
+    page_start: nil,
+    previous_page_start: nil,
+    remaining: nil,
+    previous_remaining: nil
+  )
     started_at = Time.now.to_f
     $logger.debug("Sheng generation framebuffer render started.") if $logger.respond_to?(:debug)
     framebuffer_info()
@@ -872,9 +1014,13 @@ module ShengHeadlessGenerationMenu
       else
         generations.each_with_index.map { |generation, index| generation_label(generation, index) }
       end
-    start_index, end_index = visible_range(labels.length, selected)
+    start_index, end_index = visible_range(labels.length, selected, page_start: page_start)
     previous_start, previous_end =
-      previous_selected.nil? ? [nil, nil] : visible_range(labels.length, previous_selected)
+      if previous_selected.nil?
+        [nil, nil]
+      else
+        visible_range(labels.length, previous_selected, page_start: previous_page_start)
+      end
     full_redraw = previous_selected.nil? ||
       previous_start != start_index ||
       previous_end != end_index
@@ -981,7 +1127,7 @@ module ShengHeadlessGenerationMenu
       lines << "#{marker} #{label}"
     end
     lines << ""
-    lines << "Volume +/-: select    Power: boot"
+    lines << "Volume +/- or Up/Down: select    Power or Enter: boot"
     lines << (remaining ? "Automatic boot in #{remaining}s" : "Automatic boot paused")
     console.write("\e[2J\e[H#{lines.join("\n")}\n")
     console.flush
@@ -989,13 +1135,23 @@ module ShengHeadlessGenerationMenu
     $logger.warn("Could not render sheng generation menu console fallback: #{error}")
   end
 
-  def render(generations, selected, previous_selected: nil, remaining: nil, previous_remaining: nil)
+  def render(
+    generations,
+    selected,
+    previous_selected: nil,
+    page_start: nil,
+    previous_page_start: nil,
+    remaining: nil,
+    previous_remaining: nil
+  )
     rendered = false
     unless @framebuffer_failed
       rendered = render_framebuffer(
         generations,
         selected,
         previous_selected: previous_selected,
+        page_start: page_start,
+        previous_page_start: previous_page_start,
         remaining: remaining,
         previous_remaining: previous_remaining
       )
@@ -1003,7 +1159,7 @@ module ShengHeadlessGenerationMenu
     render_console(generations, selected, remaining) unless rendered
   end
 
-  def render_booting(label = "NixOS - Default")
+  def render_booting(label = "NixOS - Default", status = "HANDING OFF TO STAGE 2")
     if @framebuffer_failed
       console.write("\e[2J\e[HNixOS Sheng\n\nStarting selected generation...\n")
       console.flush
@@ -1014,7 +1170,7 @@ module ShengHeadlessGenerationMenu
     width = panel_width()
     height = 380
     x = panel_x()
-    y = [(@fb_height - height) / 2, 24].max
+    y = [(@fb_height - height) / 2, PANEL_MIN_Y].max
     title, details = generation_parts(label, 0)
 
     draw_rect(0, 0, @fb_width, @fb_height, BG)
@@ -1055,7 +1211,7 @@ module ShengHeadlessGenerationMenu
       y + 292,
       width - PANEL_PADDING * 2,
       28,
-      "HANDING OFF TO STAGE 2",
+      status,
       BOOT_FG,
       PANEL_BG,
       scale: SUBTITLE_FONT_SCALE
@@ -1070,8 +1226,10 @@ module ShengHeadlessGenerationMenu
   def choose(switch_root)
     $logger.debug("Sheng generation menu initialization started.") if $logger.respond_to?(:debug)
     generations = Tasks::SwitchRoot::NixOSGeneration.generations()
+    menu_length = generations.empty? ? 1 : generations.length
+    page_size = [menu_length, max_visible_generations()].min.to_i
     selected = 0
-    deadline = Time.now.to_i + timeout()
+    page_start = 0
     countdown_active = true
     activate_console()
     unblank_framebuffer()
@@ -1084,57 +1242,65 @@ module ShengHeadlessGenerationMenu
     input_held.clear
     wait_for_release(VOLUME_UP + VOLUME_DOWN + CONFIRM)
     $logger.debug("Sheng generation menu input ready.") if $logger.respond_to?(:debug)
+    deadline = monotonic_time() + timeout()
     last_selected = nil
+    last_page_start = nil
     last_remaining = nil
-    volume_up_was_pressed = false
-    volume_down_was_pressed = false
+    up_was_pressed = false
+    down_was_pressed = false
     up_pressed_time = 0.0
     up_last_repeat = 0.0
     down_pressed_time = 0.0
     down_last_repeat = 0.0
+    manual_selection = false
 
     loop do
-      remaining = countdown_active ? [deadline - Time.now.to_i, 0].max : nil
-      needs_redraw = (selected != last_selected) || (remaining != last_remaining)
+      remaining = countdown_active ? countdown_remaining(deadline) : nil
+      needs_redraw = (selected != last_selected) ||
+        (page_start != last_page_start) ||
+        (remaining != last_remaining)
 
       if needs_redraw
         render(
           generations,
           selected,
           previous_selected: last_selected,
+          page_start: page_start,
+          previous_page_start: last_page_start,
           remaining: remaining,
           previous_remaining: last_remaining
         )
         last_selected = selected
+        last_page_start = page_start
         last_remaining = remaining
       end
 
       input_action = poll_input_action(0.01)
-      volume_up_pressed = input_held?(VOLUME_UP)
-      volume_down_pressed = input_held?(VOLUME_DOWN)
+      up_pressed = input_held?(VOLUME_UP)
+      down_pressed = input_held?(VOLUME_DOWN)
 
       action_up = input_action == :up
       action_down = input_action == :down
       confirm_pressed = input_action == :confirm
-      now_t = Time.now.to_f
+      now_t = monotonic_time()
 
-      if volume_up_pressed
-        if !volume_up_was_pressed
+      if up_pressed
+        if !up_was_pressed
           up_pressed_time = now_t
           up_last_repeat = now_t
           action_up = true
-        elsif now_t - up_pressed_time > 0.4 && now_t - up_last_repeat > 0.1
+        elsif navigation_repeat_due?(up_pressed_time, up_last_repeat, now_t)
           action_up = true
           up_last_repeat = now_t
         end
       end
 
-      if volume_down_pressed
-        if !volume_down_was_pressed
+      if down_pressed
+        if !down_was_pressed
           down_pressed_time = now_t
           down_last_repeat = now_t
           action_down = true
-        elsif now_t - down_pressed_time > 0.4 && now_t - down_last_repeat > 0.1
+        elsif navigation_repeat_due?(down_pressed_time, down_last_repeat, now_t)
           action_down = true
           down_last_repeat = now_t
         end
@@ -1142,21 +1308,32 @@ module ShengHeadlessGenerationMenu
 
       if action_up
         countdown_active = false
-        menu_length = generations.empty? ? 1 : generations.length
-        selected = (selected - 1) % menu_length
+        manual_selection = true
+        selected, page_start = move_selection(
+          selected, page_start, :up, menu_length, page_size
+        )
       elsif action_down
         countdown_active = false
-        menu_length = generations.empty? ? 1 : generations.length
-        selected = (selected + 1) % menu_length
+        manual_selection = true
+        selected, page_start = move_selection(
+          selected, page_start, :down, menu_length, page_size
+        )
       elsif confirm_pressed
+        manual_selection = true
         wait_for_release(CONFIRM)
         break
-      elsif countdown_active && Time.now.to_i >= deadline
+      elsif countdown_active && monotonic_time() >= deadline
         break
       end
 
-      volume_up_was_pressed = volume_up_pressed
-      volume_down_was_pressed = volume_down_pressed
+      if (action_up || action_down) && $logger.respond_to?(:debug)
+        $logger.debug(
+          "Sheng generation selection moved to #{selected}, page starts at #{page_start}."
+        )
+      end
+
+      up_was_pressed = up_pressed
+      down_was_pressed = down_pressed
     end
 
     chosen_generation =
@@ -1169,8 +1346,9 @@ module ShengHeadlessGenerationMenu
     set_console_keyboard(true)
     restore_console_logs()
     set_console_echo(true)
-    render_booting(generation_label(chosen_generation, selected))
-    chosen_generation
+    boot_status = manual_selection ? "SELECTION SAVED - RESTARTING" : "HANDING OFF TO STAGE 2"
+    render_booting(generation_label(chosen_generation, selected), boot_status)
+    [chosen_generation, manual_selection]
   end
 end
 
@@ -1179,16 +1357,19 @@ class Tasks::SwitchRoot
     return @selected_generation if @selected_generation
 
     ShengEarlyChargeGuard.wait_if_critical()
-    explicit_request = ShengHeadlessGenerationMenu.requested?()
-    wants_menu =
-      explicit_request &&
-      ShengEarlyChargeGuard.interactive_boot_safe?()
+    wants_menu = ShengEarlyChargeGuard.interactive_boot_safe?()
+    pending_generation = ShengHeadlessGenerationMenu.consume_pending_selection(self)
 
-    if wants_menu &&
+    if pending_generation
+      @selected_generation = pending_generation
+    elsif wants_menu &&
        ShengHeadlessStage1.enabled? &&
        ShengHeadlessGenerationMenu.enabled?
       ShengHeadlessGenerationMenu.consume_request()
-      @selected_generation = ShengHeadlessGenerationMenu.choose(self)
+      @selected_generation, manual_selection = ShengHeadlessGenerationMenu.choose(self)
+      if manual_selection
+        ShengHeadlessGenerationMenu.reboot_with_pending_selection(@selected_generation)
+      end
     elsif wants_menu && !ShengHeadlessStage1.enabled?
       Tasks::Splash.instance.quit("Continuing to recovery menu")
       @selected_generation = choose_generation()

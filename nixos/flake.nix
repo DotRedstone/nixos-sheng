@@ -18,7 +18,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     shengKernelSrc = {
-      url = "github:DotRedstone/linux-sheng/feat/stylus-thp";
+      url = "github:DotRedstone/linux-sheng/upgrade/sheng-7.1.8";
       flake = false;
     };
     shengFirmware = {
@@ -251,11 +251,11 @@
           }
 
           check_pixel 0 0 "11,10,8,0"
-          check_pixel 484 115 "199,210,115,0"
-          check_pixel 600 350 "67,67,35,0"
+          check_pixel 600 57 "199,210,115,0"
+          check_pixel 600 300 "67,67,35,0"
           check_pixel 2400 450 "29,27,24,0"
           test "$(sha256sum "$framebuffer" | cut -d' ' -f1)" = \
-            "943794ba5b96bbd97f4facbe601482d09a4bd813f172fa3c4d4b2d48c6f06a5f"
+            "16eab7f3420f865c18e5398bb15d553d4d890357bf59820ed38bd71015465128"
 
           echo "native framebuffer render completed in ''${elapsed_ms}ms"
           touch $out

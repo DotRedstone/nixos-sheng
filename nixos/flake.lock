@@ -100,16 +100,16 @@
     "shengKernelSrc": {
       "flake": false,
       "locked": {
-        "lastModified": 1787918760,
+        "lastModified": 1788061761,
         "narHash": "sha256-U96RPTPuctbtzUxmqcyjW/Av+UO+s/XfyA4cGT/zaoU=",
         "owner": "DotRedstone",
         "repo": "linux-sheng",
-        "rev": "c09befc761265bd3e139bbef77d3e95003bfa21a",
+        "rev": "3ca17976c6b4165559b8e25922bbecf31ac84db7",
         "type": "github"
       },
       "original": {
         "owner": "DotRedstone",
-        "ref": "feat/stylus-thp",
+        "ref": "upgrade/sheng-7.1.8",
         "repo": "linux-sheng",
         "type": "github"
       }

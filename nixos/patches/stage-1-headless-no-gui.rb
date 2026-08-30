@@ -95,6 +95,26 @@ class Tasks::Graphics::DRM
 end
 
 class Tasks::SwitchRoot
+  unless method_defined?(:sheng_run_without_dev_fd_links)
+    alias_method :sheng_run_without_dev_fd_links, :run
+  end
+
+  def run()
+    # NixOS stage-2 uses process substitution before systemd has created the
+    # usual /dev/fd links. Create them while both devtmpfs and procfs are still
+    # mounted so its early logging setup does not fail with ENOENT.
+    {
+      "/dev/fd" => "/proc/self/fd",
+      "/dev/stdin" => "/proc/self/fd/0",
+      "/dev/stdout" => "/proc/self/fd/1",
+      "/dev/stderr" => "/proc/self/fd/2",
+    }.each do |destination, source|
+      File.symlink(source, destination) unless File.exist?(destination) || File.symlink?(destination)
+    end
+
+    sheng_run_without_dev_fd_links
+  end
+
   def selected_generation()
     return @selected_generation if @selected_generation
 

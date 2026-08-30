@@ -6,7 +6,7 @@ Mobile NixOS port for the Xiaomi Pad 6S Pro 12.4 (`sheng`,
 Qualcomm SM8550).
 
 ![Device](https://img.shields.io/badge/device-Xiaomi%20Pad%206S%20Pro%2012.4-blue)
-![Kernel](https://img.shields.io/badge/kernel-sheng--7.0-blueviolet)
+![Kernel](https://img.shields.io/badge/kernel-7.1.8-blueviolet)
 ![NixOS](https://img.shields.io/badge/NixOS-Mobile%20NixOS-5277c3)
 ![License](https://img.shields.io/badge/license-MIT%20%2B%20third--party%20terms-orange)
 
@@ -29,6 +29,7 @@ a little less lonely.
 - Stage-1 NixOS generation menu controlled by volume and power keys
 - Working Wi-Fi, USB-C role/OTG, SSC sensors, RAW camera capture, and MiPPS
   fast-charging authentication
+- Integrated NT36532E THP touch/stylus and FPC1553 fingerprint support
 
 ## Status
 
@@ -45,14 +46,14 @@ issues before flashing.
 | RootFS | Mobile NixOS generated rootfs | ext4 image labeled `linux` |
 | Display/desktop | Working | 3048x2032 panel, GNOME shell, gjs-osk onscreen keyboard, physical power key toggle, four-way rotation, and cover open/close display control work |
 | Debug access | Bring-up | Stage-1/stage-2 ADB is enabled through Mobile NixOS |
-| Wi-Fi | Working | 2.4 GHz and 5 GHz scanning, connection, and networking verified; **A soft reboot is required after the first cold boot for 5GHz to work reliably.** |
-| Bluetooth | Partially working | hci0 and bluetooth.service work; discovery, pairing, reconnect, and audio need validation |
-| Audio | Partially working | ALSA card and playback/capture PCM devices enumerate; playback and recording need validation |
+| Wi-Fi | Working | 2.4 GHz and 5 GHz scanning, connection, and networking verified; a rare missing-5-GHz state was seen after a fresh flash and recovered after a soft reboot, but is not reproducible yet |
+| Bluetooth | Partially working | hci0, bluetooth.service, and Focus Pen HID reconnect work; general pairing, Bluetooth audio, and suspend/resume need wider validation |
+| Audio | Partially working | ALSA playback/capture PCM and the userspace path are integrated; repeat playback, recording, and controlled tuning tests are still needed on the release image |
 | Cameras | Partially working | front/rear RAW10 frames captured; libcamera, auto exposure, and desktop camera app need integration |
 | Sensors | User-space working | accelerometer, proximity, ambient light, and compass work through SSC + iio-sensor-proxy D-Bus |
-| Touch and stylus | Integrated, needs release-image validation | NT36532E raw THP processing provides multitouch, palm rejection, and Xiaomi Focus Pen/Focus Pen Pro pressure, tilt, hover, and buttons |
-| Fingerprint | Bring-up | FPC1553 power/IRQ resources and the QTEE-backed private libfprint driver are integrated; enrollment and verification need release-image validation |
-| Charging | Working | Standard PD and Xiaomi 120W MiPPS private fast charging are supported |
+| Touch and stylus | Working | NT36532E THP multitouch plus Xiaomi Focus Pen pressure, tilt, hover, and button events are verified; wider application compatibility still needs testing |
+| Fingerprint | Working | Graphical enrollment and verification work through the FPC1553 QTEE-backed private libfprint driver; screen-off wake-unlock needs long-term testing |
+| Charging | Working | Standard PD and Xiaomi MiPPS authentication work; actual power depends on charge state, temperature, charger, and cable and is not a guaranteed 120 W |
 
 ## Upstream Projects
 
@@ -71,7 +72,7 @@ issues before flashing.
 The kernel source is configured in `nixos/flake.nix`:
 
 ```nix
-shengKernelSrc.url = "github:DotRedstone/linux-sheng/sheng-7.0";
+shengKernelSrc.url = "github:DotRedstone/linux-sheng/upgrade/sheng-7.1.8";
 ```
 
 ## How Boot Works
@@ -99,16 +100,23 @@ only `nix/store` and `nix-path-registration` at the top level is expected for
 the Mobile NixOS generated rootfs: stage-1 uses that registration data to find
 the NixOS system closure and then runs its `init`.
 
-### 🌟 Killer Feature: Stage-1 Boot Generation Menu
+### Stage-1 Boot Generation Menu
 
 Because standard Android bootloaders cannot render GRUB or systemd-boot menus, this project implements a **custom framebuffer text menu** directly inside the `stage-1` initramfs.
 
-By running `sudo sheng-reboot-generation-menu` from the OS, the tablet will reboot into a lightweight pre-boot selector:
-- Use **Volume Keys** to navigate through your NixOS history.
-- Use **Power Key** to confirm and boot.
-- Boots the default generation automatically after 30 seconds.
+The menu appears briefly on every boot and automatically enters the newest
+generation after three seconds without input. Run
+`sudo sheng-reboot-generation-menu` to reboot to it explicitly.
 
-This brings the full power of NixOS atomic upgrades and rollbacks to a mobile device! See [`docs/boot-generation-menu.md`](docs/boot-generation-menu.md) for details.
+- Volume keys or external Up/Down arrows move the highlight; holding a key
+  repeats movement.
+- Power or Enter confirms the selection.
+- Manual input pauses the countdown. Confirmation stores the selection and
+  performs one quick reboot; the next stage-1 consumes it and skips the menu.
+  This preserves a clean Qualcomm SSC registration window even when the user
+  spends a long time choosing a generation.
+
+See [`docs/boot-generation-menu.md`](docs/boot-generation-menu.md) for details.
 
 ## Repository Layout
 
@@ -258,7 +266,11 @@ If stage-1 code or the Android boot configuration changed, rebuild and flash
 `boot_b`. If only the NixOS userspace/rootfs changed, rebuild and flash
 `linux`.
 
-**Important**: After flashing a fresh image and completing the first cold boot from fastboot, hardware initialization race conditions (such as the ADSP modem loading before the Wi-Fi driver) may cause features like 5GHz Wi-Fi to fail. **You must perform a soft reboot (`systemctl reboot`) once after the initial flash to resolve these quirks and ensure all drivers initialize reliably.**
+A rare missing-5-GHz state has been observed after the first boot of a fresh
+flash and recovered after a normal soft reboot. It is not reproducible enough
+to make a mandatory reboot part of the normal installation. If it occurs,
+capture `dmesg`, `journalctl -b -u NetworkManager`, and `iw dev` before
+rebooting.
 
 Do not flash `userdata`. Firmware, packages, systemd units, users, and other
 rootfs content live in the `linux` partition; flashing only `boot_b` does not
@@ -295,6 +307,7 @@ For the full dependency chain, offline rootfs checks, runtime verification comma
 - [docs/boot-generation-menu.md](docs/boot-generation-menu.md)
 - [docs/camera-raw-capture.md](docs/camera-raw-capture.md)
 - [docs/mipps-120w.md](docs/mipps-120w.md)
+- [docs/release-readiness.md](docs/release-readiness.md)
 - [docs/kernel-optimization-log_zh.md](docs/kernel-optimization-log_zh.md)
 - [docs/sheng-optimization-post-draft_zh.md](docs/sheng-optimization-post-draft_zh.md)
 
@@ -330,22 +343,23 @@ scripts/inspect-bootimg.sh out/mobile-bootimg
 The helper prints `/etc/boot/config`, initrd applets, and key boot flags such as
 `boot_as_recovery`, `splash.disabled`, rootfs mount settings, and USB features.
 
-## Dynamic Credentials & Default Login
+## Test-image Credentials
 
-To avoid hardcoding sensitive passwords into the open-source repository, our `vars.nix` uses **dynamic parameter injection** during system build time.
+Repository-built root filesystems are public test images. Downstream users and
+credentials belong in a private flake. Actions no longer accept plaintext
+passwords or falls back to public weak passwords for release candidates.
+Generate a yescrypt hash on a trusted machine before running
+`Build NixOS RootFS`:
 
-These credentials apply only to repository-built test images. Systems created
-through `mkShengSystem` or `mkShengMinimalSystem` define their users and
-credentials entirely in the downstream flake.
+```bash
+mkpasswd -m yescrypt
+```
 
-- **Cloud Build**: When manually triggering the `Build NixOS RootFS` workflow in GitHub Actions, you can **directly input** a custom username, user password, and Root password. The Actions runner will generate an exclusive image containing your specific credentials.
-- **Local Development**: You can directly create or modify `nixos/vars.nix` locally.
-
-If left blank or unmodified in Actions, the test image will fall back to the preset credentials:
-
-- user: `luser`
-- password: `1`
-- root password: `123456`
+The workflow writes only the hash to `initialHashedPassword`. Hashes can still
+be attacked offline, so use a strong random password. The repository default
+has no password: it enables local auto-login and passwordless sudo for
+development evaluation while keeping SSH password and root login disabled.
+Release builds require supplied hashes and disable that local auto-login mode.
 
 ## Disclaimer
 
@@ -354,18 +368,7 @@ keep the process predictable, but flashing, partitioning, and slot switching
 still carry real risk. Back up your data and make sure you understand every
 command before running it.
 
-This project is not responsible for:
-
-- devices failing to boot or partitions becoming inconsistent due to user
-  error, skipped documentation steps, or flashing the wrong partition
-- failing your finals because you spent too much time debugging boot images,
-  reading flakes in class, or falling too deep into the NixOS rabbit hole
-- having no time to find a girlfriend because you kept tuning transparent
-  terminals, window corner radius, and status-bar spacing
-
-If this project helps you feel the elegance of atomic systems, escape
-hand-crafted Debian rootfs rituals, and avoid the Debian-to-femboy pipeline,
-please thank this project.
-
-Source code, instructions, images, and other artifacts are provided without
-warranty.
+The project is not responsible for boot failures, data loss, partition damage,
+or hardware problems caused by user error, skipped steps, incorrect partition
+targets, device variation, or experimental drivers. Source code, instructions,
+images, and other artifacts are provided as-is without warranty.

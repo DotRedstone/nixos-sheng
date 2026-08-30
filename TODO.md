@@ -2,110 +2,87 @@
 
 [English](TODO.md) | [简体中文](TODO_zh.md)
 
-This file tracks high-level Xiaomi Pad 6S Pro 12.4 (`xiaomi-sheng`) NixOS port
-status. The detailed Chinese hardware-alignment matrix is kept in
-[`TODO_zh.md`](TODO_zh.md).
-
-The goal is not to develop every missing driver from scratch. The current
-priority is to keep the NixOS port aligned with already-known sheng hardware
-support, document what has been verified, and keep release blockers visible.
+This file tracks release-facing work for the Xiaomi Pad 6S Pro 12.4 (`sheng`)
+NixOS port. A checked item means it was verified on real hardware, not merely
+enabled in a kernel configuration.
 
 ## Legend
 
-- `[x]` Verified on NixOS
-- `[~]` Partially working or needs broader validation
-- `[ ]` Needs work
-- `[-]` Out of scope for the current stage
+- `[x]` Verified on sheng
+- `[~]` Integrated, but broader or longer testing is still needed
+- `[ ]` Not complete
+- `[-]` Deliberately out of scope
 
-## Core System
+## Verified Platform
 
-- [x] Boots into NixOS from the Mobile NixOS Android boot flow.
-- [x] Writable root filesystem on the dedicated `linux` partition.
-- [x] `/run/current-system` and `/nix/var/nix/profiles/system` exist.
-- [x] `nix`, `nixos-rebuild`, `systemctl`, and Home Manager CLI are available.
-- [x] Public flake constructors are available for downstream dotfiles:
-  `mkShengSystem`, `mkShengGnomeSystem`, and the compatibility alias
-  `mkShengMinimalSystem`.
-- [x] A private downstream flake has been evaluated and activated through the
-  public `mkShengSystem` constructor.
-- [x] Stage-2 NixOS generation switching and rollback have been verified.
-- [x] Stage-1 boot generation menu works with volume/power keys and external
-  arrow/Enter keys.
-- [~] Kernel, DTS, stage-1 initrd, and boot command-line changes still require
-  rebuilding and flashing `boot_b`; `nixos-rebuild` only updates stage-2.
+- [x] Mobile NixOS Android boot flow using an inactive `boot` slot and a
+  dedicated ext4 `linux` partition.
+- [x] Writable rootfs, offline stage-1 fsck/resize, ext4 health monitoring, and
+  device-side `nixos-rebuild` generation switching.
+- [x] Public desktop-neutral flake constructor, optional GNOME constructor,
+  and downstream private-dotfiles activation.
+- [x] Stage-1 framebuffer generation menu with three-second automatic boot,
+  paged volume/arrow navigation, key hold repeat, and power/Enter confirmation.
+- [x] GNOME, gjs-osk, four-way rotation, cover handling, touch input, and power
+  key display control.
+- [x] 2.4 GHz and 5 GHz Wi-Fi, USB-C role detection/OTG, standard USB-PD, and
+  Xiaomi MiPPS authentication.
+- [x] Qualcomm SSC accelerometer, proximity, ambient light, and compass through
+  `iio-sensor-proxy` D-Bus.
+- [x] Front and rear RAW10 camera capture through V4L2/CAMSS.
+- [x] NT36532E THP multitouch and Xiaomi Focus Pen pressure, tilt, hover, and
+  button events.
+- [x] FPC1553 fingerprint discovery, graphical enrollment, and verification
+  through the QTEE-backed private libfprint driver.
 
-## Desktop and Input
+## Needs More Validation
 
-- [x] GNOME rootfs boots with GDM and GNOME Shell.
-- [x] `gjs-osk` on-screen keyboard is integrated for touch input.
-- [x] Physical power key toggles display on/off without entering suspend.
-- [x] Four-way automatic rotation works, including rotated touch coordinates.
-- [x] Hall-cover close/open blanks and redraws the display without exposing
-  `SW_LID` to GNOME.
-- [x] GNOME automatic ambient-light brightness and idle dimming are disabled to
-  avoid unexpected brightness changes.
-- [~] Floating on-screen keyboard behavior still needs long-term validation
-  across more applications.
-
-## Firmware and Remoteproc
-
-- [x] `sheng-firmware` is present in `/lib/firmware`.
-- [x] ADSP and CDSP remoteproc can start.
-- [x] GPU firmware loads.
-- [x] `msm/adsp/charger_pd` can become available through PDR.
-- [x] `ucsi_glink` can register Type-C.
-- [x] `pd-mapper` firmware preparation is limited to `qcom/sm8550/sheng`,
-  reducing avoidable `/run` usage by roughly 500 MiB on tested GNOME systems.
-
-## Hardware Status
-
-- [x] Display panel and DRM nodes enumerate.
-- [x] Touchscreen works through the Novatek driver and firmware.
-- [x] Backlight sysfs nodes exist and manual brightness control works.
-- [x] Wi-Fi works on 2.4 GHz and 5 GHz after the known post-flash warm reboot.
-- [x] USB-C Type-C role detection and OTG host mode work.
-- [x] Sensors are available through Qualcomm SSC user space and
-  `iio-sensor-proxy` D-Bus: accelerometer, proximity, ambient light, compass.
-- [x] Camera sensors and CAMSS can capture RAW10 frames through V4L2.
-- [x] Xiaomi 120W MiPPS authentication can unlock the fast-charging profile.
-- [x] MiPPS authentication now retries when early power-supply events arrive
-  before `real_type`, `adapter_svid`, or `pdo2` are ready.
-- [~] Bluetooth controller enumerates; pairing, reconnect, and audio need more
-  validation.
-- [~] ALSA card and playback/capture PCM devices enumerate; real playback and
-  recording need broader validation.
-- [~] Sustained charging power, charger compatibility, and thermal behavior
-  need longer testing with an external USB-C power meter.
-- [~] Official keyboard, touchpad, and stylus authentication remain incomplete.
-- [-] Fingerprint is unsupported because it depends on proprietary Qualcomm
-  TEE/TrustZone behavior with no open Linux solution.
+- [~] Bluetooth controller startup and Focus Pen HID reconnect work; general
+  discovery, pairing, Bluetooth audio, and suspend/resume need wider testing.
+- [~] ALSA playback and capture devices enumerate and the audio userspace is
+  integrated; repeat playback/recording and subjective tuning need controlled
+  tests on the release image.
+- [~] Xiaomi 120 W MiPPS unlock works, but sustained power depends on battery
+  state, temperature, charger, and cable. Publish measured traces rather than a
+  guaranteed wattage.
+- [~] Computer C-to-C charging follows the USB data-port current limit; improve
+  only with evidence that the host and charger firmware allow a higher mode.
+- [~] libcamera, automatic exposure, and a polished desktop camera application
+  are not complete even though RAW capture works.
+- [~] Stylus palm rejection and button mapping should be tested across more
+  drawing applications.
+- [~] Fingerprint wake-unlock should receive repeated screen-off and
+  suspend/resume testing.
 
 ## Release Blockers
 
-- [x] English and Simplified Chinese README files are present.
-- [x] Docs follow the repository convention: default `.md` is English and
-  `_zh.md` is Simplified Chinese.
-- [x] Release notes are available in English and Simplified Chinese.
-- [x] Dual-boot installation docs are available in English and Simplified
-  Chinese.
-- [x] Third-party notices document upstream projects, proprietary firmware, and
-  rights-holder review path.
-- [x] Rootfs release assets use Windows-friendly split ZIP archives.
-- [x] Checksum verification remains optional but documented.
-- [ ] Boot, minimal rootfs, and GNOME rootfs artifacts for the next release
-  must come from the same release commit.
+- [x] Validated the manual generation-selection reboot handoff on hardware:
+  remained in the menu for about 24 seconds, confirmed a selection, and verified
+  that the next boot skipped the menu while SSC/IIO started with `NRestarts=0`.
+- [x] Merged `DotRedstone/linux-sheng:feat/stylus-thp` into the maintained 7.1.8
+  branch through PR #1 and locked `shengKernelSrc` to that maintained ref.
+- [x] Merged this audit branch into the default `sheng` branch through reviewed
+  PR #25 using a merge commit. No release was published from the audit branch.
+- [ ] Build boot, minimal rootfs, and GNOME rootfs from the exact same merged
+  commit; verify run `headSha`, checksums, boot partition size, matching kernel
+  modules, and ext4 features before publishing.
+- [~] Completed one deliberately delayed generation-menu handoff regression;
+  still run three normal boots on the merged release candidate and retain
+  `systemd-analyze`, failed-unit, coredump,
+  SSC, charging, rootfs, and kernel-warning evidence.
+- [ ] Review proprietary firmware and binary redistribution for every release.
+  Source availability is not redistribution permission.
 
-## Future Improvements
+## Follow-up Work
 
-- Expand the ext4 filesystem to the full `linux` partition and validate
-  long-term device-side `nixos-rebuild` usage.
-- Validate real multi-generation selection through the stage-1 boot menu after
-  the filesystem has enough space for more generations.
-- Improve desktop camera integration through libcamera or another suitable
-  userspace stack.
-- Validate Bluetooth pairing/audio and ALSA playback/recording.
-- Continue charging compatibility and thermal testing across chargers and
-  cables.
-- Investigate kernel IIO exposure only if strict `/sys/bus/iio/devices`
-  compatibility becomes necessary; the current SSC + D-Bus path works for the
-  desktop.
+- [ ] Add libcamera tuning/IPA integration and a desktop camera path.
+- [ ] Validate Bluetooth audio profiles and long suspend/resume cycles.
+- [ ] Run repeatable speaker and microphone A/B tests with the same
+  PipeWire/WirePlumber state and publish the test method.
+- [ ] Expand charger/cable/temperature coverage with an external power meter.
+- [ ] Decode the remaining Xiaomi proximity payload warning and expose gyro
+  only if an application needs it.
+- [ ] Improve recovery documentation and automate collection of a sanitized
+  release-candidate health bundle.
+- [-] A kernel IIO bridge is not required while the SSC + D-Bus path satisfies
+  the desktop; revisit only for software that strictly requires IIO sysfs.

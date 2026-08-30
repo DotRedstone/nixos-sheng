@@ -26,7 +26,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 1
 
@@ -135,14 +135,14 @@ jobs:
           sha256sum out/kernel/* > out/kernel/sha256sums.txt
 
       - name: Upload kernel artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sheng-mobile-nixos-boot
           path: out/kernel/
           retention-days: 14
 
       - name: Upload standalone NT36532E THP module
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sheng-nt36532e-thp-module
           path: out/thp-module/
