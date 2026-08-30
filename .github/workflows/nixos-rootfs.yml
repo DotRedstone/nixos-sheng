@@ -32,14 +32,14 @@ on:
         description: "Default non-root username"
         required: false
         default: "luser"
-      user_password:
-        description: "Password for the non-root user"
-        required: false
-        default: "1"
-      root_password:
-        description: "Password for the root user"
-        required: false
-        default: "123456"
+      user_password_hash:
+        description: "Strong crypt hash for the non-root user (mkpasswd -m yescrypt)"
+        required: true
+        type: string
+      root_password_hash:
+        description: "Strong crypt hash for root (mkpasswd -m yescrypt)"
+        required: true
+        type: string
 
 jobs:
   build:
@@ -64,12 +64,31 @@ jobs:
             experimental-features = nix-command flakes
 
       - name: Inject dynamic credentials
+        env:
+          INPUT_USERNAME: ${{ inputs.username }}
+          INPUT_USER_PASSWORD_HASH: ${{ inputs.user_password_hash }}
+          INPUT_ROOT_PASSWORD_HASH: ${{ inputs.root_password_hash }}
         run: |
+          set -euo pipefail
+          case "$INPUT_USER_PASSWORD_HASH" in
+            '$'*) ;;
+            *) echo "User password must be supplied as a crypt hash" >&2; exit 1 ;;
+          esac
+          case "$INPUT_ROOT_PASSWORD_HASH" in
+            '$'*) ;;
+            *) echo "Root password must be supplied as a crypt hash" >&2; exit 1 ;;
+          esac
+
+          username_json="$(jq -Rn --arg value "$INPUT_USERNAME" '$value')"
+          user_hash_json="$(jq -Rn --arg value "$INPUT_USER_PASSWORD_HASH" '$value')"
+          root_hash_json="$(jq -Rn --arg value "$INPUT_ROOT_PASSWORD_HASH" '$value')"
           cat <<EOF > nixos/vars.nix
           {
-            username = "${{ github.event.inputs.username || 'luser' }}";
-            userPassword = "${{ github.event.inputs.user_password || '1' }}";
-            rootPassword = "${{ github.event.inputs.root_password || '123456' }}";
+            username = $username_json;
+            userPassword = null;
+            rootPassword = null;
+            userPasswordHash = $user_hash_json;
+            rootPasswordHash = $root_hash_json;
           }
           EOF
 

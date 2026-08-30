@@ -51,20 +51,35 @@ jobs:
 
       - name: Determine Release Info
         id: release_info
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag_name }}
+          INPUT_NAME: ${{ inputs.release_name }}
+          INPUT_KERNEL_RUN: ${{ inputs.kernel_run_id }}
+          INPUT_MINIMAL_ROOTFS_RUN: ${{ inputs.minimal_rootfs_run_id }}
+          INPUT_GNOME_ROOTFS_RUN: ${{ inputs.gnome_rootfs_run_id }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "tag=${{ github.event.inputs.tag_name }}" >> $GITHUB_OUTPUT
-            echo "name=${{ github.event.inputs.release_name }}" >> $GITHUB_OUTPUT
-            echo "kernel_run=${{ github.event.inputs.kernel_run_id }}" >> $GITHUB_OUTPUT
-            echo "minimal_rootfs_run=${{ github.event.inputs.minimal_rootfs_run_id }}" >> $GITHUB_OUTPUT
-            echo "gnome_rootfs_run=${{ github.event.inputs.gnome_rootfs_run_id }}" >> $GITHUB_OUTPUT
-          else
-            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "name=NixOS Sheng ${{ github.ref_name }} (kernel 7.1.8)" >> $GITHUB_OUTPUT
-            echo "kernel_run=" >> $GITHUB_OUTPUT
-            echo "minimal_rootfs_run=" >> $GITHUB_OUTPUT
-            echo "gnome_rootfs_run=" >> $GITHUB_OUTPUT
-          fi
+          set -euo pipefail
+          case "$INPUT_TAG$INPUT_NAME" in
+            *$'\n'*) echo "Release tag and name must be single-line values" >&2; exit 1 ;;
+          esac
+
+          {
+            if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+              printf 'tag=%s\n' "$INPUT_TAG"
+              printf 'name=%s\n' "$INPUT_NAME"
+              printf 'kernel_run=%s\n' "$INPUT_KERNEL_RUN"
+              printf 'minimal_rootfs_run=%s\n' "$INPUT_MINIMAL_ROOTFS_RUN"
+              printf 'gnome_rootfs_run=%s\n' "$INPUT_GNOME_ROOTFS_RUN"
+            else
+              printf 'tag=%s\n' "$REF_NAME"
+              printf 'name=NixOS Sheng %s (kernel 7.1.8)\n' "$REF_NAME"
+              printf 'kernel_run=\n'
+              printf 'minimal_rootfs_run=\n'
+              printf 'gnome_rootfs_run=\n'
+            fi
+          } >> "$GITHUB_OUTPUT"
 
       - name: Download artifacts using gh CLI
         env:
@@ -143,6 +158,7 @@ jobs:
       - name: Prepare directly flashable files
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_NAME: ${{ steps.release_info.outputs.name }}
         run: |
           set -euo pipefail
 
@@ -216,11 +232,11 @@ jobs:
           cp LICENSE THIRD_PARTY_NOTICES.md release-upload/
 
           cd release-upload
-          sha256sum * > sha256sums.txt
+          sha256sum -- ./* > sha256sums.txt
           cd ..
 
           cat > release-body.md <<EOF
-          # ${{ steps.release_info.outputs.name }}
+          # $RELEASE_NAME
 
           This release contains the boot image, minimal rootfs, optional GNOME
           rootfs, checksums, license, and third-party notices for Xiaomi Pad 6S

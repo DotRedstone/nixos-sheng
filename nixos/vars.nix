@@ -6,6 +6,8 @@
 
 {
   username = "luser";
-  userPassword = "1";
-  rootPassword = "123456";
+  userPassword = null;
+  rootPassword = null;
+  userPasswordHash = null;
+  rootPasswordHash = null;
 }
