@@ -14,7 +14,10 @@
 - 设置 `vm.swappiness=100`，让匿名页在全局回收长时间停顿前使用 zram；
 - 设置 `vm.page-cluster=0`；压缩内存没有寻道开销，避免换入时额外解压未使用页面；
 - 让 systemd-oomd 监控用户 slice，在持续桌面内存压力演变为内核全局 OOM
-  卡死前进行恢复。
+  卡死前进行恢复；
+- 设备端 Nix 构建默认同时运行最多 2 个 derivation，每个构建最多使用 4 核；
+- 将 `nix-daemon` 的 CPU 与 I/O cgroup 权重设为 50，让桌面和硬件服务在资源争用
+  时优先。权重不限制空闲时的吞吐，也不设置会导致大型软件包失败的内存硬上限。
 
 zram 的 50% 是逻辑容量上限，不会预留一半物理内存。实际占用和压缩率应通过
 `zramctl` 与 `mm_stat` 判断。
@@ -44,12 +47,17 @@ zram 统计、OOMD 状态、存储计数、电源、硬件服务、coredump 和�
   services.sheng-performance = {
     zramMemoryPercent = 35;
     protectUserSessions = false;
+    protectInteractiveWorkloads = true;
+    buildMaxJobs = 2;
+    buildCores = 4;
     # enable = false;
   };
 }
 ```
 
-关闭模块会恢复 NixOS 上游默认值，不修改内核、boot 镜像或 Android 分区。
+将 `protectInteractiveWorkloads` 设为 `false` 可恢复 Nix 上游的自动并发和 daemon
+默认权重。关闭整个模块会恢复全部 NixOS 上游默认值，不修改内核、boot 镜像或
+Android 分区。命令行显式传入的 `--max-jobs` 仍可覆盖默认并发。
 
 ## 2026-08-31 实机验证
 
@@ -67,6 +75,10 @@ zram 统计、OOMD 状态、存储计数、电源、硬件服务、coredump 和�
 本次重建不能作为修改前后性能跑分。私人配置中的 Rnote 首次源码构建占据了绝大
 部分时间，墙钟耗时 28 分 54 秒，峰值使用 5.7 GiB RAM 和 7.2 GiB swap。新策略
 激活前的这段极端负载中出现过一次 Adreno GMU 性能投票超时，重启后未复现。
+
+因此第二批策略不对 CPU、GPU 或 UFS 锁频，而是约束设备端构建并发并降低
+`nix-daemon` 的争用权重。它针对的是构建时桌面响应和峰值压力，不代表编译总耗时
+一定缩短；修改后的效果需要用同一源码、相同缓存状态进行 A/B 测试。
 
 验证启动总耗时 36.082 秒，但 stage-1 日志表明其中 14.8 秒是挂载 12 次后按计划
 触发的 ext4 完整检查。用户态在 11.513 秒到达 `graphical.target`，与旧样本的
