@@ -16,8 +16,9 @@
 - 让 systemd-oomd 监控用户 slice，在持续桌面内存压力演变为内核全局 OOM
   卡死前进行恢复；
 - 设备端 Nix 构建默认同时运行最多 2 个 derivation，每个构建最多使用 4 核；
-- 将 `nix-daemon` 的 CPU 与 I/O cgroup 权重设为 50，让桌面和硬件服务在资源争用
-  时优先。权重不限制空闲时的吞吐，也不设置会导致大型软件包失败的内存硬上限。
+- 将 `nix-daemon` 的 CPU cgroup 权重设为 50，并将进程 I/O 优先级设为
+  best-effort 6，让桌面和硬件服务在资源争用时优先。这些设置不限制空闲时的吞吐，
+  也不设置会导致大型软件包失败的内存硬上限。
 
 zram 的 50% 是逻辑容量上限，不会预留一半物理内存。实际占用和压缩率应通过
 `zramctl` 与 `mm_stat` 判断。
@@ -30,9 +31,10 @@ zram 的 50% 是逻辑容量上限，不会预留一半物理内存。实际占�
 sudo ./scripts/collect-hardware-baseline.sh 10 > sheng-performance.txt
 ```
 
-报告包含启动耗时、CPU/devfreq 策略、空闲驻留、温度、PSI、MGLRU/THP 状态、
-zram 统计、OOMD 状态、存储计数、电源、硬件服务、coredump 和内核告警。脚本不
-采集 SSID、IP 地址或 MAC 地址；公开前仍应人工检查内核与服务日志中的设备信息。
+报告包含启动耗时、CPU/devfreq 策略、Nix 构建并发与 cgroup 权重、空闲驻留、
+温度、PSI、MGLRU/THP 状态、zram 统计、OOMD 状态、存储计数、电源、硬件服务、
+coredump 和内核告警。脚本不采集 SSID、IP 地址或 MAC 地址；公开前仍应人工检查
+内核与服务日志中的设备信息。
 
 有效的 A/B 测试应在修改前后分别完成三次普通启动，并运行相同工作负载。重点比较
 启动时间、`memory full` PSI、zram 压缩率、OOMD 动作、应用存活、温度和空闲驻留。
@@ -50,13 +52,15 @@ zram 统计、OOMD 状态、存储计数、电源、硬件服务、coredump 和�
     protectInteractiveWorkloads = true;
     buildMaxJobs = 2;
     buildCores = 4;
+    buildCpuWeight = 50;
+    buildIoPriority = 6;
     # enable = false;
   };
 }
 ```
 
 将 `protectInteractiveWorkloads` 设为 `false` 可恢复 Nix 上游的自动并发和 daemon
-默认权重。关闭整个模块会恢复全部 NixOS 上游默认值，不修改内核、boot 镜像或
+默认优先级。关闭整个模块会恢复全部 NixOS 上游默认值，不修改内核、boot 镜像或
 Android 分区。命令行显式传入的 `--max-jobs` 仍可覆盖默认并发。
 
 ## 2026-08-31 实机验证
@@ -77,7 +81,7 @@ Android 分区。命令行显式传入的 `--max-jobs` 仍可覆盖默认并发�
 激活前的这段极端负载中出现过一次 Adreno GMU 性能投票超时，重启后未复现。
 
 因此第二批策略不对 CPU、GPU 或 UFS 锁频，而是约束设备端构建并发并降低
-`nix-daemon` 的争用权重。它针对的是构建时桌面响应和峰值压力，不代表编译总耗时
+`nix-daemon` 的 CPU/I/O 争用优先级。它针对的是构建时桌面响应和峰值压力，不代表编译总耗时
 一定缩短；修改后的效果需要用同一源码、相同缓存状态进行 A/B 测试。
 
 验证启动总耗时 36.082 秒，但 stage-1 日志表明其中 14.8 秒是挂载 12 次后按计划

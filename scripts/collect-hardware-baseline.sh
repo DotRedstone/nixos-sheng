@@ -73,6 +73,22 @@ if command -v systemd-analyze >/dev/null 2>&1; then
 	systemd-analyze critical-chain graphical.target --no-pager 2>&1 || true
 fi
 
+section "nix-build-policy"
+if command -v nix >/dev/null 2>&1; then
+	nix show-config 2>/dev/null | grep -E '^(cores|max-jobs) =' || true
+fi
+if command -v systemctl >/dev/null 2>&1; then
+	systemctl show nix-daemon.service --no-pager \
+		--property=ActiveState,SubState,NRestarts,CPUWeight,IOWeight,IOSchedulingClass,IOSchedulingPriority,ControlGroup \
+		2>&1 || true
+	control_group="$(systemctl show nix-daemon.service \
+		--property=ControlGroup --value 2>/dev/null)"
+	if [ -n "$control_group" ] && [ -d "/sys/fs/cgroup$control_group" ]; then
+		read_value cpu_weight "/sys/fs/cgroup$control_group/cpu.weight"
+		read_value io_weight "/sys/fs/cgroup$control_group/io.weight"
+	fi
+fi
+
 section "hardware-services"
 if command -v systemctl >/dev/null 2>&1; then
 	for unit in \
