@@ -50,3 +50,25 @@ zram 统计、OOMD 状态、存储计数、电源、硬件服务、coredump 和�
 ```
 
 关闭模块会恢复 NixOS 上游默认值，不修改内核、boot 镜像或 Android 分区。
+
+## 2026-08-31 实机验证
+
+修改前运行中的系统为 `vm.swappiness=60`、`vm.page-cluster=3`，且
+`oomctl dump` 的 `Memory Pressure Monitored CGroups` 为空。设备内完成 stage-2
+重建并普通重启后，sheng 的结果如下：
+
+- `vm.swappiness=100`、`vm.page-cluster=0`；
+- `/user.slice` 及其应用子 slice 以 80% 压力、持续 30 秒为门限接受监控；
+- systemd 失败单元和 coredump 均为 0；
+- ADSP、pd-mapper、sensor PD、iio-sensor-proxy、NetworkManager 和显示管理器
+  全部运行，重启计数均为 0；
+- 空闲内存 PSI 为 0，重启后没有再次出现构建期间的 GPU 告警。
+
+本次重建不能作为修改前后性能跑分。私人配置中的 Rnote 首次源码构建占据了绝大
+部分时间，墙钟耗时 28 分 54 秒，峰值使用 5.7 GiB RAM 和 7.2 GiB swap。新策略
+激活前的这段极端负载中出现过一次 Adreno GMU 性能投票超时，重启后未复现。
+
+验证启动总耗时 36.082 秒，但 stage-1 日志表明其中 14.8 秒是挂载 12 次后按计划
+触发的 ext4 完整检查。用户态在 11.513 秒到达 `graphical.target`，与旧样本的
+11.216 秒接近。后续对比必须保留并单独标记这项用于保护可写根分区、与内存策略
+无关的周期检查。

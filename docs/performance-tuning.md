@@ -57,3 +57,29 @@ Downstream configurations can change the zram limit or disable the policy:
 
 Disabling the module restores upstream NixOS defaults; it does not alter the
 kernel, boot image, or Android partitions.
+
+## Device Validation: 2026-08-31
+
+The pre-change running system used `vm.swappiness=60`, `vm.page-cluster=3`, and
+had no cgroups under `Memory Pressure Monitored CGroups` in `oomctl dump`. After
+a device-side stage-2 rebuild and a normal reboot, sheng reported:
+
+- `vm.swappiness=100` and `vm.page-cluster=0`;
+- `/user.slice` and its application descendants monitored at 80% pressure for
+  30 seconds;
+- no failed units or coredumps;
+- ADSP, pd-mapper, sensor PD, iio-sensor-proxy, NetworkManager, and the display
+  manager active with zero restarts;
+- zero idle memory PSI and no recurrence of the build-time GPU warning after
+  reboot.
+
+The rebuild is not a before/after performance benchmark. A first-time Rnote
+source build dominated it, taking 28 minutes 54 seconds and reaching 5.7 GiB of
+RAM plus 7.2 GiB of swap. One Adreno GMU performance-vote timeout occurred under
+that pre-activation load and did not recur after reboot.
+
+The validation boot took 36.082 seconds, but stage-1 logs show that 14.8 seconds
+were a scheduled full ext4 check after 12 mounts. Userspace reached
+`graphical.target` in 11.513 seconds, close to the 11.216-second prior sample.
+Keep the ext4 check in comparisons: it protects the writable root filesystem and
+is unrelated to this memory policy.
