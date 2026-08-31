@@ -13,6 +13,7 @@
     ./modules/sheng-devauth.nix
     ./modules/sheng-offline-charging.nix
     ./modules/sheng-fingerprint.nix
+    ./modules/sheng-performance.nix
     ./modules/sheng-rootfs-health.nix
     ./modules/xiaomi-mipps-auth.nix
     ./modules/xiaomi-pen-status.nix

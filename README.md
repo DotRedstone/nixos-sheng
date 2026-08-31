@@ -308,6 +308,7 @@ For the full dependency chain, offline rootfs checks, runtime verification comma
 - [docs/camera-raw-capture.md](docs/camera-raw-capture.md)
 - [docs/mipps-120w.md](docs/mipps-120w.md)
 - [docs/release-readiness.md](docs/release-readiness.md)
+- [docs/performance-tuning.md](docs/performance-tuning.md)
 - [docs/kernel-optimization-log_zh.md](docs/kernel-optimization-log_zh.md)
 - [docs/sheng-optimization-post-draft_zh.md](docs/sheng-optimization-post-draft_zh.md)
 
