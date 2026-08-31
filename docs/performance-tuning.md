@@ -20,9 +20,10 @@ clock-floor changes require separate performance-per-watt evidence.
   can be recovered before a kernel-wide OOM deadlock;
 - at most two concurrent Nix derivations and four build cores per derivation for
   device-side builds;
-- CPU and I/O cgroup weights of 50 for `nix-daemon`, allowing desktop and
-  hardware services to win during contention. The weights do not cap idle
-  throughput, and no hard memory limit is imposed on large builds.
+- a CPU cgroup weight of 50 and best-effort I/O priority 6 for `nix-daemon`,
+  allowing desktop and hardware services to win during contention. These
+  settings do not cap idle throughput, and no hard memory limit is imposed on
+  large builds.
 
 The zram size is a logical limit. It does not reserve half of physical RAM.
 Actual use and compression ratio are visible in `zramctl` and `mm_stat`.
@@ -35,11 +36,12 @@ Run the repository's read-only report script:
 sudo ./scripts/collect-hardware-baseline.sh 10 > sheng-performance.txt
 ```
 
-It records boot timing, CPU and device-frequency policy, idle residency,
-thermals, PSI, MGLRU/THP state, zram statistics, OOMD state, storage counters,
-power supplies, hardware services, coredumps, and kernel warnings. It does not
-collect SSIDs, IP addresses, or MAC addresses. Review a report before publishing
-it because kernel and service logs can still contain device-specific details.
+It records boot timing, CPU and device-frequency policy, Nix build parallelism
+and cgroup weights, idle residency, thermals, PSI, MGLRU/THP state, zram
+statistics, OOMD state, storage counters, power supplies, hardware services,
+coredumps, and kernel warnings. It does not collect SSIDs, IP addresses, or MAC
+addresses. Review a report before publishing it because kernel and service logs
+can still contain device-specific details.
 
 For a useful A/B comparison, collect three normal boots and the same workload on
 both generations. Compare boot time, `memory full` PSI, zram compression ratio,
@@ -58,13 +60,15 @@ Downstream configurations can change the zram limit or disable the policy:
     protectInteractiveWorkloads = true;
     buildMaxJobs = 2;
     buildCores = 4;
+    buildCpuWeight = 50;
+    buildIoPriority = 6;
     # enable = false;
   };
 }
 ```
 
 Set `protectInteractiveWorkloads = false` to restore upstream automatic Nix
-parallelism and daemon weights. Disabling the whole module restores all upstream
+parallelism and daemon priorities. Disabling the whole module restores all upstream
 NixOS defaults; neither action alters the kernel, boot image, or Android
 partitions. An explicit command-line `--max-jobs` can still override the default.
 
@@ -89,7 +93,7 @@ RAM plus 7.2 GiB of swap. One Adreno GMU performance-vote timeout occurred under
 that pre-activation load and did not recur after reboot.
 
 The second policy batch therefore leaves CPU, GPU, and UFS clocks alone. It
-reduces device-side build parallelism and contention weight to target desktop
+reduces device-side build parallelism and CPU/I/O contention priority to target desktop
 responsiveness and peak pressure. It is not expected to reduce total compile
 time; that requires an A/B test with identical sources and cache state.
 

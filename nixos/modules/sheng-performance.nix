@@ -39,8 +39,8 @@ in
       default = true;
       description = ''
         Limit device-side Nix build parallelism and give the Nix daemon lower
-        CPU and I/O weights than interactive services. The daemon can still use
-        idle resources; the weights only matter during contention.
+        CPU and block-I/O priority than interactive services. The daemon can
+        still use idle resources; the priorities only matter during contention.
       '';
     };
 
@@ -59,6 +59,24 @@ in
       description = ''
         Maximum parallelism exposed to an individual Nix build when interactive
         workload protection is enabled.
+      '';
+    };
+
+    buildCpuWeight = lib.mkOption {
+      type = lib.types.ints.between 1 10000;
+      default = 50;
+      description = ''
+        CPU cgroup weight assigned to the Nix daemon. The normal systemd service
+        weight is 100, and lower values yield to competing services.
+      '';
+    };
+
+    buildIoPriority = lib.mkOption {
+      type = lib.types.ints.between 0 7;
+      default = 6;
+      description = ''
+        Best-effort block-I/O priority assigned to the Nix daemon. Zero is the
+        highest priority and seven is the lowest.
       '';
     };
   };
@@ -88,13 +106,16 @@ in
       cores = lib.mkDefault cfg.buildCores;
     };
 
-    # A low weight does not cap an idle build. It only lets desktop and hardware
-    # services win when they contend with a device-side rebuild.
+    # CPUWeight does not cap an idle build. mq-deadline honors process I/O
+    # priorities but does not expose the generic cgroup io.weight interface.
     systemd.services.nix-daemon.serviceConfig =
       lib.mkIf cfg.protectInteractiveWorkloads
         {
-          CPUWeight = lib.mkDefault 50;
-          IOWeight = lib.mkDefault 50;
+          CPUWeight = lib.mkDefault cfg.buildCpuWeight;
+          IOSchedulingClass = lib.mkDefault "best-effort";
+          # nix-daemon defaults to best-effort 4 in nixpkgs, so this policy
+          # needs a stronger value while still allowing downstream mkForce.
+          IOSchedulingPriority = lib.mkOverride 90 cfg.buildIoPriority;
         };
   };
 }
