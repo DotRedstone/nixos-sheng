@@ -53,6 +53,9 @@ enabled in a kernel configuration.
   drawing applications.
 - [~] Fingerprint wake-unlock should receive repeated screen-off and
   suspend/resume testing.
+- [~] The zram and user-slice OOMD policy is integrated; collect matching
+  before/after PSI, compression, temperature, and application-survival reports
+  on sheng before claiming a performance improvement.
 
 ## Release Blockers
 

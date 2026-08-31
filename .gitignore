@@ -6,3 +6,4 @@ rootdir/
 *.img
 *.img.7z
 *.tar.zst
+.artifacts/
