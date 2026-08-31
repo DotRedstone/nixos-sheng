@@ -17,7 +17,12 @@ clock-floor changes require separate performance-per-watt evidence.
 - `vm.page-cluster=0`, because compressed RAM has no seek penalty and clustered
   swap-in can decompress pages that are never used;
 - systemd-oomd monitoring for user slices, so sustained desktop memory pressure
-  can be recovered before a kernel-wide OOM deadlock.
+  can be recovered before a kernel-wide OOM deadlock;
+- at most two concurrent Nix derivations and four build cores per derivation for
+  device-side builds;
+- CPU and I/O cgroup weights of 50 for `nix-daemon`, allowing desktop and
+  hardware services to win during contention. The weights do not cap idle
+  throughput, and no hard memory limit is imposed on large builds.
 
 The zram size is a logical limit. It does not reserve half of physical RAM.
 Actual use and compression ratio are visible in `zramctl` and `mm_stat`.
@@ -50,13 +55,18 @@ Downstream configurations can change the zram limit or disable the policy:
   services.sheng-performance = {
     zramMemoryPercent = 35;
     protectUserSessions = false;
+    protectInteractiveWorkloads = true;
+    buildMaxJobs = 2;
+    buildCores = 4;
     # enable = false;
   };
 }
 ```
 
-Disabling the module restores upstream NixOS defaults; it does not alter the
-kernel, boot image, or Android partitions.
+Set `protectInteractiveWorkloads = false` to restore upstream automatic Nix
+parallelism and daemon weights. Disabling the whole module restores all upstream
+NixOS defaults; neither action alters the kernel, boot image, or Android
+partitions. An explicit command-line `--max-jobs` can still override the default.
 
 ## Device Validation: 2026-08-31
 
@@ -77,6 +87,11 @@ The rebuild is not a before/after performance benchmark. A first-time Rnote
 source build dominated it, taking 28 minutes 54 seconds and reaching 5.7 GiB of
 RAM plus 7.2 GiB of swap. One Adreno GMU performance-vote timeout occurred under
 that pre-activation load and did not recur after reboot.
+
+The second policy batch therefore leaves CPU, GPU, and UFS clocks alone. It
+reduces device-side build parallelism and contention weight to target desktop
+responsiveness and peak pressure. It is not expected to reduce total compile
+time; that requires an A/B test with identical sources and cache state.
 
 The validation boot took 36.082 seconds, but stage-1 logs show that 14.8 seconds
 were a scheduled full ext4 check after 12 mounts. Userspace reached

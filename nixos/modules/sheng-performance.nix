@@ -33,6 +33,34 @@ in
         the kernel reaches an unrecoverable global OOM stall.
       '';
     };
+
+    protectInteractiveWorkloads = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = ''
+        Limit device-side Nix build parallelism and give the Nix daemon lower
+        CPU and I/O weights than interactive services. The daemon can still use
+        idle resources; the weights only matter during contention.
+      '';
+    };
+
+    buildMaxJobs = lib.mkOption {
+      type = lib.types.ints.between 1 1024;
+      default = 2;
+      description = ''
+        Maximum number of Nix derivations built concurrently when interactive
+        workload protection is enabled.
+      '';
+    };
+
+    buildCores = lib.mkOption {
+      type = lib.types.ints.between 1 1024;
+      default = 4;
+      description = ''
+        Maximum parallelism exposed to an individual Nix build when interactive
+        workload protection is enabled.
+      '';
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -54,5 +82,19 @@ in
       enable = lib.mkDefault true;
       enableUserSlices = lib.mkDefault cfg.protectUserSessions;
     };
+
+    nix.settings = lib.mkIf cfg.protectInteractiveWorkloads {
+      max-jobs = lib.mkDefault cfg.buildMaxJobs;
+      cores = lib.mkDefault cfg.buildCores;
+    };
+
+    # A low weight does not cap an idle build. It only lets desktop and hardware
+    # services win when they contend with a device-side rebuild.
+    systemd.services.nix-daemon.serviceConfig =
+      lib.mkIf cfg.protectInteractiveWorkloads
+        {
+          CPUWeight = lib.mkDefault 50;
+          IOWeight = lib.mkDefault 50;
+        };
   };
 }
