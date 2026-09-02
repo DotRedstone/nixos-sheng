@@ -229,7 +229,9 @@
             pkgs.sheng-fb-painter
           ];
         } ''
-          ruby ${../scripts/test-stage1-early-charge-guard.rb}
+          ruby \
+            ${../scripts/test-stage1-early-charge-guard.rb} \
+            ${./patches/stage-1-early-charge-guard.rb}
           python3 \
             ${../scripts/test-offline-charging.py} \
             ${./scripts/sheng-offline-charging.py} \

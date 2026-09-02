@@ -20,10 +20,11 @@ end
 
 $logger = Logger.new(File::NULL)
 
-load File.expand_path(
+guard_path = ARGV[0] || File.expand_path(
   "../nixos/patches/stage-1-early-charge-guard.rb",
   __dir__
 )
+load guard_path
 
 def assert(condition, message)
   raise message unless condition
