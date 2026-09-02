@@ -23,6 +23,10 @@ set. A simultaneous power-key bit and `androidboot.force_normal_boot=1` both
 force a normal boot, so starting the tablet intentionally while it is connected
 does not enter offline charging.
 
+The system image must not append `androidboot.force_normal_boot=1` permanently.
+That flag is suitable only for a one-shot recovery boot because otherwise it
+overrides every charger-boot reason supplied by the bootloader.
+
 ## Deployment
 
 This feature changes both initramfs stage-1 and NixOS stage-2. Build and flash

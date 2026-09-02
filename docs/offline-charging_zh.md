@@ -22,6 +22,9 @@ sheng 和 Android 一样使用正常的 Linux 内核完成关机充电。插入�
 `androidboot.force_normal_boot=1`，则强制按正常开机处理，避免插着充电器主动开机时
 误入关机充电。
 
+系统镜像不能把 `androidboot.force_normal_boot=1` 固定写入内核参数；该参数只适合
+一次性的救援启动，否则 bootloader 提供的充电启动原因会被永久覆盖。
+
 ## 部署
 
 本功能同时修改 initramfs stage-1 和 NixOS stage-2。需要构建并刷入匹配的

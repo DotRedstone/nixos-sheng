@@ -229,6 +229,14 @@
             pkgs.sheng-fb-painter
           ];
         } ''
+          ${pkgs.lib.optionalString
+            (builtins.elem
+              "androidboot.force_normal_boot=1"
+              mobileEval.config.boot.kernelParams)
+            ''
+              echo "androidboot.force_normal_boot=1 disables charger boot detection" >&2
+              exit 1
+            ''}
           ruby \
             ${../scripts/test-stage1-early-charge-guard.rb} \
             ${./patches/stage-1-early-charge-guard.rb}
