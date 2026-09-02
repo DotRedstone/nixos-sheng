@@ -222,6 +222,20 @@
       };
 
       checks.${system} = {
+        offlineCharging = pkgs.runCommand "sheng-offline-charging-check" {
+          nativeBuildInputs = [
+            pkgs.python3
+            pkgs.ruby
+            pkgs.sheng-fb-painter
+          ];
+        } ''
+          ruby ${../scripts/test-stage1-early-charge-guard.rb}
+          python3 \
+            ${../scripts/test-offline-charging.py} \
+            ${./scripts/sheng-offline-charging.py} \
+            ${pkgs.sheng-fb-painter}/bin/sheng-fb-painter
+          touch $out
+        '';
         generationMenuRenderer = pkgs.runCommand "sheng-generation-menu-renderer-check" {
           nativeBuildInputs = [
             pkgs.coreutils
