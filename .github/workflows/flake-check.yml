@@ -49,6 +49,12 @@ jobs:
             --json
           nix flake check ./nixos --no-build
 
+      - name: Validate offline charging mode
+        run: |
+          nix build \
+            './nixos#checks.aarch64-linux.offlineCharging' \
+            --no-link
+
       - name: Build Sheng touch and stylus processor
         run: |
           nix build ./nixos#xiaomiShengThp --no-link

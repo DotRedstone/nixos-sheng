@@ -7,9 +7,10 @@
 module ShengEarlyChargeGuard
   extend self
 
-  # Sheng reports this after a battery brownout followed by USB insertion.
-  # The low byte is Qualcomm PON HARD_RESET (bit 0) | USB_CHG (bit 4).
-  SHENG_USB_HARD_RESET_REASON = /^bootinfo\.pureason=0x0*8000?11$/i
+  # Qualcomm PON encodes trigger sources in the low byte. A power-key bit wins
+  # over USB_CHG so booting normally while connected is never forced offline.
+  PON_USB_CHG = 1 << 4
+  PON_KPDPWR_N = 1 << 7
 
   def config()
     Configuration["sheng_early_charge_guard"] || {}
@@ -31,25 +32,61 @@ module ShengEarlyChargeGuard
     [(config()["max_wait_seconds"] || 30).to_i, 0].max
   end
 
-  def charger_mode?()
-    return true if System.cmdline().include?("androidboot.mode=charger")
-    return true if System.cmdline().any? do |argument|
-      argument =~ SHENG_USB_HARD_RESET_REASON
-    end
-    return false unless File.exist?("/proc/bootconfig")
+  def cmdline_value(key)
+    prefix = "#{key}="
+    argument = System.cmdline().find { |item| item.start_with?(prefix) }
+    argument ? argument[prefix.length..-1].delete('"') : nil
+  end
 
-    File.read("/proc/bootconfig").each_line.any? do |line|
-      line =~ /^\s*androidboot\.mode\s*=\s*"?charger"?\s*$/
+  def bootconfig_value(key)
+    return nil unless File.exist?("/proc/bootconfig")
+
+    pattern = /^\s*#{Regexp.escape(key)}\s*=\s*"?([^"\s]+)"?\s*$/
+    File.read("/proc/bootconfig").each_line do |line|
+      match = line.match(pattern)
+      return match[1] if match
     end
+    nil
+  rescue
+    nil
+  end
+
+  def boot_value(key)
+    cmdline_value(key) || bootconfig_value(key)
+  end
+
+  def charger_power_on_reason?(value)
+    return false if value.nil? || value.empty?()
+
+    reason = Integer(value, 0)
+    pon = reason & 0xff
+    (pon & PON_USB_CHG) != 0 && (pon & PON_KPDPWR_N) == 0
+  rescue ArgumentError, TypeError
+    false
+  end
+
+  def power_key_power_on_reason?(value)
+    return false if value.nil? || value.empty?()
+
+    reason = Integer(value, 0)
+    ((reason & 0xff) & PON_KPDPWR_N) != 0
+  rescue ArgumentError, TypeError
+    false
+  end
+
+  def charger_mode?()
+    return false if boot_value("androidboot.force_normal_boot") == "1"
+    pureason = boot_value("bootinfo.pureason")
+    return false if power_key_power_on_reason?(pureason)
+    return true if boot_value("androidboot.mode").to_s.downcase == "charger"
+
+    charger_power_on_reason?(pureason)
   rescue
     false
   end
 
   def interactive_boot_safe?()
-    return true unless charger_mode?()
-
-    capacity = battery_capacity()
-    !capacity.nil? && capacity > critical_capacity()
+    !charger_mode?()
   end
 
   def power_supply_type(path)
@@ -119,6 +156,17 @@ module ShengEarlyChargeGuard
       File.write(path, "0\n")
     rescue
     end
+  end
+
+  def prepare_offline_charging_handoff()
+    return if @offline_charging_handoff_prepared
+
+    Dir.glob("/sys/class/graphics/fb*/blank").each do |path|
+      File.write(path, "1\n")
+    rescue
+    end
+    @offline_charging_handoff_prepared = true
+    $logger.info("Charger boot: handing off to the offline charging target with the framebuffer blanked.")
   end
 
   def wait_for_battery()
