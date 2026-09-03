@@ -27,6 +27,7 @@ a little less lonely.
 - Desktop-neutral public flake constructor for private dotfiles repositories
 - Optional GNOME image with touch keyboard, rotation, and cover handling
 - Stage-1 NixOS generation menu controlled by volume and power keys
+- Android-style offline charging with a framebuffer battery UI and power-key controls
 - Working Wi-Fi, USB-C role/OTG, SSC sensors, RAW camera capture, and MiPPS
   fast-charging authentication
 - Integrated NT36532E THP touch/stylus and FPC1553 fingerprint support
@@ -53,7 +54,7 @@ issues before flashing.
 | Sensors | User-space working | accelerometer, proximity, ambient light, and compass work through SSC + iio-sensor-proxy D-Bus |
 | Touch and stylus | Working | NT36532E THP multitouch plus Xiaomi Focus Pen pressure, tilt, hover, and button events are verified; wider application compatibility still needs testing |
 | Fingerprint | Working | Graphical enrollment and verification work through the FPC1553 QTEE-backed private libfprint driver; screen-off wake-unlock needs long-term testing |
-| Charging | Working | Standard PD and Xiaomi MiPPS authentication work; actual power depends on charge state, temperature, charger, and cable and is not a guaranteed 120 W |
+| Charging | Working | Standard PD and Xiaomi MiPPS authentication work; Android-style offline charging is implemented and awaiting a complete power-off hardware cycle; actual power depends on charge state, temperature, charger, and cable and is not a guaranteed 120 W |
 
 ## Upstream Projects
 
@@ -307,6 +308,7 @@ For the full dependency chain, offline rootfs checks, runtime verification comma
 - [docs/boot-generation-menu.md](docs/boot-generation-menu.md)
 - [docs/camera-raw-capture.md](docs/camera-raw-capture.md)
 - [docs/mipps-120w.md](docs/mipps-120w.md)
+- [docs/offline-charging.md](docs/offline-charging.md)
 - [docs/release-readiness.md](docs/release-readiness.md)
 - [docs/performance-tuning.md](docs/performance-tuning.md)
 - [docs/kernel-optimization-log_zh.md](docs/kernel-optimization-log_zh.md)

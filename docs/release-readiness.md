@@ -41,6 +41,9 @@ Use the exact release-candidate boot and rootfs commit.
   before reboot if the rare post-flash 5 GHz issue occurs.
 - [ ] Standard PD and MiPPS are tested separately; USB data-port charging is
   reported separately from charger-only behavior.
+- [ ] After a full power-off, inserting a charger enters the offline charging
+  target without starting the desktop; short power-key press wakes the battery
+  UI, long press starts GNOME, and unplugging powers the tablet off.
 - [ ] Speaker playback/restart and microphone recording work; WirePlumber has
   no new coredump.
 - [ ] Touch, rotation, cover, Focus Pen pressure/tilt/buttons, fingerprint

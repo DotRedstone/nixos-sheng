@@ -20,14 +20,63 @@ end
 
 $logger = Logger.new(File::NULL)
 
-load File.expand_path(
+guard_path = ARGV[0] || File.expand_path(
   "../nixos/patches/stage-1-early-charge-guard.rb",
   __dir__
 )
+load guard_path
 
 def assert(condition, message)
   raise message unless condition
 end
+
+assert(
+  ShengEarlyChargeGuard.charger_power_on_reason?("0x800011"),
+  "USB charger PON reason was not detected"
+)
+assert(
+  ShengEarlyChargeGuard.charger_power_on_reason?("0x00000010"),
+  "plain USB charger PON reason was not detected"
+)
+assert(
+  !ShengEarlyChargeGuard.charger_power_on_reason?("0x800091"),
+  "power-key boot while connected was misdetected as charger mode"
+)
+assert(
+  !ShengEarlyChargeGuard.charger_power_on_reason?("invalid"),
+  "malformed PON reason was accepted"
+)
+
+def charger_mode_for(values)
+  ShengEarlyChargeGuard.define_singleton_method(:boot_value) do |key|
+    values[key]
+  end
+  ShengEarlyChargeGuard.charger_mode?
+end
+
+assert(
+  charger_mode_for("androidboot.mode" => "charger"),
+  "androidboot charger mode was not detected"
+)
+assert(
+  !charger_mode_for(
+    "androidboot.mode" => "charger",
+    "androidboot.force_normal_boot" => "1"
+  ),
+  "force-normal boot did not override charger mode"
+)
+assert(
+  !charger_mode_for(
+    "androidboot.mode" => "charger",
+    "bootinfo.pureason" => "0x800091"
+  ),
+  "power-key PON reason did not override a stale charger mode"
+)
+charger_mode_for("androidboot.mode" => "charger")
+assert(
+  !ShengEarlyChargeGuard.interactive_boot_safe?(),
+  "charger mode incorrectly allowed the generation menu"
+)
 
 def run_case(charger_boot:, capacities:, max_wait_seconds:)
   state = {
