@@ -49,7 +49,7 @@ class Tasks::UDev < SingletonTask
       $logger.warn("udevadm settle returned non-zero (#{e}); continuing")
     end
 
-    if defined?(ShengEarlyChargeGuard) && ShengEarlyChargeGuard.charger_mode?()
+    if ShengEarlyChargeGuard.charger_mode?()
       ShengEarlyChargeGuard.prepare_offline_charging_handoff()
     end
   end
