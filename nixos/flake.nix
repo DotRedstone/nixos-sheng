@@ -226,6 +226,7 @@
           nativeBuildInputs = [
             pkgs.python3
             pkgs.ruby
+            pkgs.mruby
             pkgs.sheng-fb-painter
           ];
         } ''
@@ -240,6 +241,9 @@
           ruby \
             ${../scripts/test-stage1-early-charge-guard.rb} \
             ${./patches/stage-1-early-charge-guard.rb}
+          mruby \
+            ${../scripts/test-stage1-udev-tolerant.rb} \
+            ${./patches/stage-1-udev-trigger-tolerant.rb}
           python3 \
             ${../scripts/test-offline-charging.py} \
             ${./scripts/sheng-offline-charging.py} \
