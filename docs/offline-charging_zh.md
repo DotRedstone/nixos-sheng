@@ -6,6 +6,10 @@ sheng 和 Android 一样使用正常的 Linux 内核完成关机充电。插入�
 仍会启动 `boot_b`，但 stage-1 会跳过世代菜单，stage-2 选择
 `sheng-offline-charging.target`，而不是启动桌面。
 
+启动检测 generator 把覆盖链接写入 `generator.early`。该目录的优先级高于
+NixOS 固定在 `/etc/systemd/system/default.target` 的桌面目标，确保充电启动不会
+被 GNOME 默认目标覆盖。
+
 ## 行为
 
 - 直接在 `/dev/fb0` 绘制电池图标和电量百分比；

@@ -244,6 +244,8 @@
           mruby \
             ${../scripts/test-stage1-udev-tolerant.rb} \
             ${./patches/stage-1-udev-trigger-tolerant.rb}
+          grep -F 'output_dir="$2"' \
+            ${mobileEval.config.systemd.generators.sheng-offline-charging}
           python3 \
             ${../scripts/test-offline-charging.py} \
             ${./scripts/sheng-offline-charging.py} \
