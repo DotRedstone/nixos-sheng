@@ -25,7 +25,9 @@ let
   offlineChargingGenerator = pkgs.writeShellScript "sheng-offline-charging-generator" ''
     set -eu
 
-    output_dir="$1"
+    # NixOS installs /etc/systemd/system/default.target. Only generator.early
+    # precedes that path in systemd's unit lookup order.
+    output_dir="$2"
     if ! reason="$(${offlineChargingProgram} detect 2>/dev/null)"; then
       exit 0
     fi

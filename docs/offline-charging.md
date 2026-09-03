@@ -7,6 +7,10 @@ Android's charger mode. The bootloader still starts `boot_b`, but stage-1 skips
 the generation menu and stage-2 selects `sheng-offline-charging.target` instead
 of the desktop.
 
+The boot detector writes its override to `generator.early`. That lookup path
+precedes NixOS' static `/etc/systemd/system/default.target`, so the graphical
+default cannot override charger mode.
+
 ## Behaviour
 
 - A battery icon and percentage are drawn directly to `/dev/fb0`.
