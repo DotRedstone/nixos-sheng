@@ -55,6 +55,18 @@ assert_true(
     module.detect_charger_boot("bootinfo.pureason=broken", "") == "",
     "malformed PON reason was accepted",
 )
+assert_true(
+    not module.normal_boot_allowed(None),
+    "normal boot was allowed without a battery reading",
+)
+assert_true(
+    not module.normal_boot_allowed(module.MINIMUM_BOOT_CAPACITY - 1),
+    "normal boot was allowed below the safe charge threshold",
+)
+assert_true(
+    module.normal_boot_allowed(module.MINIMUM_BOOT_CAPACITY),
+    "normal boot was rejected at the safe charge threshold",
+)
 
 with tempfile.TemporaryDirectory() as directory:
     cmdline = Path(directory) / "cmdline"

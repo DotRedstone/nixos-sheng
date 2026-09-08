@@ -44,10 +44,7 @@ in
 
   systemd.targets.sheng-offline-charging = {
     description = "Sheng Offline Charging";
-    requires = [
-      "basic.target"
-      "systemd-udev-settle.service"
-    ];
+    requires = [ "basic.target" ];
     wants = [
       "systemd-modules-load.service"
       "sheng-sensor-files.service"
@@ -58,7 +55,6 @@ in
     after = [
       "basic.target"
       "systemd-modules-load.service"
-      "systemd-udev-settle.service"
       "sheng-sensor-files.service"
       "adsprpcd.service"
       "pd-mapper.service"
@@ -72,7 +68,6 @@ in
   systemd.services.sheng-offline-charging = {
     description = "Monitor sheng offline charging mode";
     wantedBy = [ "sheng-offline-charging.target" ];
-    after = [ "systemd-udev-settle.service" ];
     serviceConfig = {
       Type = "simple";
       ExecStart = "${offlineChargingProgram} monitor";

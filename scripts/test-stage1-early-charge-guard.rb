@@ -112,9 +112,9 @@ def run_case(charger_boot:, capacities:, max_wait_seconds:)
 end
 
 charger = run_case(charger_boot: true, capacities: [1, 1, 5], max_wait_seconds: 0)
-assert(charger[:sleeps] == 2, "charger mode incorrectly honored the normal timeout")
-assert(charger[:blanked] == 1, "charger mode did not blank the display")
-assert(charger[:restored] == 1, "charger mode did not restore the display")
+assert(charger[:sleeps] == 0, "charger mode did not hand off immediately")
+assert(charger[:blanked] == 0, "charger mode was blanked by the normal-boot guard")
+assert(charger[:restored] == 0, "charger mode changed display state before handoff")
 
 normal = run_case(charger_boot: false, capacities: [1], max_wait_seconds: 0)
 assert(normal[:sleeps] == 0, "normal boot did not honor the timeout")
