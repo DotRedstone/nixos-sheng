@@ -20,6 +20,7 @@ EV_KEY = 1
 KEY_POWER = 116
 HOLD_SECONDS = 2.0
 DISPLAY_SECONDS = 8.0
+ANIMATION_INTERVAL = 0.5
 MINIMUM_BOOT_CAPACITY = 5
 POWER_DISCOVERY_GRACE_SECONDS = 30.0
 DISCONNECT_SECONDS = 10.0
@@ -35,6 +36,14 @@ ACCENT = (115, 210, 199)
 FULL = (121, 218, 158)
 LOW = (238, 186, 96)
 CRITICAL = (232, 105, 105)
+BOLT_PULSE = (
+    BG,
+    (59, 66, 66),
+    (137, 150, 147),
+    OUTLINE,
+    (137, 150, 147),
+    (59, 66, 66),
+)
 
 DIGITS = {
     "0": ("01110", "10001", "10011", "10101", "11001", "10001", "01110"),
@@ -218,7 +227,7 @@ def charge_color(capacity):
     return ACCENT
 
 
-def build_framebuffer_commands(width, height, capacity):
+def build_framebuffer_commands(width, height, capacity, animation_phase=0):
     operations = []
     add_rect(operations, 0, 0, width, height, BG)
 
@@ -256,7 +265,9 @@ def build_framebuffer_commands(width, height, capacity):
             charge_color(capacity),
         )
 
-    bolt_color = BG if shown_capacity >= 45 else OUTLINE
+    # Pulse between a cut-out and a bright bolt. Unlike animating the fill,
+    # this remains visible at 100% and never misrepresents charge capacity.
+    bolt_color = BOLT_PULSE[animation_phase % len(BOLT_PULSE)]
     bolt_scale = max(8, body_width // 24)
     bolt_x = width // 2 - (len(BOLT[0]) * bolt_scale) // 2
     bolt_y = body_y + body_height // 2 - (len(BOLT) * bolt_scale) // 2
@@ -292,6 +303,7 @@ def build_framebuffer_commands(width, height, capacity):
 class Display:
     def __init__(self):
         self.saved_backlights = {}
+        self.visible = False
 
     def capture_backlights(self):
         for path in glob.glob("/sys/class/backlight/*/brightness"):
@@ -314,6 +326,7 @@ class Display:
             write_text(path, "0\n")
         for path, value in self.saved_backlights.items():
             write_text(path, value + "\n")
+        self.visible = True
 
     def blank(self):
         self.capture_backlights()
@@ -321,13 +334,22 @@ class Display:
             write_text(path, "0\n")
         for path in glob.glob("/sys/class/graphics/fb*/blank"):
             write_text(path, "1\n")
+        self.visible = False
 
-    def render(self, capacity):
+    def render(self, capacity, animation_phase=0):
         geometry = framebuffer_geometry()
         if geometry is None or not os.path.exists("/dev/fb0"):
             return False
-        self.unblank()
-        commands = build_framebuffer_commands(*geometry, capacity)
+        was_visible = self.visible
+        if not was_visible:
+            # Paint the first frame while the panel is still blank. Unblanking
+            # before the painter ran exposed one frame of the boot console.
+            self.blank()
+        commands = build_framebuffer_commands(
+            *geometry,
+            capacity,
+            animation_phase=animation_phase,
+        )
         try:
             with open(FRAMEBUFFER_COMMAND_PATH, "wb") as handle:
                 handle.write(commands)
@@ -336,7 +358,11 @@ class Display:
                 check=False,
                 timeout=5,
             )
-            return result.returncode == 0
+            if result.returncode != 0:
+                return False
+            if not was_visible:
+                self.unblank()
+            return True
         except (OSError, subprocess.TimeoutExpired):
             return False
 
@@ -399,6 +425,8 @@ def monitor():
     last_report = 0.0
     last_capacity = None
     visible_until = time.monotonic() + DISPLAY_SECONDS
+    animation_phase = 0
+    next_animation_at = time.monotonic() + ANIMATION_INTERVAL
     started_at = time.monotonic()
 
     for _ in range(100):
@@ -406,7 +434,7 @@ def monitor():
             break
         time.sleep(0.1)
     last_capacity = battery_capacity()
-    display.render(last_capacity)
+    display.render(last_capacity, animation_phase)
 
     while True:
         if power_key is None:
@@ -434,13 +462,13 @@ def monitor():
             )
             last_report = now
 
-        if (
-            capacity != last_capacity
-            and visible_until is not None
-            and now < visible_until
-        ):
-            display.render(capacity)
-            last_capacity = capacity
+        if visible_until is not None and now < visible_until:
+            if capacity != last_capacity or now >= next_animation_at:
+                if now >= next_animation_at:
+                    animation_phase += 1
+                    next_animation_at = now + ANIMATION_INTERVAL
+                display.render(capacity, animation_phase)
+                last_capacity = capacity
         elif visible_until is not None and now >= visible_until:
             display.blank()
             visible_until = None
@@ -468,12 +496,16 @@ def monitor():
                             if start_normal_boot(display):
                                 return 0
                             last_capacity = battery_capacity()
-                            display.render(last_capacity)
+                            animation_phase = 0
+                            display.render(last_capacity, animation_phase)
                             visible_until = time.monotonic() + DISPLAY_SECONDS
+                            next_animation_at = time.monotonic() + ANIMATION_INTERVAL
                         else:
                             last_capacity = battery_capacity()
-                            display.render(last_capacity)
+                            animation_phase = 0
+                            display.render(last_capacity, animation_phase)
                             visible_until = time.monotonic() + DISPLAY_SECONDS
+                            next_animation_at = time.monotonic() + ANIMATION_INTERVAL
         else:
             time.sleep(0.1)
 
@@ -482,8 +514,10 @@ def monitor():
                 return 0
             pressed_at = None
             last_capacity = battery_capacity()
-            display.render(last_capacity)
+            animation_phase = 0
+            display.render(last_capacity, animation_phase)
             visible_until = time.monotonic() + DISPLAY_SECONDS
+            next_animation_at = time.monotonic() + ANIMATION_INTERVAL
 
 
 def main(argv):
