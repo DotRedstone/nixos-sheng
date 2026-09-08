@@ -116,13 +116,6 @@ for width, height in ((3048, 2032), (2032, 3048), (1280, 720)):
         "battery fill does not increase with capacity",
     )
 
-full_even = module.build_framebuffer_commands(3048, 2032, 100, animation_phase=0)
-full_odd = module.build_framebuffer_commands(3048, 2032, 100, animation_phase=1)
-assert_true(
-    full_even != full_odd,
-    "charging animation is not visible at full capacity",
-)
-
 with tempfile.TemporaryDirectory() as directory:
     events = []
     original_command_path = module.FRAMEBUFFER_COMMAND_PATH
@@ -148,16 +141,16 @@ with tempfile.TemporaryDirectory() as directory:
     display.blank = fake_blank
     display.unblank = fake_unblank
     try:
-        assert_true(display.render(100, 0), "initial charging frame failed")
+        assert_true(display.render(100), "initial charging frame failed")
         assert_true(
             events == ["blank", "paint", "unblank"],
             "panel was unblanked before the first frame was painted",
         )
         events.clear()
-        assert_true(display.render(100, 1), "animated charging frame failed")
+        assert_true(display.render(100), "visible charging frame refresh failed")
         assert_true(
             events == ["paint"],
-            "visible animation frame unnecessarily blanked the panel",
+            "visible frame refresh unnecessarily blanked the panel",
         )
     finally:
         module.FRAMEBUFFER_COMMAND_PATH = original_command_path

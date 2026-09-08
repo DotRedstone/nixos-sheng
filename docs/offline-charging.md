@@ -15,8 +15,7 @@ default cannot override charger mode.
 
 - The first frame is painted before the panel is unblanked, preventing a brief
   flash of boot-console text.
-- A battery icon, percentage, and low-frequency pulsing bolt are drawn directly
-  to `/dev/fb0`.
+- A static battery icon and percentage are drawn directly to `/dev/fb0`.
 - Charger boots hand off directly to the minimal charging target instead of
   waiting in a black stage-1.
 - The display turns off after eight seconds to reduce idle power.
