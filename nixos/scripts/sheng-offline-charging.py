@@ -20,6 +20,7 @@ EV_KEY = 1
 KEY_POWER = 116
 HOLD_SECONDS = 2.0
 DISPLAY_SECONDS = 8.0
+MINIMUM_BOOT_CAPACITY = 5
 POWER_DISCOVERY_GRACE_SECONDS = 30.0
 DISCONNECT_SECONDS = 10.0
 PREFERRED_POWER_KEY_PATH = (
@@ -357,7 +358,21 @@ def open_power_key():
     return None
 
 
+def normal_boot_allowed(capacity):
+    return capacity is not None and capacity >= MINIMUM_BOOT_CAPACITY
+
+
 def start_normal_boot(display):
+    capacity = battery_capacity()
+    if not normal_boot_allowed(capacity):
+        shown_capacity = "unknown" if capacity is None else f"{capacity}%"
+        print(
+            "Offline charging: normal boot deferred at "
+            f"{shown_capacity}; {MINIMUM_BOOT_CAPACITY}% is required.",
+            flush=True,
+        )
+        return False
+
     print("Offline charging: power key held; starting the normal system.", flush=True)
     display.unblank()
     result = subprocess.run(
@@ -452,6 +467,9 @@ def monitor():
                         if held_for >= HOLD_SECONDS:
                             if start_normal_boot(display):
                                 return 0
+                            last_capacity = battery_capacity()
+                            display.render(last_capacity)
+                            visible_until = time.monotonic() + DISPLAY_SECONDS
                         else:
                             last_capacity = battery_capacity()
                             display.render(last_capacity)
@@ -463,6 +481,9 @@ def monitor():
             if start_normal_boot(display):
                 return 0
             pressed_at = None
+            last_capacity = battery_capacity()
+            display.render(last_capacity)
+            visible_until = time.monotonic() + DISPLAY_SECONDS
 
 
 def main(argv):

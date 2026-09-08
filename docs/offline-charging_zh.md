@@ -13,12 +13,17 @@ NixOS 固定在 `/etc/systemd/system/default.target` 的桌面目标，确保充
 ## 行为
 
 - 直接在 `/dev/fb0` 绘制电池图标和电量百分比；
+- charger 启动会立即进入最小充电 target，不在黑屏的 stage-1 中等待电量；
 - 显示 8 秒后自动熄屏，降低待机功耗；
 - 短按电源键可再次显示充电界面；
-- 长按电源键 2 秒进入正常图形系统；
+- 电量达到 5% 后，长按电源键 2 秒进入正常图形系统；
 - 外部电源断开 10 秒后自动关机；
 - 最小充电目标只启动 Qualcomm ADSP、PD mapper 与 MiPPS 认证链，不拉起
   GNOME、Wi-Fi、蓝牙或传感器用户态服务。
+
+充电界面不等待全局 `systemd-udev-settle`；脚本会自行短暂等待 framebuffer 与电池
+节点出现。这样慢速或异常的无关设备不会阻塞最先需要显示的充电反馈。电量低于 5%
+时长按电源键只会重新显示当前电量，不会拉起完整桌面，从而避免 brownout 重启循环。
 
 启动模式优先识别 AOSP 标准的 cmdline/bootconfig
 `androidboot.mode=charger`，同时兼容 sheng 的 Qualcomm PON USB 充电位。

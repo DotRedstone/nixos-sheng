@@ -191,6 +191,14 @@ module ShengEarlyChargeGuard
   def wait_if_critical()
     return unless enabled?
 
+    # Charger boots continue into a deliberately small stage-2 target which
+    # can draw the battery UI and handle the power key. Keeping them here made
+    # a critically low tablet look dead until it reached boot_capacity.
+    if charger_mode?()
+      $logger.info("Early charge guard: charger boot detected; handing off to low-power userspace.")
+      return
+    end
+
     capacity = wait_for_battery()
     if capacity.nil?
       $logger.warn("Early charge guard: battery capacity is unavailable; continuing boot.")
@@ -203,11 +211,9 @@ module ShengEarlyChargeGuard
       return
     end
 
-    charger_boot = charger_mode?()
-    wait_limit = charger_boot ? "without a timeout" : "for at most #{max_wait_seconds()} seconds"
     $logger.info(
       "Early charge guard: battery is at #{capacity}%; charging with the display off until #{boot_capacity()}% " \
-      "(#{wait_limit})."
+      "(for at most #{max_wait_seconds()} seconds)."
     )
     blank_display()
     last_report = nil
@@ -222,7 +228,7 @@ module ShengEarlyChargeGuard
         break
       end
 
-      if !charger_boot && elapsed >= max_wait_seconds()
+      if elapsed >= max_wait_seconds()
         $logger.warn(
           "Early charge guard: pre-charge timed out at #{capacity || "unknown"}%; continuing boot so userspace charging can start."
         )

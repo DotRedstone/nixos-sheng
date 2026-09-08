@@ -14,12 +14,21 @@ default cannot override charger mode.
 ## Behaviour
 
 - A battery icon and percentage are drawn directly to `/dev/fb0`.
+- Charger boots hand off directly to the minimal charging target instead of
+  waiting in a black stage-1.
 - The display turns off after eight seconds to reduce idle power.
 - A short power-key press shows the charge UI again.
-- Holding the power key for two seconds starts the normal graphical system.
+- Holding the power key for two seconds starts the normal graphical system once
+  the battery has reached 5%.
 - Disconnecting external power for ten seconds powers the tablet off.
 - The minimal target starts the Qualcomm ADSP/PD mapper and MiPPS authentication
   path, but does not pull in GNOME, Wi-Fi, Bluetooth, or sensor userspace.
+
+The charging UI does not wait for the global `systemd-udev-settle` barrier. It
+briefly discovers the framebuffer and battery nodes itself, so an unrelated
+slow device cannot block the first visible charging feedback. Below 5%, a long
+power-key press only redraws the current level instead of starting the desktop,
+which avoids the low-battery brownout loop.
 
 Detection follows AOSP's `androidboot.mode=charger` in the kernel command line
 or bootconfig. Sheng also accepts a Qualcomm PON reason with the USB charger bit
