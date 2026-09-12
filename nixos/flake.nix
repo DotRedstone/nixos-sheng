@@ -223,8 +223,9 @@
 
       checks.${system} = {
         offlineCharging = pkgs.runCommand "sheng-offline-charging-check" {
+          SHENG_CHARGING_FONT = "${pkgs.inter}/share/fonts/truetype/Inter.ttc";
           nativeBuildInputs = [
-            pkgs.python3
+            (pkgs.python3.withPackages (ps: [ ps.pillow ]))
             pkgs.ruby
             pkgs.mruby
             pkgs.sheng-fb-painter
@@ -257,6 +258,7 @@
             pkgs.coreutils
             pkgs.mruby
             pkgs.sheng-fb-painter
+            (pkgs.python3.withPackages (ps: [ ps.pillow ]))
           ];
         } ''
           commands="$TMPDIR/sheng-menu.fbops"
@@ -265,7 +267,7 @@
           mruby \
             ${./tests/test-stage1-generation-menu-renderer.rb} \
             ${./patches/stage-1-headless-generation-menu.rb} \
-            "$commands"
+            "$commands" ${pkgs.sheng-fb-painter}/share/sheng/menu-font.rb
 
           truncate -s $((2032 * 12288)) "$framebuffer"
           started_at="$(date +%s%N)"
@@ -280,12 +282,12 @@
             test "$blue,$green,$red,$alpha" = "$3"
           }
 
-          check_pixel 0 0 "11,10,8,0"
-          check_pixel 600 57 "199,210,115,0"
-          check_pixel 600 300 "67,67,35,0"
-          check_pixel 2400 450 "29,27,24,0"
-          test "$(sha256sum "$framebuffer" | cut -d' ' -f1)" = \
-            "16eab7f3420f865c18e5398bb15d553d4d890357bf59820ed38bd71015465128"
+          check_pixel 0 0 "0,0,0,0"
+          check_pixel 810 540 "36,43,24,0"
+          check_pixel 900 660 "0,0,0,0"
+
+          python3 ${../scripts/preview-generation-menu.py} "$commands" \
+            ${pkgs.sheng-fb-painter}/bin/sheng-fb-painter
 
           echo "native framebuffer render completed in ''${elapsed_ms}ms"
           touch $out

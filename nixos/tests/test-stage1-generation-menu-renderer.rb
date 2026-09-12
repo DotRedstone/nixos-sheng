@@ -10,7 +10,8 @@ end
 
 menu_source = ARGV[0]
 command_path = ARGV[1]
-raise "usage: #{$0} MENU_SOURCE COMMAND_OUTPUT" unless menu_source && command_path
+font_metrics = ARGV[2]
+raise "usage: #{$0} MENU_SOURCE COMMAND_OUTPUT FONT_METRICS" unless menu_source && command_path && font_metrics
 
 Configuration = {
   "sheng_generation_menu" => {
@@ -73,6 +74,7 @@ class TestLogger
 end
 
 $logger = TestLogger.new
+eval(File.read(font_metrics), nil, font_metrics)
 eval(File.read(menu_source), nil, menu_source)
 
 class TestGeneration
@@ -109,7 +111,7 @@ module ShengHeadlessGenerationMenu
       details_parts = number_and_details.split("(", 2)
       details = details_parts.length > 1 ? details_parts[1] : "SYSTEM PROFILE"
       details = details[0, details.length - 1] if details[-1, 1] == ")"
-      ["GENERATION #{number}", details]
+      ["Generation #{number}", details]
     end
 
     def unblank_framebuffer()
@@ -190,7 +192,7 @@ menu.instance_variable_set(:@fb_stride, 12288)
 menu.instance_variable_set(:@fb_ready, true)
 
 menu.instance_variable_set(:@fb_height, 2032.0)
-raise "floating framebuffer height produced a non-integer page size" unless menu.max_visible_generations() == 13
+raise "floating framebuffer height produced a non-integer page size" unless menu.max_visible_generations() == 8
 raise "page size remained a float" unless menu.max_visible_generations().is_a?(Integer)
 menu.instance_variable_set(:@fb_height, 2032)
 
@@ -240,7 +242,8 @@ end
 menu.instance_variable_set(:@draw_operations, operations.dup)
 rectangles = menu.framebuffer_rectangles()
 raise "raster expansion queued too many rectangles: #{rectangles.length}" if rectangles.length > 7000
-raise "raster expansion retained a vector operation" unless rectangles.all? { |operation| operation[0] == :rect }
+raise "raster expansion retained a vector operation" unless rectangles.all? { |operation| [:rect, :glyph].include?(operation[0]) }
+raise "smooth font commands are missing" unless rectangles.any? { |operation| operation[0] == :glyph }
 
 command_data = menu.framebuffer_command_data(rectangles)
 raise "invalid framebuffer command magic" unless command_data[0, 4] == menu::FRAMEBUFFER_COMMAND_MAGIC
@@ -309,3 +312,46 @@ raise "line sampling is unbounded" if line_operations.length > menu::MAX_LINE_SA
 raise "line emitted a vector operation" unless line_operations.all? { |operation| operation[0] == :rect }
 
 puts "generation menu renderer: #{operations.length} operations, #{rectangles.length} native rectangles"
+
+def save_frame(menu, path)
+  menu.instance_variable_set(:@draw_operations, menu.captured_operations.dup)
+  commands = menu.framebuffer_rectangles()
+  # A repeated selection on a two-row display produces no damage at all.
+  commands = [[:rect, 0, 0, 1, 1, menu::BG]] if commands.empty?
+  commands.each do |operation|
+    _, x, y, width, height = operation
+    raise "native command escaped framebuffer" if x < 0 || y < 0 ||
+      x + width > menu.instance_variable_get(:@fb_width) ||
+      y + height > menu.instance_variable_get(:@fb_height)
+  end
+  menu.write_framebuffer_commands(path, commands)
+  menu.instance_variable_set(:@draw_operations, [])
+end
+
+[[3048, 2032], [2032, 3048], [1280, 720]].each do |width, height|
+  menu.instance_variable_set(:@fb_width, width)
+  menu.instance_variable_set(:@fb_height, height)
+  page_size = menu.max_visible_generations()
+  prefix = "#{command_path}.#{width}"
+  menu.render_framebuffer(generations, 0, remaining: 3)
+  save_frame(menu, "#{prefix}.initial")
+  previous = 0
+  previous_page = 0
+  previous_remaining = 3
+  [1, page_size - 1, page_size, page_size - 1, generations.length - 1, 0].each_with_index do |selected, step|
+    page = menu.visible_range(generations.length, selected)[0]
+    menu.render_framebuffer(generations, selected,
+      previous_selected: previous, page_start: page, previous_page_start: previous_page,
+      remaining: nil, previous_remaining: previous_remaining)
+    save_frame(menu, "#{prefix}.#{step}.partial")
+    menu.render_framebuffer(generations, selected, page_start: page, remaining: nil)
+    save_frame(menu, "#{prefix}.#{step}.full")
+    previous = selected
+    previous_page = page
+    previous_remaining = nil
+  end
+  menu.render_framebuffer([], 0, remaining: 3)
+  save_frame(menu, "#{prefix}.empty")
+  menu.render_booting(generations[0].label())
+  save_frame(menu, "#{prefix}.booting")
+end

@@ -19,14 +19,13 @@ module ShengHeadlessGenerationMenu
   OUTER_MARGIN = 64
   PANEL_MIN_Y = 24
   PANEL_MIN_WIDTH = 720
-  PANEL_MAX_WIDTH = 2080
+  PANEL_MAX_WIDTH = 1560
   PANEL_PADDING = 56
-  PANEL_BORDER = 2
   FONT_SCALE = 4
   TITLE_FONT_SCALE = 6
   SUBTITLE_FONT_SCALE = 3
   HEADER_HEIGHT = 184
-  ROW_HEIGHT = 108
+  ROW_HEIGHT = 124
   ROW_GAP = 12
   FOOTER_HEIGHT = 190
   SCROLLBAR_WIDTH = 8
@@ -36,19 +35,17 @@ module ShengHeadlessGenerationMenu
   FRAMEBUFFER_COMMAND_MAGIC = "SFB1"
   MAX_FRAMEBUFFER_RECTANGLES = 10_000
   MAX_LINE_SAMPLES = 48
-  BG = [8, 10, 11]
-  PANEL_BG = [17, 19, 21]
-  PANEL_BORDER_COLOR = [57, 64, 66]
-  ROW_BG = [24, 27, 29]
-  SELECT_BG = [35, 67, 67]
-  ACCENT = [115, 210, 199]
-  ACCENT_DIM = [51, 101, 97]
-  TITLE_FG = [242, 246, 245]
-  SELECT_FG = [248, 251, 250]
+  BG = [0, 0, 0]
+  PANEL_BG = BG
+  PANEL_BORDER_COLOR = [24, 31, 30]
+  ROW_BG = BG
+  SELECT_BG = [24, 43, 36]
+  ACCENT = [130, 214, 184]
+  TITLE_FG = [229, 236, 233]
+  SELECT_FG = TITLE_FG
   NORMAL_FG = [207, 214, 212]
   MUTED_FG = [137, 150, 147]
-  STATUS_FG = [238, 186, 96]
-  BOOT_FG = [121, 218, 158]
+  BOOT_FG = ACCENT
   EV_KEY = 1
   KEY_VOLUMEUP = 115
   KEY_VOLUMEDOWN = 114
@@ -67,59 +64,6 @@ module ShengHeadlessGenerationMenu
     confirm: [KEY_POWER, KEY_ENTER, KEY_KPENTER]
   }
 
-  FONT = {
-    " " => ["00000", "00000", "00000", "00000", "00000", "00000", "00000"],
-    "!" => ["00100", "00100", "00100", "00100", "00100", "00000", "00100"],
-    "#" => ["01010", "11111", "01010", "01010", "11111", "01010", "01010"],
-    "(" => ["00010", "00100", "01000", "01000", "01000", "00100", "00010"],
-    ")" => ["01000", "00100", "00010", "00010", "00010", "00100", "01000"],
-    "+" => ["00000", "00100", "00100", "11111", "00100", "00100", "00000"],
-    "-" => ["00000", "00000", "00000", "11111", "00000", "00000", "00000"],
-    "." => ["00000", "00000", "00000", "00000", "00000", "01100", "01100"],
-    "/" => ["00001", "00010", "00100", "01000", "10000", "00000", "00000"],
-    "0" => ["01110", "10001", "10011", "10101", "11001", "10001", "01110"],
-    "1" => ["00100", "01100", "00100", "00100", "00100", "00100", "01110"],
-    "2" => ["01110", "10001", "00001", "00010", "00100", "01000", "11111"],
-    "3" => ["11110", "00001", "00001", "01110", "00001", "00001", "11110"],
-    "4" => ["00010", "00110", "01010", "10010", "11111", "00010", "00010"],
-    "5" => ["11111", "10000", "10000", "11110", "00001", "00001", "11110"],
-    "6" => ["00110", "01000", "10000", "11110", "10001", "10001", "01110"],
-    "7" => ["11111", "00001", "00010", "00100", "01000", "01000", "01000"],
-    "8" => ["01110", "10001", "10001", "01110", "10001", "10001", "01110"],
-    "9" => ["01110", "10001", "10001", "01111", "00001", "00010", "01100"],
-    ":" => ["00000", "01100", "01100", "00000", "01100", "01100", "00000"],
-    ">" => ["10000", "01000", "00100", "00010", "00100", "01000", "10000"],
-    "?" => ["01110", "10001", "00001", "00010", "00100", "00000", "00100"],
-    "[" => ["01110", "01000", "01000", "01000", "01000", "01000", "01110"],
-    "]" => ["01110", "00010", "00010", "00010", "00010", "00010", "01110"],
-    "_" => ["00000", "00000", "00000", "00000", "00000", "00000", "11111"],
-    "A" => ["01110", "10001", "10001", "11111", "10001", "10001", "10001"],
-    "B" => ["11110", "10001", "10001", "11110", "10001", "10001", "11110"],
-    "C" => ["01110", "10001", "10000", "10000", "10000", "10001", "01110"],
-    "D" => ["11110", "10001", "10001", "10001", "10001", "10001", "11110"],
-    "E" => ["11111", "10000", "10000", "11110", "10000", "10000", "11111"],
-    "F" => ["11111", "10000", "10000", "11110", "10000", "10000", "10000"],
-    "G" => ["01110", "10001", "10000", "10111", "10001", "10001", "01110"],
-    "H" => ["10001", "10001", "10001", "11111", "10001", "10001", "10001"],
-    "I" => ["01110", "00100", "00100", "00100", "00100", "00100", "01110"],
-    "J" => ["00111", "00010", "00010", "00010", "00010", "10010", "01100"],
-    "K" => ["10001", "10010", "10100", "11000", "10100", "10010", "10001"],
-    "L" => ["10000", "10000", "10000", "10000", "10000", "10000", "11111"],
-    "M" => ["10001", "11011", "10101", "10101", "10001", "10001", "10001"],
-    "N" => ["10001", "11001", "10101", "10011", "10001", "10001", "10001"],
-    "O" => ["01110", "10001", "10001", "10001", "10001", "10001", "01110"],
-    "P" => ["11110", "10001", "10001", "11110", "10000", "10000", "10000"],
-    "Q" => ["01110", "10001", "10001", "10001", "10101", "10010", "01101"],
-    "R" => ["11110", "10001", "10001", "11110", "10100", "10010", "10001"],
-    "S" => ["01111", "10000", "10000", "01110", "00001", "00001", "11110"],
-    "T" => ["11111", "00100", "00100", "00100", "00100", "00100", "00100"],
-    "U" => ["10001", "10001", "10001", "10001", "10001", "10001", "01110"],
-    "V" => ["10001", "10001", "10001", "10001", "10001", "01010", "00100"],
-    "W" => ["10001", "10001", "10001", "10101", "10101", "10101", "01010"],
-    "X" => ["10001", "10001", "01010", "00100", "01010", "10001", "10001"],
-    "Y" => ["10001", "10001", "01010", "00100", "00100", "00100", "00100"],
-    "Z" => ["11111", "00001", "00010", "00100", "01000", "10000", "11111"]
-  }
 
   def config()
     Configuration["sheng_generation_menu"] || {}
@@ -525,10 +469,16 @@ module ShengHeadlessGenerationMenu
       height = operation[4]
       text, fg, bg, scale, align = operation[5]
       rectangles << [:rect, x, y, width, height, bg]
-      chars = text.upcase.each_char.to_a
-      max_chars = [width / (6 * scale), 0].max
-      chars = chars[0, max_chars]
-      rendered_width = [chars.length * 6 * scale - scale, 0].max
+      chars = []
+      rendered_width = 0
+      text.each_byte do |byte|
+        code = byte >= 32 && byte <= 126 ? byte : 63
+        advance = FONT_WIDTHS[scale][code - 32]
+        break if rendered_width + advance > width
+
+        chars << [code, advance]
+        rendered_width += advance
+      end
       start_x =
         case align
         when :right
@@ -539,26 +489,9 @@ module ShengHeadlessGenerationMenu
           0
         end
 
-      chars.each_with_index do |char, char_index|
-        glyph_runs(char).each_with_index do |runs, glyph_y|
-          destination_y = glyph_y * scale
-          next if destination_y >= height
-
-          runs.each do |run_start, run_width|
-            destination_x = start_x + (char_index * 6 + run_start) * scale
-            next if destination_x >= width
-
-            clipped_width = [run_width * scale, width - destination_x].min
-            rectangles << [
-              :rect,
-              x + destination_x,
-              y + destination_y,
-              clipped_width,
-              [scale, height - destination_y].min,
-              fg
-            ]
-          end
-        end
+      chars.each do |code, advance|
+        rectangles << [:glyph, x + start_x, y, advance, scale * 9, fg, code] if code != 32
+        start_x += advance
       end
     end
     rectangles
@@ -574,7 +507,7 @@ module ShengHeadlessGenerationMenu
     rectangles.each do |operation|
       x, y, width, height, color = operation[1], operation[2], operation[3], operation[4], operation[5]
       data << [x, y, width, height].pack("v4")
-      data << [color[0], color[1], color[2], 0].pack("C4")
+      data << [color[0], color[1], color[2], operation[0] == :glyph ? operation[6] : 0].pack("C4")
     end
     data
   end
@@ -653,31 +586,6 @@ module ShengHeadlessGenerationMenu
     mark_framebuffer_dirty(y, height)
   end
 
-  def glyph(char)
-    FONT[char.upcase] || FONT["?"]
-  end
-
-  def glyph_runs(char)
-    @glyph_run_cache ||= {}
-    normalized = char.upcase
-    return @glyph_run_cache[normalized] if @glyph_run_cache.key?(normalized)
-
-    @glyph_run_cache[normalized] = glyph(normalized).map do |bits|
-      runs = []
-      run_start = nil
-      bits.each_char.with_index do |bit, index|
-        if bit == "1"
-          run_start = index if run_start.nil?
-        elsif run_start
-          runs << [run_start, index - run_start]
-          run_start = nil
-        end
-      end
-      runs << [run_start, bits.length - run_start] if run_start
-      runs
-    end
-  end
-
   def draw_text_box(x, y, width, height, text, fg, bg, scale: FONT_SCALE, align: :left)
     framebuffer_info()
     return if width <= 0 || height <= 0
@@ -685,8 +593,9 @@ module ShengHeadlessGenerationMenu
     x = clamp(x, 0, @fb_width)
     y = clamp(y, 0, @fb_height)
     width = clamp(width, 0, @fb_width - x)
-    height = clamp(height, 0, @fb_height - y)
+    height = clamp([height, scale * 9].max, 0, @fb_height - y)
     return if width <= 0 || height <= 0
+    return if height < scale * 9
 
     draw_operations() << [:text, x, y, width, height, [text.to_s, fg, bg, scale, align]]
     mark_framebuffer_dirty(y, height)
@@ -710,52 +619,6 @@ module ShengHeadlessGenerationMenu
     end
   end
 
-  def draw_circle(cx, cy, radius, color, thickness = 3)
-    half = radius * 3 / 4
-    points = [
-      [cx, cy - radius], [cx + half, cy - half], [cx + radius, cy], [cx + half, cy + half],
-      [cx, cy + radius], [cx - half, cy + half], [cx - radius, cy], [cx - half, cy - half],
-      [cx, cy - radius]
-    ]
-    index = 0
-    while index + 1 < points.length
-      draw_line(
-        points[index][0], points[index][1],
-        points[index + 1][0], points[index + 1][1],
-        color, thickness
-      )
-      index += 1
-    end
-  end
-
-  def draw_brand_mark(x, y, size, color)
-    half = size / 2
-    diagonal_x = size / 4
-    diagonal_y = size * 7 / 16
-    center_x = x + half
-    center_y = y + half
-    thickness = [size / 12, 3].max
-
-    draw_line(center_x - half, center_y, center_x + half, center_y, color, thickness)
-    draw_line(
-      center_x - diagonal_x,
-      center_y - diagonal_y,
-      center_x + diagonal_x,
-      center_y + diagonal_y,
-      color,
-      thickness
-    )
-    draw_line(
-      center_x + diagonal_x,
-      center_y - diagonal_y,
-      center_x - diagonal_x,
-      center_y + diagonal_y,
-      color,
-      thickness
-    )
-    draw_rect(center_x - thickness, center_y - thickness, thickness * 2, thickness * 2, PANEL_BG)
-  end
-
   def draw_chevron(cx, cy, direction, color, size = 12, thickness = 3)
     if direction == :up
       draw_line(cx - size, cy + size / 2, cx, cy - size / 2, color, thickness)
@@ -770,9 +633,10 @@ module ShengHeadlessGenerationMenu
   end
 
   def draw_power_icon(cx, cy, color)
-    draw_circle(cx, cy + 2, 16, color, 3)
-    draw_rect(cx - 5, cy - 19, 10, 20, PANEL_BG)
-    draw_rect(cx - 2, cy - 20, 5, 21, color)
+    draw_rounded_rect(cx - 16, cy - 14, 32, 32, 16, color, PANEL_BG)
+    draw_rounded_rect(cx - 13, cy - 11, 26, 26, 13, PANEL_BG, color, clear: false)
+    draw_rect(cx - 6, cy - 16, 12, 18, PANEL_BG)
+    draw_rect(cx - 1, cy - 19, 3, 20, color)
   end
 
   def panel_width()
@@ -811,7 +675,7 @@ module ShengHeadlessGenerationMenu
   def max_visible_generations()
     framebuffer_info()
     available = @fb_height - PANEL_MIN_Y * 2 - HEADER_HEIGHT - FOOTER_HEIGHT
-    clamp((available + ROW_GAP) / (ROW_HEIGHT + ROW_GAP), 1, 18).to_i
+    clamp((available + ROW_GAP) / (ROW_HEIGHT + ROW_GAP), 1, 8).to_i
   end
 
   def last_page_start(count, page_size)
@@ -874,7 +738,7 @@ module ShengHeadlessGenerationMenu
     number = match ? match[1] : (index + 1).to_s
     details = match ? match[2].to_s.strip : label.to_s.strip
     details = "SYSTEM PROFILE" if details.empty?
-    ["GENERATION #{number}", details]
+    ["Generation #{number}", details]
   end
 
   def generation_label(generation, index)
@@ -894,11 +758,25 @@ module ShengHeadlessGenerationMenu
 
   def draw_panel(x, y, width, height)
     draw_rect(x, y, width, height, PANEL_BG)
-    draw_rect(x, y, width, PANEL_BORDER, PANEL_BORDER_COLOR)
-    draw_rect(x, y + height - PANEL_BORDER, width, PANEL_BORDER, PANEL_BORDER_COLOR)
-    draw_rect(x, y, PANEL_BORDER, height, PANEL_BORDER_COLOR)
-    draw_rect(x + width - PANEL_BORDER, y, PANEL_BORDER, height, PANEL_BORDER_COLOR)
-    draw_rect(x, y, width, 5, ACCENT)
+  end
+
+  def draw_rounded_rect(x, y, width, height, radius, color, background, clear: true)
+    radius = [radius, width / 2, height / 2].min
+    draw_rect(x, y, width, height, background) if clear
+    draw_rect(x, y + radius, width, height - radius * 2, color)
+    radius.times do |row|
+      distance = radius - row - 0.5
+      inset = radius - Math.sqrt(radius * radius - distance * distance)
+      solid = inset.ceil
+      draw_rect(x + solid, y + row, width - solid * 2, 1, color)
+      draw_rect(x + solid, y + height - row - 1, width - solid * 2, 1, color)
+      coverage = solid - inset
+      edge = color.each_with_index.map { |value, i| (value * coverage + background[i] * (1 - coverage)).round }
+      [y + row, y + height - row - 1].each do |edge_y|
+        draw_rect(x + solid - 1, edge_y, 1, 1, edge)
+        draw_rect(x + width - solid, edge_y, 1, 1, edge)
+      end
+    end
   end
 
   def row_width(scrollable)
@@ -913,17 +791,17 @@ module ShengHeadlessGenerationMenu
     fg = is_selected ? SELECT_FG : NORMAL_FG
     width = row_width(labels.length > visible_count)
     title, details = generation_parts(labels[index], index)
-    text_x = content_x() + (is_selected ? 54 : 30)
-    text_width = width - (text_x - content_x()) - 24
+    text_x = content_x() + 34
+    text_width = width - 100
 
     draw_rect(content_x(), row_y, width, ROW_HEIGHT, bg)
     if is_selected
-      draw_rect(content_x(), row_y, 8, ROW_HEIGHT, ACCENT)
-      draw_chevron(content_x() + 29, row_y + ROW_HEIGHT / 2, :right, ACCENT, 9, 3)
+      draw_rounded_rect(content_x(), row_y, width, ROW_HEIGHT, 8, SELECT_BG, BG)
+      draw_chevron(content_x() + width - 34, row_y + ROW_HEIGHT / 2, :right, ACCENT, 9, 3)
     end
     draw_text_box(
       text_x,
-      row_y + 17,
+      row_y + 20,
       text_width,
       32,
       title,
@@ -932,7 +810,7 @@ module ShengHeadlessGenerationMenu
     )
     draw_text_box(
       text_x,
-      row_y + 66,
+      row_y + 72,
       text_width,
       24,
       details,
@@ -946,23 +824,22 @@ module ShengHeadlessGenerationMenu
     controls_y = footer_y + 128
     first_x = content_x() + 18
 
-    draw_rect(first_x, controls_y - 23, 48, 46, ROW_BG)
     draw_chevron(first_x + 24, controls_y - 7, :up, NORMAL_FG, 9, 3)
     draw_chevron(first_x + 24, controls_y + 10, :down, NORMAL_FG, 9, 3)
-    draw_text_box(first_x + 68, controls_y - 14, 180, 30, "SELECT", MUTED_FG, PANEL_BG, scale: SUBTITLE_FONT_SCALE)
+    draw_text_box(first_x + 68, controls_y - 14, 180, 30, "Select", MUTED_FG, PANEL_BG, scale: SUBTITLE_FONT_SCALE)
 
     second_x = first_x + 290
     draw_power_icon(second_x + 18, controls_y, NORMAL_FG)
-    draw_text_box(second_x + 52, controls_y - 14, 180, 30, "BOOT", MUTED_FG, PANEL_BG, scale: SUBTITLE_FONT_SCALE)
+    draw_text_box(second_x + 52, controls_y - 14, 180, 30, "Boot", MUTED_FG, PANEL_BG, scale: SUBTITLE_FONT_SCALE)
   end
 
   def draw_countdown(footer_y, remaining)
     label_y = footer_y + 25
     track_y = footer_y + 76
     width = content_width()
-    status = remaining ? "AUTO BOOT" : "MANUAL SELECTION"
-    value = remaining ? "#{remaining} SEC" : "PAUSED"
-    color = remaining ? STATUS_FG : MUTED_FG
+    status = remaining ? "Auto boot" : "Select a generation"
+    value = remaining ? "#{remaining}s" : "Paused"
+    color = remaining ? ACCENT : MUTED_FG
 
     draw_text_box(content_x(), label_y, width / 2, 28, status, color, PANEL_BG, scale: SUBTITLE_FONT_SCALE)
     draw_text_box(
@@ -976,9 +853,9 @@ module ShengHeadlessGenerationMenu
       scale: SUBTITLE_FONT_SCALE,
       align: :right
     )
-    draw_rect(content_x(), track_y, width, 8, ROW_BG)
+    draw_rect(content_x(), track_y, width, 3, PANEL_BORDER_COLOR)
     progress = remaining ? clamp(remaining, 0, timeout()) : 0
-    draw_rect(content_x(), track_y, width * progress / [timeout(), 1].max, 8, remaining ? STATUS_FG : ACCENT_DIM)
+    draw_rect(content_x(), track_y, width * progress / [timeout(), 1].max, 3, ACCENT)
   end
 
   def draw_scrollbar(count, visible_count, start_index, rows_y)
@@ -1032,20 +909,18 @@ module ShengHeadlessGenerationMenu
     rows_y = y + HEADER_HEIGHT
     footer_y = rows_y + rows_height(visible_count)
     title_scale = content_width() < 900 ? 4 : TITLE_FONT_SCALE
-    mark_size = content_width() < 900 ? 52 : 68
-    brand_x = content_x() + mark_size + 34
+    brand_x = content_x()
     count_width = content_width() < 900 ? 140 : 210
 
     if full_redraw
       draw_rect(0, 0, @fb_width, @fb_height, BG)
       draw_panel(x, y, width, height)
-      draw_brand_mark(content_x(), y + 41, mark_size, ACCENT)
       draw_text_box(
         brand_x,
         y + 35,
-        content_width() - mark_size - 34 - count_width,
+        content_width() - count_width,
         48,
-        "NIXOS SHENG",
+        "NixOS Sheng",
         TITLE_FG,
         PANEL_BG,
         scale: title_scale
@@ -1053,9 +928,9 @@ module ShengHeadlessGenerationMenu
       draw_text_box(
         brand_x,
         y + 101,
-        content_width() - mark_size - 34,
+        content_width(),
         28,
-        "RECOVERY / GENERATIONS",
+        "Boot generations",
         ACCENT,
         PANEL_BG,
         scale: SUBTITLE_FONT_SCALE
@@ -1071,14 +946,14 @@ module ShengHeadlessGenerationMenu
         scale: SUBTITLE_FONT_SCALE,
         align: :right
       )
-      draw_rect(x + PANEL_BORDER, y + HEADER_HEIGHT - 2, width - PANEL_BORDER * 2, 2, PANEL_BORDER_COLOR)
+      draw_rect(content_x(), y + HEADER_HEIGHT - 20, content_width(), 2, PANEL_BORDER_COLOR)
       index = start_index
       while index < end_index
         draw_generation_row(labels, index, selected, start_index, visible_count)
         index += 1
       end
       draw_scrollbar(labels.length, visible_count, start_index, rows_y)
-      draw_rect(x + PANEL_BORDER, footer_y, width - PANEL_BORDER * 2, 2, PANEL_BORDER_COLOR)
+      draw_rect(content_x(), footer_y, content_width(), 2, PANEL_BORDER_COLOR)
       draw_controls(footer_y)
     elsif previous_selected != selected
       draw_generation_row(labels, previous_selected, selected, start_index, visible_count) if previous_selected
@@ -1159,7 +1034,7 @@ module ShengHeadlessGenerationMenu
     render_console(generations, selected, remaining) unless rendered
   end
 
-  def render_booting(label = "NixOS - Default", status = "HANDING OFF TO STAGE 2")
+  def render_booting(label = "NixOS - Default", status = "Starting system")
     if @framebuffer_failed
       console.write("\e[2J\e[HNixOS Sheng\n\nStarting selected generation...\n")
       console.flush
@@ -1175,31 +1050,29 @@ module ShengHeadlessGenerationMenu
 
     draw_rect(0, 0, @fb_width, @fb_height, BG)
     draw_panel(x, y, width, height)
-    draw_brand_mark(x + PANEL_PADDING, y + 51, 68, ACCENT)
     draw_text_box(
-      x + PANEL_PADDING + 102,
+      x + PANEL_PADDING,
       y + 46,
-      width - PANEL_PADDING * 2 - 102,
+      width - PANEL_PADDING * 2,
       48,
-      "NIXOS SHENG",
+      "NixOS Sheng",
       TITLE_FG,
       PANEL_BG,
       scale: TITLE_FONT_SCALE
     )
-    draw_rect(x + PANEL_PADDING, y + 145, 8, 104, BOOT_FG)
     draw_text_box(
-      x + PANEL_PADDING + 28,
+      x + PANEL_PADDING,
       y + 147,
-      width - PANEL_PADDING * 2 - 28,
+      width - PANEL_PADDING * 2,
       34,
       title,
       TITLE_FG,
       PANEL_BG
     )
     draw_text_box(
-      x + PANEL_PADDING + 28,
+      x + PANEL_PADDING,
       y + 202,
-      width - PANEL_PADDING * 2 - 28,
+      width - PANEL_PADDING * 2,
       28,
       details,
       MUTED_FG,
@@ -1216,8 +1089,7 @@ module ShengHeadlessGenerationMenu
       PANEL_BG,
       scale: SUBTITLE_FONT_SCALE
     )
-    draw_rect(x + PANEL_PADDING, y + 339, width - PANEL_PADDING * 2, 8, ROW_BG)
-    draw_rect(x + PANEL_PADDING, y + 339, width - PANEL_PADDING * 2, 8, BOOT_FG)
+    draw_rect(x + PANEL_PADDING, y + 339, width - PANEL_PADDING * 2, 3, BOOT_FG)
     present_framebuffer()
   rescue => error
     $logger.warn("Could not render sheng generation menu boot status: #{error}")
@@ -1346,7 +1218,7 @@ module ShengHeadlessGenerationMenu
     set_console_keyboard(true)
     restore_console_logs()
     set_console_echo(true)
-    boot_status = manual_selection ? "SELECTION SAVED - RESTARTING" : "HANDING OFF TO STAGE 2"
+    boot_status = manual_selection ? "Restarting" : "Starting system"
     render_booting(generation_label(chosen_generation, selected), boot_status)
     [chosen_generation, manual_selection]
   end

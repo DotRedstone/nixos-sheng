@@ -102,11 +102,13 @@ def charged_area(operations):
     )
 
 
-for width, height in ((3048, 2032), (2032, 3048), (1280, 720)):
+for width, height in ((3048, 2032), (2032, 3048), (1280, 720), (480, 800)):
     low = decode_commands(module.build_framebuffer_commands(width, height, 20))
     high = decode_commands(module.build_framebuffer_commands(width, height, 80))
     unknown = decode_commands(module.build_framebuffer_commands(width, height, None))
-    for operations in (low, high, unknown):
+    extremes = [decode_commands(module.build_framebuffer_commands(width, height, capacity))
+                for capacity in (0, 1, 5, 100)]
+    for operations in (low, high, unknown, *extremes):
         assert_true(0 < len(operations) < 10000, "invalid rectangle count")
         for x, y, rect_width, rect_height, _, _, _, _ in operations:
             assert_true(x + rect_width <= width, "rectangle exceeds framebuffer width")
@@ -115,6 +117,8 @@ for width, height in ((3048, 2032), (2032, 3048), (1280, 720)):
         charged_area(high) > charged_area(low),
         "battery fill does not increase with capacity",
     )
+    assert_true(charged_area(extremes[0]) == 0, "empty battery has a colored fill")
+    assert_true(charged_area(extremes[1]) > 0, "one-percent battery fill disappeared")
 
 with tempfile.TemporaryDirectory() as directory:
     events = []

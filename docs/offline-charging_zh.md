@@ -13,7 +13,9 @@ NixOS 固定在 `/etc/systemd/system/default.target` 的桌面目标，确保充
 ## 行为
 
 - 在黑屏状态完成首帧绘制后再点亮面板，避免短暂露出启动命令；
-- 直接在 `/dev/fb0` 绘制静态电池图标和电量百分比；
+- 直接在 `/dev/fb0` 绘制圆角横向电池与抗锯齿 Inter 电量数字，黑底搭配薄荷绿，
+  低电量使用琥珀色或红色；缓存静态画面，没有动画定时器。Pillow 与随包字体只在
+  绘图时加载，不参与开机模式判断；
 - charger 启动会立即进入最小充电 target，不在黑屏的 stage-1 中等待电量；
 - 显示 8 秒后自动熄屏，降低待机功耗；
 - 短按电源键可再次显示充电界面；
@@ -40,6 +42,13 @@ NixOS 固定在 `/etc/systemd/system/default.target` 的桌面目标，确保充
 本功能同时修改 initramfs stage-1 和 NixOS stage-2。需要构建并刷入匹配的
 `boot_b`，随后激活或刷入匹配的 rootfs/系统世代。仅在设备内执行
 `nixos-rebuild` 无法更新 stage-1。
+
+静态界面重新设计只涉及 stage-2。已经安装关机充电启动支持的设备，激活新版系统
+世代即可，无须再次刷 boot；切换回上一系统世代即可恢复原界面。
+
+离机预览可运行 `scripts/preview-offline-charging.py OUTPUT.png`，需要 Pillow，
+并将 `SHENG_CHARGING_FONT` 指向 `Inter.ttc`。通过 `--capacity`、`--width` 和
+`--height` 选择电量与屏幕尺寸。预览解码的 SFB1 指令与实机绘制工具使用的相同。
 
 ## 实机验收
 

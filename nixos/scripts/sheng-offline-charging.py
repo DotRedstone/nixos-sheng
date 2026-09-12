@@ -1,6 +1,7 @@
 #!@python@
 
 import glob
+import functools
 import os
 import re
 import select
@@ -13,6 +14,7 @@ import time
 SYSTEMCTL = "@systemctl@"
 FRAMEBUFFER_PAINTER = "@framebufferPainter@"
 FRAMEBUFFER_COMMAND_PATH = "/run/sheng-offline-charging.fbops"
+FONT_PATH = "@chargingFont@"
 
 EVENT = struct.Struct("llHHI")
 RECTANGLE = struct.Struct("<HHHHBBBB")
@@ -28,41 +30,13 @@ PREFERRED_POWER_KEY_PATH = (
     "platform-c400000.spmi-platform-c400000.spmi:pmic@0:pon@1300:pwrkey-event"
 )
 
-BG = (8, 10, 11)
-TRACK = (35, 40, 41)
-OUTLINE = (207, 214, 212)
-ACCENT = (115, 210, 199)
-FULL = (121, 218, 158)
+BG = (0, 0, 0)
+TRACK = (24, 31, 30)
+OUTLINE = (229, 236, 233)
+ACCENT = (130, 214, 184)
+FULL = (130, 214, 184)
 LOW = (238, 186, 96)
 CRITICAL = (232, 105, 105)
-DIGITS = {
-    "0": ("01110", "10001", "10011", "10101", "11001", "10001", "01110"),
-    "1": ("00100", "01100", "00100", "00100", "00100", "00100", "01110"),
-    "2": ("01110", "10001", "00001", "00010", "00100", "01000", "11111"),
-    "3": ("11110", "00001", "00001", "01110", "00001", "00001", "11110"),
-    "4": ("00010", "00110", "01010", "10010", "11111", "00010", "00010"),
-    "5": ("11111", "10000", "10000", "11110", "00001", "00001", "11110"),
-    "6": ("00110", "01000", "10000", "11110", "10001", "10001", "01110"),
-    "7": ("11111", "00001", "00010", "00100", "01000", "01000", "01000"),
-    "8": ("01110", "10001", "10001", "01110", "10001", "10001", "01110"),
-    "9": ("01110", "10001", "10001", "01111", "00001", "00010", "01100"),
-    "%": ("11001", "11010", "00100", "01000", "10110", "00110", "00000"),
-    "-": ("00000", "00000", "00000", "11111", "00000", "00000", "00000"),
-}
-
-BOLT = (
-    "00110",
-    "01100",
-    "01100",
-    "11000",
-    "11110",
-    "00110",
-    "00110",
-    "00100",
-    "01000",
-)
-
-
 def read_text(path):
     try:
         with open(path, "r", encoding="ascii") as handle:
@@ -186,107 +160,109 @@ def add_rect(operations, x, y, width, height, color):
     operations.append((int(x), int(y), int(width), int(height), *color, 0))
 
 
-def draw_text(operations, text, center_x, top, scale, color):
-    glyph_width = 5 * scale
-    gap = scale * 2
-    text_width = len(text) * glyph_width + max(0, len(text) - 1) * gap
-    x = center_x - text_width // 2
-    for character in text:
-        glyph = DIGITS.get(character, DIGITS["-"])
-        for row, pattern in enumerate(glyph):
-            for column, pixel in enumerate(pattern):
-                if pixel == "1":
-                    add_rect(
-                        operations,
-                        x + column * scale,
-                        top + row * scale,
-                        scale,
-                        scale,
-                        color,
-                    )
-        x += glyph_width + gap
-
-
 def charge_color(capacity):
-    if capacity is None or capacity <= 10:
+    if capacity is None:
+        return OUTLINE
+    if capacity <= 10:
         return CRITICAL
     if capacity <= 25:
         return LOW
-    if capacity >= 95:
-        return FULL
     return ACCENT
 
 
+@functools.lru_cache(maxsize=4)
 def build_framebuffer_commands(width, height, capacity):
-    operations = []
-    add_rect(operations, 0, 0, width, height, BG)
+    # Pillow and the font are only loaded for the screen, never by the boot
+    # generator's charger detection path.
+    from PIL import Image, ImageDraw, ImageFont
 
-    body_height = max(260, min(int(height * 0.42), 680))
-    body_width = max(150, int(body_height * 0.46))
-    border = max(8, body_width // 18)
-    terminal_width = body_width // 3
-    terminal_height = max(12, border * 2)
-    body_x = (width - body_width) // 2
-    body_y = max(60, (height - body_height) // 2 - height // 16)
-    terminal_x = body_x + (body_width - terminal_width) // 2
-    terminal_y = body_y - terminal_height
+    if capacity is not None:
+        capacity = max(0, min(100, capacity))
+    scale = min(width / 440, height / 440, 2.0)
+    supersample = 2
+    size = max(1, round(360 * scale))
+    factor = size * supersample / 360
+    canvas = Image.new("RGB", (size * supersample, size * supersample), BG)
+    draw = ImageDraw.Draw(canvas)
 
-    add_rect(operations, terminal_x, terminal_y, terminal_width, terminal_height, OUTLINE)
-    add_rect(operations, body_x, body_y, body_width, border, OUTLINE)
-    add_rect(operations, body_x, body_y + body_height - border, body_width, border, OUTLINE)
-    add_rect(operations, body_x, body_y, border, body_height, OUTLINE)
-    add_rect(operations, body_x + body_width - border, body_y, border, body_height, OUTLINE)
+    def box(bounds):
+        return tuple(round(value * factor) for value in bounds)
 
-    inner_x = body_x + border * 2
-    inner_y = body_y + border * 2
-    inner_width = body_width - border * 4
-    inner_height = body_height - border * 4
-    add_rect(operations, inner_x, inner_y, inner_width, inner_height, TRACK)
+    def rounded(bounds, radius, color):
+        draw.rounded_rectangle(box(bounds), radius=round(radius * factor), fill=color)
 
-    shown_capacity = 0 if capacity is None else capacity
-    fill_height = max(border, inner_height * shown_capacity // 100) if shown_capacity else 0
-    if fill_height:
-        add_rect(
-            operations,
-            inner_x,
-            inner_y + inner_height - fill_height,
-            inner_width,
-            fill_height,
-            charge_color(capacity),
-        )
-
-    bolt_color = BG if shown_capacity >= 45 else OUTLINE
-    bolt_scale = max(8, body_width // 24)
-    bolt_x = width // 2 - (len(BOLT[0]) * bolt_scale) // 2
-    bolt_y = body_y + body_height // 2 - (len(BOLT) * bolt_scale) // 2
-    for row, pattern in enumerate(BOLT):
-        for column, pixel in enumerate(pattern):
-            if pixel == "1":
-                add_rect(
-                    operations,
-                    bolt_x + column * bolt_scale,
-                    bolt_y + row * bolt_scale,
-                    bolt_scale,
-                    bolt_scale,
-                    bolt_color,
-                )
-
-    label = "--%" if capacity is None else f"{capacity}%"
-    text_scale = max(7, min(width, height) // 105)
-    draw_text(
-        operations,
-        label,
-        width // 2,
-        body_y + body_height + max(55, height // 24),
-        text_scale,
-        OUTLINE,
+    # A quiet horizontal battery above the numeric reading. The inner fill is
+    # clipped to one rounded mask, keeping its level accurate even near zero.
+    rounded((94, 67, 260, 145), 18, (72, 86, 81))
+    rounded((97, 70, 257, 142), 15, BG)
+    rounded((264, 93, 270, 119), 3, (72, 86, 81))
+    rounded((103, 76, 251, 136), 10, TRACK)
+    if capacity:
+        mask = Image.new("L", canvas.size)
+        md = ImageDraw.Draw(mask)
+        md.rounded_rectangle(box((103, 76, 251, 136)), radius=round(10 * factor), fill=255)
+        if capacity < 100:
+            md.rectangle(box((103 + 148 * capacity / 100, 75, 252, 137)), fill=0)
+        canvas.paste(charge_color(capacity), (0, 0), mask)
+    # The bolt has its own dark backing so it stays legible across the fill edge.
+    rounded((163, 84, 195, 128), 10, TRACK)
+    draw.polygon(
+        [(round(x * factor), round(y * factor)) for x, y in
+         ((182, 91), (170, 108), (178, 108), (175, 121), (188, 103), (180, 103))],
+        fill=OUTLINE,
     )
 
-    data = bytearray(b"SFB1")
-    for operation in operations:
-        data.extend(RECTANGLE.pack(*operation))
-    return bytes(data)
+    font_path = os.environ.get("SHENG_CHARGING_FONT", FONT_PATH)
+    number_font = ImageFont.truetype(font_path, round(72 * factor))
+    percent_font = ImageFont.truetype(font_path, round(27 * factor))
+    label = "--" if capacity is None else str(capacity)
+    number_width = draw.textlength(label, font=number_font)
+    percent_width = draw.textlength("%", font=percent_font)
+    gap = round(6 * factor)
+    left = (canvas.width - number_width - gap - percent_width) / 2
+    baseline = round(249 * factor)
+    draw.text((left, baseline), label, font=number_font, fill=OUTLINE, anchor="ls")
+    draw.text((left + number_width + gap, baseline - round(5 * factor)), "%",
+              font=percent_font, fill=(135, 151, 144), anchor="ls")
 
+    canvas = canvas.resize((size, size), Image.Resampling.LANCZOS)
+    # Bound edge colors and merge equal vertical runs to stay within SFB1's
+    # 10,000-rectangle limit while retaining antialiased curves and type.
+    palette_colors = [BG]
+    for color in (TRACK, OUTLINE, ACCENT, LOW, CRITICAL, (72, 86, 81), (135, 151, 144)):
+        palette_colors.extend(tuple(round(c * level / 8) for c in color)
+                              for level in range(1, 9))
+    palette = Image.new("P", (1, 1))
+    palette.putpalette([c for color in palette_colors for c in color]
+                       + [0] * (768 - 3 * len(palette_colors)))
+    canvas = canvas.quantize(palette=palette, dither=Image.Dither.NONE).convert("RGB")
+    pixels = canvas.load()
+    origin_x, origin_y = (width - size) // 2, (height - size) // 2
+    operations = []
+    add_rect(operations, 0, 0, width, height, BG)
+    active = {}
+    for y in range(size):
+        current = {}
+        x = 0
+        while x < size:
+            color = pixels[x, y]
+            end = x + 1
+            while end < size and pixels[end, y] == color:
+                end += 1
+            if color != BG:
+                key = (x, end - x, color)
+                current[key] = active.pop(key, (y, 0))
+                first, length = current[key]
+                current[key] = (first, length + 1)
+            x = end
+        for (x, length, color), (first, rows) in active.items():
+            add_rect(operations, origin_x + x, origin_y + first, length, rows, color)
+        active = current
+    for (x, length, color), (first, rows) in active.items():
+        add_rect(operations, origin_x + x, origin_y + first, length, rows, color)
+    if len(operations) > 10000:
+        raise ValueError("charging frame exceeds the native painter limit")
+    return b"SFB1" + b"".join(RECTANGLE.pack(*op) for op in operations)
 
 class Display:
     def __init__(self):
