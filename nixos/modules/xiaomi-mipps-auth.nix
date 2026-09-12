@@ -66,9 +66,11 @@ let
         echo "USB data role already device"
       fi
 
-      # FunctionFS may have started while no UDC was available. Re-enabling
-      # adbd binds the existing gadget as soon as the device role is active.
-      systemctl try-restart adbd.service
+      # FunctionFS may have started while no UDC was available. Queue an ADB
+      # restart after this oneshot exits. A synchronous restart deadlocks here:
+      # adbd is ordered after this unit, while this unit would be waiting for
+      # the ordered ADB job to finish.
+      systemctl --no-block try-restart adbd.service
     '';
   };
   retryPackage = pkgs.writeShellApplication {
