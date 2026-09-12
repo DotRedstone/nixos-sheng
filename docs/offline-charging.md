@@ -15,7 +15,10 @@ default cannot override charger mode.
 
 - The first frame is painted before the panel is unblanked, preventing a brief
   flash of boot-console text.
-- A static battery icon and percentage are drawn directly to `/dev/fb0`.
+- A static rounded horizontal battery and antialiased Inter percentage are drawn
+  directly to `/dev/fb0`, with a black background and mint, amber or red fill.
+  Frames are cached; there is no animation timer. Pillow and the bundled font
+  are used only when rendering, not during boot-mode detection.
 - Charger boots hand off directly to the minimal charging target instead of
   waiting in a black stage-1.
 - The display turns off after eight seconds to reduce idle power.
@@ -47,6 +50,16 @@ overrides every charger-boot reason supplied by the bootloader.
 This feature changes both initramfs stage-1 and NixOS stage-2. Build and flash
 the matching `boot_b` image, then activate or flash the matching rootfs/system
 generation. A device-side `nixos-rebuild` alone cannot update stage-1.
+
+The static screen redesign only changes stage-2. On a device with the charger
+boot support already installed, activate the updated system generation; no
+additional boot flash is needed. Switching to the previous system generation
+restores the previous renderer.
+
+For an off-device PNG preview, run `scripts/preview-offline-charging.py OUTPUT.png`
+with Pillow available and `SHENG_CHARGING_FONT` pointing to `Inter.ttc`.
+`--capacity`, `--width`, and `--height` select the battery level and framebuffer
+size. The preview decodes the same SFB1 commands consumed by the native painter.
 
 ## Hardware Validation
 

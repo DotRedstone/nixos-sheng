@@ -13,11 +13,13 @@ let
         "@python@"
         "@systemctl@"
         "@framebufferPainter@"
+        "@chargingFont@"
       ]
       [
-        "${pkgs.python3}/bin/python3"
+        "${pkgs.python3.withPackages (ps: [ ps.pillow ])}/bin/python3"
         "${pkgs.systemd}/bin/systemctl"
         "${pkgs.sheng-fb-painter}/bin/sheng-fb-painter"
+        "${pkgs.inter}/share/fonts/truetype/Inter.ttc"
       ]
       (builtins.readFile ../scripts/sheng-offline-charging.py)
   );

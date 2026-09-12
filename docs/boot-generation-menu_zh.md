@@ -17,6 +17,15 @@ sudo sheng-reboot-generation-menu
 菜单会在 framebuffer 上显示两层世代信息、当前选择位置、按键图标和自动启动
 进度。选中的世代使用高对比色块和方向标记强调。
 
+新版静态设计与关机充电界面统一：纯黑背景、Inter 字体、薄荷绿强调和圆角选中行，
+去掉外围大面板，不增加过渡动画。每页最多八个世代，小屏幕自动减少行数。
+字体覆盖率位图和文字宽度在构建 painter 时生成，stage-1 不需要 Python 或字体引擎。
+字体署名与许可保留在 `sheng-fb-painter --font-license` 中。
+
+菜单和 painter 必须一起进入新的 `boot_b`：字形指令使用 SFB1 记录原来的保留字节。
+旧的纯矩形充电帧仍兼容新版 painter。仅更新 stage-2 不会更新开机菜单。
+这次设计的实机显示验收尚未完成。
+
 - 音量上下键或外接键盘上下方向键用于切换高亮的 stage-2 世代。
 - 高亮会在当前页内逐行移动；越过本页最后一项时才切换到下一页。
 - 长按导航键会连续移动选择。
@@ -61,6 +70,24 @@ Qualcomm SSC 服务存在启动注册窗口。如果用户在 stage-1 慢慢翻�
 选择、切换或回滚 stage-2 世代不需要重新刷机。
 
 ## 验证
+
+`generationMenuRenderer` flake 检查覆盖 mruby 输入与导航，以及真正的原生 painter。
+测试在 3048x2032、2032x3048、1280x720 和带行填充的 16/24/32 bpp 下，对比局部重绘
+与完整重绘的像素，包括选中项变化、上下跨页、首尾循环；另检查空世代和启动交接画面。
+由于共用 painter，还必须运行关机充电回归测试。
+
+本机预览需要 mruby、带 Pillow 的 Python，以及按本机架构构建的 painter 包：
+
+```sh
+mruby nixos/tests/test-stage1-generation-menu-renderer.rb \
+  nixos/patches/stage-1-headless-generation-menu.rb /tmp/menu.fbops \
+  "$PAINTER/share/sheng/menu-font.rb"
+python3 scripts/preview-generation-menu.py /tmp/menu.fbops \
+  "$PAINTER/bin/sheng-fb-painter" --output /tmp/menu-preview
+```
+
+`PAINTER` 指向本机架构的包输出目录。PNG 直接来自原生 framebuffer 字节，而不是
+另一套效果图实现；本机测试通过不能代替刷入 boot 后的实机验证。
 
 测试菜单前，先确认至少存在两个世代：
 

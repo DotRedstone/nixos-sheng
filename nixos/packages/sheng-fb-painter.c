@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
+#include "menu-font.h"
 
 #define COMMAND_MAGIC "SFB1"
 #define COMMAND_HEADER_SIZE 4U
@@ -77,6 +78,51 @@ static void store_pixel(uint8_t *destination, uint32_t value,
     destination[index] = (uint8_t)(value >> (index * 8U));
 }
 
+static uint8_t read_color(uint32_t pixel, struct fb_bitfield field) {
+  if (!field.length || field.length > 8 || field.offset >= 32)
+    return 0;
+  unsigned int maximum = (1U << field.length) - 1U;
+  return (uint8_t)(((pixel >> field.offset) & maximum) * 255U / maximum);
+}
+
+/* SFB1's reserved byte is zero for fills, or an ASCII code for baked glyphs.
+ * Blend into the composition surface, never into the live scanout buffer. */
+static int paint_glyph(struct target *target, const uint8_t *record) {
+  unsigned int code = record[11];
+  unsigned int x = read_le16(record), y = read_le16(record + 2);
+  unsigned int width = read_le16(record + 4), height = read_le16(record + 6);
+  unsigned int bank;
+  if (code < 32 || code > 126)
+    return -1;
+  switch (height) {
+    case 27: bank = 0; break;
+    case 36: bank = 1; break;
+    case 54: bank = 2; break;
+    default: return -1;
+  }
+  const struct menu_glyph *glyph = &menu_glyphs[bank * 95 + code - 32];
+  if (!width || width > glyph->width)
+    return -1;
+  for (unsigned int row = 0; row < height && y + row < target->height; row++) {
+    for (unsigned int col = 0; col < width && x + col < target->width; col++) {
+      unsigned int alpha = menu_coverage[glyph->offset + row * glyph->width + col];
+      if (!alpha)
+        continue;
+      uint8_t *dest = target->surface +
+          (size_t)(y + row - target->surface_y) * target->surface_stride +
+          (size_t)(x + col - target->surface_x) * target->bytes_per_pixel;
+      uint32_t previous = 0;
+      for (unsigned int b = 0; b < target->bytes_per_pixel; b++)
+        previous |= (uint32_t)dest[b] << (b * 8);
+      uint8_t r = (record[8] * alpha + read_color(previous, target->red) * (255 - alpha) + 127) / 255;
+      uint8_t g = (record[9] * alpha + read_color(previous, target->green) * (255 - alpha) + 127) / 255;
+      uint8_t b = (record[10] * alpha + read_color(previous, target->blue) * (255 - alpha) + 127) / 255;
+      store_pixel(dest, pixel_value(target, r, g, b), target->bytes_per_pixel);
+    }
+  }
+  return 0;
+}
+
 static int paint_rectangle(struct target *target, const uint8_t *record,
                            const struct timespec *started_at) {
   unsigned int x = read_le16(record);
@@ -91,6 +137,8 @@ static int paint_rectangle(struct target *target, const uint8_t *record,
 
   if (x >= target->width || y >= target->height || width == 0 || height == 0)
     return 0;
+  if (record[11])
+    return paint_glyph(target, record);
   if (width > target->width - x)
     width = target->width - x;
   if (height > target->height - y)
@@ -342,6 +390,11 @@ int main(int argc, char **argv) {
   int result = 1;
   struct timespec started_at;
 
+  if (argc == 2 && strcmp(argv[1], "--font-license") == 0) {
+    puts(menu_font_license);
+    return 0;
+  }
+
   target.fd = -1;
   target.map = NULL;
   target.surface = NULL;
@@ -415,7 +468,7 @@ int main(int argc, char **argv) {
     const uint8_t *record = commands + COMMAND_HEADER_SIZE +
                             index * COMMAND_RECORD_SIZE;
     if (paint_rectangle(&target, record, &started_at) < 0) {
-      fprintf(stderr, "framebuffer render exceeded %ld ms\n",
+      fprintf(stderr, "invalid glyph command or framebuffer render exceeded %ld ms\n",
               RENDER_TIMEOUT_MS);
       munmap(commands, command_length);
       result = 124;

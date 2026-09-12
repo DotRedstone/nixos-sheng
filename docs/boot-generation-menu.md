@@ -20,6 +20,18 @@ The framebuffer UI presents generation details on two levels together with the
 current position, button icons, and an automatic-boot progress indicator. The
 selected generation has a high-contrast highlight and direction marker.
 
+The static design matches the offline charging screen: black background,
+Inter type, mint accents and a rounded selected row, without an enclosing panel
+or animated transitions. Up to eight generations are shown per page; smaller
+displays show fewer rows. Inter coverage masks and matching text metrics are
+baked during the painter build. Stage-1 needs neither Python nor a font engine.
+Font attribution is embedded in `sheng-fb-painter --font-license`.
+
+The menu and painter must ship together in the new `boot_b`: glyph commands use
+the previously reserved SFB1 record byte. Existing rectangle-only charging
+frames remain compatible with the new painter. Updating only stage-2 does not
+update this menu. Physical display acceptance of this redesign is still pending.
+
 - Volume up/down or an external keyboard's up/down arrows change the
   highlighted stage-2 generation.
 - The highlight advances within the current page and only switches pages after
@@ -82,6 +94,28 @@ flashing `boot_b`. Creating, selecting, switching, or rolling back stage-2
 generations does not require flashing.
 
 ## Verification
+
+The `generationMenuRenderer` flake check exercises mruby input/navigation and
+the actual native painter. It compares incremental frames against full redraws
+across page boundaries, wraparound, and selection changes at 3048x2032,
+2032x3048 and 1280x720, with padded strides at 16/24/32 bpp. Empty lists and the
+boot handoff screen are rendered as well. The offline-charging check must also
+pass because both interfaces use the painter.
+
+For host-only previews (Python needs Pillow; mruby is also required), first
+build the painter for the host architecture, then run:
+
+```sh
+mruby nixos/tests/test-stage1-generation-menu-renderer.rb \
+  nixos/patches/stage-1-headless-generation-menu.rb /tmp/menu.fbops \
+  "$PAINTER/share/sheng/menu-font.rb"
+python3 scripts/preview-generation-menu.py /tmp/menu.fbops \
+  "$PAINTER/bin/sheng-fb-painter" --output /tmp/menu-preview
+```
+
+`PAINTER` is the host-built package output. Preview PNGs come from native
+framebuffer bytes, not a separate mockup. Host checks are not a substitute for
+testing the flashed boot image.
 
 Before testing the menu, confirm at least two generations exist:
 
