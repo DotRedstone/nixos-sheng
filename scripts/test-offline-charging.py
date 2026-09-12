@@ -4,6 +4,7 @@ import importlib.util
 import subprocess
 import sys
 import tempfile
+import types
 from pathlib import Path
 
 
@@ -55,6 +56,18 @@ assert_true(
     module.detect_charger_boot("bootinfo.pureason=broken", "") == "",
     "malformed PON reason was accepted",
 )
+assert_true(
+    not module.normal_boot_allowed(None),
+    "normal boot was allowed without a battery reading",
+)
+assert_true(
+    not module.normal_boot_allowed(module.MINIMUM_BOOT_CAPACITY - 1),
+    "normal boot was allowed below the safe charge threshold",
+)
+assert_true(
+    module.normal_boot_allowed(module.MINIMUM_BOOT_CAPACITY),
+    "normal boot was rejected at the safe charge threshold",
+)
 
 with tempfile.TemporaryDirectory() as directory:
     cmdline = Path(directory) / "cmdline"
@@ -102,6 +115,48 @@ for width, height in ((3048, 2032), (2032, 3048), (1280, 720)):
         charged_area(high) > charged_area(low),
         "battery fill does not increase with capacity",
     )
+
+with tempfile.TemporaryDirectory() as directory:
+    events = []
+    original_command_path = module.FRAMEBUFFER_COMMAND_PATH
+    original_geometry = module.framebuffer_geometry
+    original_exists = module.os.path.exists
+    original_run = module.subprocess.run
+    module.FRAMEBUFFER_COMMAND_PATH = str(Path(directory) / "display-order.fbops")
+    module.framebuffer_geometry = lambda: (1280, 720)
+    module.os.path.exists = lambda path: path == "/dev/fb0" or original_exists(path)
+    module.subprocess.run = lambda *args, **kwargs: (
+        events.append("paint") or types.SimpleNamespace(returncode=0)
+    )
+    display = module.Display()
+
+    def fake_blank():
+        events.append("blank")
+        display.visible = False
+
+    def fake_unblank():
+        events.append("unblank")
+        display.visible = True
+
+    display.blank = fake_blank
+    display.unblank = fake_unblank
+    try:
+        assert_true(display.render(100), "initial charging frame failed")
+        assert_true(
+            events == ["blank", "paint", "unblank"],
+            "panel was unblanked before the first frame was painted",
+        )
+        events.clear()
+        assert_true(display.render(100), "visible charging frame refresh failed")
+        assert_true(
+            events == ["paint"],
+            "visible frame refresh unnecessarily blanked the panel",
+        )
+    finally:
+        module.FRAMEBUFFER_COMMAND_PATH = original_command_path
+        module.framebuffer_geometry = original_geometry
+        module.os.path.exists = original_exists
+        module.subprocess.run = original_run
 
 if painter is not None:
     with tempfile.TemporaryDirectory() as directory:

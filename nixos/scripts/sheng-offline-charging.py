@@ -20,6 +20,7 @@ EV_KEY = 1
 KEY_POWER = 116
 HOLD_SECONDS = 2.0
 DISPLAY_SECONDS = 8.0
+MINIMUM_BOOT_CAPACITY = 5
 POWER_DISCOVERY_GRACE_SECONDS = 30.0
 DISCONNECT_SECONDS = 10.0
 PREFERRED_POWER_KEY_PATH = (
@@ -34,7 +35,6 @@ ACCENT = (115, 210, 199)
 FULL = (121, 218, 158)
 LOW = (238, 186, 96)
 CRITICAL = (232, 105, 105)
-
 DIGITS = {
     "0": ("01110", "10001", "10011", "10101", "11001", "10001", "01110"),
     "1": ("00100", "01100", "00100", "00100", "00100", "00100", "01110"),
@@ -291,6 +291,7 @@ def build_framebuffer_commands(width, height, capacity):
 class Display:
     def __init__(self):
         self.saved_backlights = {}
+        self.visible = False
 
     def capture_backlights(self):
         for path in glob.glob("/sys/class/backlight/*/brightness"):
@@ -313,6 +314,7 @@ class Display:
             write_text(path, "0\n")
         for path, value in self.saved_backlights.items():
             write_text(path, value + "\n")
+        self.visible = True
 
     def blank(self):
         self.capture_backlights()
@@ -320,12 +322,17 @@ class Display:
             write_text(path, "0\n")
         for path in glob.glob("/sys/class/graphics/fb*/blank"):
             write_text(path, "1\n")
+        self.visible = False
 
     def render(self, capacity):
         geometry = framebuffer_geometry()
         if geometry is None or not os.path.exists("/dev/fb0"):
             return False
-        self.unblank()
+        was_visible = self.visible
+        if not was_visible:
+            # Paint the first frame while the panel is still blank. Unblanking
+            # before the painter ran exposed one frame of the boot console.
+            self.blank()
         commands = build_framebuffer_commands(*geometry, capacity)
         try:
             with open(FRAMEBUFFER_COMMAND_PATH, "wb") as handle:
@@ -335,7 +342,11 @@ class Display:
                 check=False,
                 timeout=5,
             )
-            return result.returncode == 0
+            if result.returncode != 0:
+                return False
+            if not was_visible:
+                self.unblank()
+            return True
         except (OSError, subprocess.TimeoutExpired):
             return False
 
@@ -357,7 +368,21 @@ def open_power_key():
     return None
 
 
+def normal_boot_allowed(capacity):
+    return capacity is not None and capacity >= MINIMUM_BOOT_CAPACITY
+
+
 def start_normal_boot(display):
+    capacity = battery_capacity()
+    if not normal_boot_allowed(capacity):
+        shown_capacity = "unknown" if capacity is None else f"{capacity}%"
+        print(
+            "Offline charging: normal boot deferred at "
+            f"{shown_capacity}; {MINIMUM_BOOT_CAPACITY}% is required.",
+            flush=True,
+        )
+        return False
+
     print("Offline charging: power key held; starting the normal system.", flush=True)
     display.unblank()
     result = subprocess.run(
@@ -419,13 +444,10 @@ def monitor():
             )
             last_report = now
 
-        if (
-            capacity != last_capacity
-            and visible_until is not None
-            and now < visible_until
-        ):
-            display.render(capacity)
-            last_capacity = capacity
+        if visible_until is not None and now < visible_until:
+            if capacity != last_capacity:
+                display.render(capacity)
+                last_capacity = capacity
         elif visible_until is not None and now >= visible_until:
             display.blank()
             visible_until = None
@@ -452,6 +474,9 @@ def monitor():
                         if held_for >= HOLD_SECONDS:
                             if start_normal_boot(display):
                                 return 0
+                            last_capacity = battery_capacity()
+                            display.render(last_capacity)
+                            visible_until = time.monotonic() + DISPLAY_SECONDS
                         else:
                             last_capacity = battery_capacity()
                             display.render(last_capacity)
@@ -463,6 +488,9 @@ def monitor():
             if start_normal_boot(display):
                 return 0
             pressed_at = None
+            last_capacity = battery_capacity()
+            display.render(last_capacity)
+            visible_until = time.monotonic() + DISPLAY_SECONDS
 
 
 def main(argv):
