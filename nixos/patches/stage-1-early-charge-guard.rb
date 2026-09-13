@@ -77,9 +77,16 @@ module ShengEarlyChargeGuard
   def normal_reboot_requested?()
     return @normal_reboot_requested if @normal_reboot_requested_checked
 
+    marker_path = normal_reboot_marker_path()
+    # SwitchRoot can probe charger_mode? before the root filesystem has been
+    # mounted at /mnt. A missing parent then is not a negative answer: caching
+    # it would permanently classify a USB-connected normal reboot as charger
+    # mode. Wait until the persistent marker directory is visible.
+    return false unless File.directory?(File.dirname(marker_path))
+
     @normal_reboot_requested_checked = true
-    @normal_reboot_requested = File.exist?(normal_reboot_marker_path())
-    File.delete(normal_reboot_marker_path()) if @normal_reboot_requested
+    @normal_reboot_requested = File.exist?(marker_path)
+    File.delete(marker_path) if @normal_reboot_requested
     @normal_reboot_requested
   rescue Errno::ENOENT
     @normal_reboot_requested = false
