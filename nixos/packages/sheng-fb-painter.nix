@@ -11,6 +11,7 @@ stdenv.mkDerivation {
     runHook preBuild
     python3 ${./build-menu-font.py} ${inter}/share/fonts/truetype/Inter.ttc \
       menu-font.h menu-font.rb
+    cp ${./sheng-boot-animation.h} sheng-boot-animation.h
     $CC -O2 -std=c11 -Wall -Wextra -Werror -I. \
       ${./sheng-fb-painter.c} \
       -o sheng-fb-painter

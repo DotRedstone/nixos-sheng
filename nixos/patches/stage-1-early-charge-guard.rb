@@ -75,8 +75,9 @@ module ShengEarlyChargeGuard
   end
 
   def normal_reboot_requested?()
-    return @normal_reboot_requested if defined?(@normal_reboot_requested)
+    return @normal_reboot_requested if @normal_reboot_requested_checked
 
+    @normal_reboot_requested_checked = true
     @normal_reboot_requested = File.exist?(normal_reboot_marker_path())
     File.delete(normal_reboot_marker_path()) if @normal_reboot_requested
     @normal_reboot_requested

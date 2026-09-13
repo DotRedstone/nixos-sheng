@@ -81,6 +81,7 @@
             });
         };
         gjs-osk = final.callPackage ./packages/gjs-osk.nix { };
+        sheng-boot-animation = final.callPackage ./packages/sheng-boot-animation.nix { };
         sheng-fb-painter = final.callPackage ./packages/sheng-fb-painter.nix { };
         sheng-libssc = final.callPackage ./hardware/xiaomi-sheng/sensors/libssc.nix { };
         sheng-touch-firmware = final.callPackage ./packages/xiaomi-sheng-touch-firmware.nix { };
@@ -222,6 +223,22 @@
       };
 
       checks.${system} = {
+        bootAnimation = pkgs.runCommand "sheng-boot-animation-check" {
+          nativeBuildInputs = [
+            pkgs.ruby pkgs.mruby pkgs.sheng-fb-painter
+            (pkgs.python3.withPackages (ps: [ ps.pillow ]))
+          ];
+        } ''
+          mrbc -c ${./patches/stage-1-boot-animation.rb}
+          ruby ${../scripts/test-stage1-boot-animation.rb} \
+            ${./patches/stage-1-boot-animation.rb} \
+            ${./patches/stage-1-early-charge-guard.rb}
+          python3 ${../scripts/test-boot-animation.py} \
+            ${pkgs.sheng-fb-painter}/bin/sheng-fb-painter \
+            ${pkgs.sheng-boot-animation}
+          touch $out
+        '';
+
         offlineCharging = pkgs.runCommand "sheng-offline-charging-check" {
           SHENG_CHARGING_FONT = "${pkgs.inter}/share/fonts/truetype/Inter.ttc";
           nativeBuildInputs = [
@@ -287,8 +304,10 @@
           }
 
           check_pixel 0 0 "0,0,0,0"
-          check_pixel 810 540 "36,43,24,0"
-          check_pixel 900 660 "0,0,0,0"
+          # Rounded corner, mint selection, and the next dark card.
+          check_pixel 940 434 "0,0,0,0"
+          check_pixel 1000 540 "184,214,130,0"
+          check_pixel 1000 680 "19,21,16,0"
 
           python3 ${../scripts/preview-generation-menu.py} "$commands" \
             ${pkgs.sheng-fb-painter}/bin/sheng-fb-painter

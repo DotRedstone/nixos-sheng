@@ -13,6 +13,8 @@ let
     + (builtins.readFile ../patches/stage-1-early-charge-guard.rb)
     + "\n"
     + (builtins.readFile ../patches/stage-1-headless-generation-menu.rb)
+    + "\n"
+    + (builtins.readFile ../patches/stage-1-boot-animation.rb)
   );
   headlessStage1Task = pkgs.runCommand "sheng-headless-stage1-task" { } ''
     mkdir -p $out
@@ -184,6 +186,7 @@ in
       boot.fail.shell = true;
       gui.enable = false;
       splash.disabled = true;
+      sheng_boot_animation.enable = true;
       sheng_generation_menu = {
         enable = true;
         timeout = 3;
@@ -204,6 +207,10 @@ in
       headlessStage1Task
       rootFsckTask
       udevTolerantTask
+    ];
+
+    contents = [
+      { object = pkgs.sheng-boot-animation; symlink = "/etc/sheng-boot-animation"; }
     ];
 
     extraUtils = [

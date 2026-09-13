@@ -228,7 +228,9 @@ elapsed = Time.now.to_f - started_at
 operations = menu.captured_operations
 
 raise "renderer queued no operations" if operations.empty?
-raise "renderer queued too many operations: #{operations.length}" if operations.length > 1500
+# Antialiased 32px card corners add bounded scanlines; keep a budget well
+# below the native painter limit and verify partial updates independently.
+raise "renderer queued too many operations: #{operations.length}" if operations.length > 3000
 raise "renderer preparation took #{elapsed}s" if elapsed > 2.0
 
 operations.each do |operation|
@@ -270,7 +272,7 @@ menu.render_framebuffer(
   previous_remaining: 3
 )
 partial_operations = menu.captured_operations
-raise "partial redraw queued too many operations" if partial_operations.length > 250
+raise "partial redraw queued too many operations" if partial_operations.length > 800
 
 menu.render_framebuffer(
   generations,
@@ -282,7 +284,7 @@ menu.render_framebuffer(
   previous_remaining: nil
 )
 last_row_operations = menu.captured_operations
-raise "last row unexpectedly redrew the whole page" if last_row_operations.length > 250
+raise "last row unexpectedly redrew the whole page" if last_row_operations.length > 800
 
 menu.render_framebuffer(
   generations,
@@ -294,7 +296,7 @@ menu.render_framebuffer(
   previous_remaining: nil
 )
 next_page_operations = menu.captured_operations
-raise "page boundary did not redraw the new page" if next_page_operations.length <= 250
+raise "page boundary did not redraw the new page" if next_page_operations.length <= 800
 
 menu.render_framebuffer(generations, generations.length - 1, remaining: nil)
 bottom_operations = menu.captured_operations
@@ -349,6 +351,17 @@ end
     previous = selected
     previous_page = page
     previous_remaining = nil
+  end
+  # Rounded progress ends must also erase cleanly as the countdown shrinks.
+  menu.render_framebuffer(generations, 0, remaining: 3)
+  previous_remaining = 3
+  [2, 1, 0, nil].each_with_index do |remaining, step|
+    menu.render_framebuffer(generations, 0, previous_selected: 0,
+      remaining: remaining, previous_remaining: previous_remaining)
+    save_frame(menu, "#{prefix}.countdown-#{step}.partial")
+    menu.render_framebuffer(generations, 0, remaining: remaining)
+    save_frame(menu, "#{prefix}.countdown-#{step}.full")
+    previous_remaining = remaining
   end
   menu.render_framebuffer([], 0, remaining: 3)
   save_frame(menu, "#{prefix}.empty")

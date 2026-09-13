@@ -20,17 +20,23 @@ The framebuffer UI presents generation details on two levels together with the
 current position, button icons, and an automatic-boot progress indicator. The
 selected generation has a high-contrast highlight and direction marker.
 
-The static design matches the offline charging screen: black background,
-Inter type, mint accents and a rounded selected row, without an enclosing panel
-or animated transitions. Up to eight generations are shown per page; smaller
-displays show fewer rows. Inter coverage masks and matching text metrics are
+The static design follows the original rounded battery screen: black background,
+Inter type, 32px rounded generation cards, a mint-filled selection and a dark
+rounded arrow. Other entries use soft dark cards; the position badge and physical
+button hints are pill-shaped. Scrollbars, the countdown track and boot handoff
+use rounded ends as well. The column is narrower with more space between cards,
+without animated transitions. The charging screen is unchanged. Up to eight
+generations are shown per page; smaller displays show fewer rows.
+Inter coverage masks and matching text metrics are
 baked during the painter build. Stage-1 needs neither Python nor a font engine.
 Font attribution is embedded in `sheng-fb-painter --font-license`.
 
 The menu and painter must ship together in the new `boot_b`: glyph commands use
 the previously reserved SFB1 record byte. Existing rectangle-only charging
 frames remain compatible with the new painter. Updating only stage-2 does not
-update this menu. Physical display acceptance of this redesign is still pending.
+update this menu. The rounded menu itself affects stage-1. The accompanying
+[boot animation](boot-animation.md) also changes cmdline and stage-2 services;
+deploy matching boot_b and system generation/rootfs for the complete flow. Physical display acceptance of this redesign is still pending.
 
 - Volume up/down or an external keyboard's up/down arrows change the
   highlighted stage-2 generation.

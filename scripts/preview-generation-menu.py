@@ -48,6 +48,15 @@ with tempfile.TemporaryDirectory(prefix="sheng-menu-") as temporary:
                     preview("selection")
                 if step == 2:
                     preview("next-page")
+            paint(actual, "initial")
+            for step in range(4):
+                paint(actual, f"countdown-{step}.partial")
+                paint(expected, f"countdown-{step}.full")
+                assert actual.read_bytes() == expected.read_bytes(), (width, bpp, "countdown", step)
+                if step == 0:
+                    preview("countdown-2")
+                if step == 1:
+                    preview("countdown")
             for state in ("empty", "booting"):
                 paint(actual, state)
                 preview(state)

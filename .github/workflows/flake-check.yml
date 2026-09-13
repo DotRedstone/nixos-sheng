@@ -53,6 +53,7 @@ jobs:
         run: |
           nix build \
             './nixos#checks.aarch64-linux.offlineCharging' \
+            './nixos#checks.aarch64-linux.bootAnimation' \
             --no-link
 
       - name: Build Sheng touch and stylus processor

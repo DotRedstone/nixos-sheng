@@ -70,6 +70,42 @@ assert_true(
 )
 
 with tempfile.TemporaryDirectory() as directory:
+    marker = Path(directory) / "force-normal-once"
+    assert_true(
+        module.request_normal_reboot(str(marker)),
+        "normal reboot marker could not be written",
+    )
+    assert_true(
+        marker.read_text(encoding="ascii") == "normal-reboot\n",
+        "normal reboot marker content is invalid",
+    )
+
+events = []
+original_capacity = module.battery_capacity
+original_request = module.request_normal_reboot
+original_run = module.subprocess.run
+module.battery_capacity = lambda: module.MINIMUM_BOOT_CAPACITY
+module.request_normal_reboot = lambda: events.append("marker") or True
+module.subprocess.run = lambda command, **kwargs: (
+    events.append(command) or types.SimpleNamespace(returncode=0)
+)
+display = types.SimpleNamespace(unblank=lambda: events.append("unblank"), blank=lambda: events.append("blank"))
+try:
+    assert_true(module.start_normal_boot(display), "normal reboot request failed")
+    assert_true(
+        events == [
+            "marker",
+            "unblank",
+            [module.SYSTEMCTL, "--no-block", "reboot", "--force"],
+        ],
+        "charger power hold bypassed the stage-1 normal reboot path",
+    )
+finally:
+    module.battery_capacity = original_capacity
+    module.request_normal_reboot = original_request
+    module.subprocess.run = original_run
+
+with tempfile.TemporaryDirectory() as directory:
     cmdline = Path(directory) / "cmdline"
     bootconfig = Path(directory) / "bootconfig"
     cmdline.write_text("bootinfo.pureason=0x10\n", encoding="ascii")

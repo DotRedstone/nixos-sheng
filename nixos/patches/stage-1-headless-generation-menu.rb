@@ -13,21 +13,21 @@ module ShengHeadlessGenerationMenu
   REQUEST_PATH = "/mnt/var/lib/sheng-boot-menu/requested"
   PENDING_SELECTION_PATH = "/mnt/var/lib/sheng-boot-menu/pending-generation"
   MENU_CONSOLE_PATH = "/dev/tty2"
-  FALLBACK_CONSOLE_PATH = "/dev/tty0"
+  FALLBACK_CONSOLE_PATH = "/dev/tty3"
   FB_PATH = "/dev/fb0"
   FB_SYSFS = "/sys/class/graphics/fb0"
   OUTER_MARGIN = 64
   PANEL_MIN_Y = 24
   PANEL_MIN_WIDTH = 720
-  PANEL_MAX_WIDTH = 1560
+  PANEL_MAX_WIDTH = 1280
   PANEL_PADDING = 56
   FONT_SCALE = 4
   TITLE_FONT_SCALE = 6
   SUBTITLE_FONT_SCALE = 3
   HEADER_HEIGHT = 184
-  ROW_HEIGHT = 124
-  ROW_GAP = 12
-  FOOTER_HEIGHT = 190
+  ROW_HEIGHT = 128
+  ROW_GAP = 16
+  FOOTER_HEIGHT = 212
   SCROLLBAR_WIDTH = 8
   SCROLLBAR_GAP = 28
   FRAMEBUFFER_PAINTER = "sheng-fb-painter"
@@ -38,11 +38,13 @@ module ShengHeadlessGenerationMenu
   BG = [0, 0, 0]
   PANEL_BG = BG
   PANEL_BORDER_COLOR = [24, 31, 30]
-  ROW_BG = BG
-  SELECT_BG = [24, 43, 36]
+  ROW_BG = [16, 21, 19]
+  CONTROL_BG = [24, 31, 30]
+  SELECT_BG = [130, 214, 184]
   ACCENT = [130, 214, 184]
   TITLE_FG = [229, 236, 233]
-  SELECT_FG = TITLE_FG
+  SELECT_FG = [14, 31, 24]
+  SELECT_MUTED_FG = [35, 70, 56]
   NORMAL_FG = [207, 214, 212]
   MUTED_FG = [137, 150, 147]
   BOOT_FG = ACCENT
@@ -355,6 +357,12 @@ module ShengHeadlessGenerationMenu
   end
 
   def activate_console()
+    if File.exist?("/run/sheng-boot-ui.disabled") || System.cmdline().include?("sheng.boot-ui=0")
+      @framebuffer_failed = true
+      System.run("chvt", "3")
+      @console_path = FALLBACK_CONSOLE_PATH
+      return
+    end
     System.run("chvt", "2")
     @console_path = MENU_CONSOLE_PATH
   rescue System::CommandError => error
@@ -632,10 +640,10 @@ module ShengHeadlessGenerationMenu
     end
   end
 
-  def draw_power_icon(cx, cy, color)
-    draw_rounded_rect(cx - 16, cy - 14, 32, 32, 16, color, PANEL_BG)
-    draw_rounded_rect(cx - 13, cy - 11, 26, 26, 13, PANEL_BG, color, clear: false)
-    draw_rect(cx - 6, cy - 16, 12, 18, PANEL_BG)
+  def draw_power_icon(cx, cy, color, background = PANEL_BG)
+    draw_rounded_rect(cx - 16, cy - 14, 32, 32, 16, color, background)
+    draw_rounded_rect(cx - 13, cy - 11, 26, 26, 13, background, color, clear: false)
+    draw_rect(cx - 6, cy - 16, 12, 18, background)
     draw_rect(cx - 1, cy - 19, 3, 20, color)
   end
 
@@ -791,17 +799,21 @@ module ShengHeadlessGenerationMenu
     fg = is_selected ? SELECT_FG : NORMAL_FG
     width = row_width(labels.length > visible_count)
     title, details = generation_parts(labels[index], index)
-    text_x = content_x() + 34
-    text_width = width - 100
+    text_x = content_x() + 40
+    text_width = width - 144
 
-    draw_rect(content_x(), row_y, width, ROW_HEIGHT, bg)
+    # Match the charging battery's soft silhouette and mint fill. Clear the
+    # whole row first so rounded corners never retain the previous selection.
+    draw_rounded_rect(content_x(), row_y, width, ROW_HEIGHT, 32, bg, PANEL_BG)
     if is_selected
-      draw_rounded_rect(content_x(), row_y, width, ROW_HEIGHT, 8, SELECT_BG, BG)
-      draw_chevron(content_x() + width - 34, row_y + ROW_HEIGHT / 2, :right, ACCENT, 9, 3)
+      icon_x = content_x() + width - 68
+      draw_rounded_rect(icon_x - 22, row_y + ROW_HEIGHT / 2 - 22,
+        44, 44, 16, CONTROL_BG, bg)
+      draw_chevron(icon_x, row_y + ROW_HEIGHT / 2, :right, TITLE_FG, 9, 3)
     end
     draw_text_box(
       text_x,
-      row_y + 20,
+      row_y + 24,
       text_width,
       32,
       title,
@@ -814,28 +826,42 @@ module ShengHeadlessGenerationMenu
       text_width,
       24,
       details,
-      is_selected ? ACCENT : MUTED_FG,
+      is_selected ? SELECT_MUTED_FG : MUTED_FG,
       bg,
       scale: SUBTITLE_FONT_SCALE
     )
   end
 
+  def draw_selection_count(y, selected, count)
+    width = 160
+    x = content_x() + content_width() - width
+    draw_rounded_rect(x, y + 35, width, 52, 26, CONTROL_BG, PANEL_BG)
+    draw_text_box(x + 20, y + 47, width - 40, 28,
+      selection_count(selected, count), MUTED_FG, CONTROL_BG,
+      scale: SUBTITLE_FONT_SCALE, align: :center)
+  end
+
   def draw_controls(footer_y)
-    controls_y = footer_y + 128
-    first_x = content_x() + 18
+    controls_y = footer_y + 142
+    first_x = content_x() + (content_width() - 460) / 2
+    second_x = first_x + 244
 
-    draw_chevron(first_x + 24, controls_y - 7, :up, NORMAL_FG, 9, 3)
-    draw_chevron(first_x + 24, controls_y + 10, :down, NORMAL_FG, 9, 3)
-    draw_text_box(first_x + 68, controls_y - 14, 180, 30, "Select", MUTED_FG, PANEL_BG, scale: SUBTITLE_FONT_SCALE)
+    [first_x, second_x].each do |x|
+      draw_rounded_rect(x, controls_y - 32, 216, 64, 32, CONTROL_BG, PANEL_BG)
+    end
+    draw_chevron(first_x + 44, controls_y - 7, :up, NORMAL_FG, 9, 3)
+    draw_chevron(first_x + 44, controls_y + 10, :down, NORMAL_FG, 9, 3)
+    draw_text_box(first_x + 78, controls_y - 14, 110, 30,
+      "Select", MUTED_FG, CONTROL_BG, scale: SUBTITLE_FONT_SCALE)
 
-    second_x = first_x + 290
-    draw_power_icon(second_x + 18, controls_y, NORMAL_FG)
-    draw_text_box(second_x + 52, controls_y - 14, 180, 30, "Boot", MUTED_FG, PANEL_BG, scale: SUBTITLE_FONT_SCALE)
+    draw_power_icon(second_x + 44, controls_y, NORMAL_FG, CONTROL_BG)
+    draw_text_box(second_x + 78, controls_y - 14, 110, 30,
+      "Boot", MUTED_FG, CONTROL_BG, scale: SUBTITLE_FONT_SCALE)
   end
 
   def draw_countdown(footer_y, remaining)
-    label_y = footer_y + 25
-    track_y = footer_y + 76
+    label_y = footer_y + 26
+    track_y = footer_y + 74
     width = content_width()
     status = remaining ? "Auto boot" : "Select a generation"
     value = remaining ? "#{remaining}s" : "Paused"
@@ -853,9 +879,13 @@ module ShengHeadlessGenerationMenu
       scale: SUBTITLE_FONT_SCALE,
       align: :right
     )
-    draw_rect(content_x(), track_y, width, 3, PANEL_BORDER_COLOR)
+    draw_rounded_rect(content_x(), track_y, width, 10, 5, CONTROL_BG, PANEL_BG)
     progress = remaining ? clamp(remaining, 0, timeout()) : 0
-    draw_rect(content_x(), track_y, width * progress / [timeout(), 1].max, 3, ACCENT)
+    fill_width = width * progress / [timeout(), 1].max
+    if fill_width > 0
+      draw_rounded_rect(content_x(), track_y, fill_width, 10, 5,
+        ACCENT, CONTROL_BG, clear: false)
+    end
   end
 
   def draw_scrollbar(count, visible_count, start_index, rows_y)
@@ -869,8 +899,9 @@ module ShengHeadlessGenerationMenu
     denominator = count - visible_count
     thumb_y = rows_y + (denominator > 0 ? travel * start_index / denominator : 0)
 
-    draw_rect(track_x, rows_y, SCROLLBAR_WIDTH, track_height, ROW_BG)
-    draw_rect(track_x, thumb_y, SCROLLBAR_WIDTH, thumb_height, ACCENT)
+    draw_rect(track_x, rows_y, SCROLLBAR_WIDTH, track_height, PANEL_BG)
+    draw_rounded_rect(track_x, thumb_y, SCROLLBAR_WIDTH, thumb_height,
+      SCROLLBAR_WIDTH / 2, ACCENT, PANEL_BG)
   end
 
   def render_framebuffer(
@@ -910,7 +941,7 @@ module ShengHeadlessGenerationMenu
     footer_y = rows_y + rows_height(visible_count)
     title_scale = content_width() < 900 ? 4 : TITLE_FONT_SCALE
     brand_x = content_x()
-    count_width = content_width() < 900 ? 140 : 210
+    count_width = 190
 
     if full_redraw
       draw_rect(0, 0, @fb_width, @fb_height, BG)
@@ -931,44 +962,22 @@ module ShengHeadlessGenerationMenu
         content_width(),
         28,
         "Boot generations",
-        ACCENT,
+        MUTED_FG,
         PANEL_BG,
         scale: SUBTITLE_FONT_SCALE
       )
-      draw_text_box(
-        content_x() + content_width() - count_width,
-        y + 48,
-        count_width,
-        30,
-        selection_count(selected, labels.length),
-        MUTED_FG,
-        PANEL_BG,
-        scale: SUBTITLE_FONT_SCALE,
-        align: :right
-      )
-      draw_rect(content_x(), y + HEADER_HEIGHT - 20, content_width(), 2, PANEL_BORDER_COLOR)
+      draw_selection_count(y, selected, labels.length)
       index = start_index
       while index < end_index
         draw_generation_row(labels, index, selected, start_index, visible_count)
         index += 1
       end
       draw_scrollbar(labels.length, visible_count, start_index, rows_y)
-      draw_rect(content_x(), footer_y, content_width(), 2, PANEL_BORDER_COLOR)
       draw_controls(footer_y)
     elsif previous_selected != selected
       draw_generation_row(labels, previous_selected, selected, start_index, visible_count) if previous_selected
       draw_generation_row(labels, selected, selected, start_index, visible_count)
-      draw_text_box(
-        content_x() + content_width() - count_width,
-        y + 48,
-        count_width,
-        30,
-        selection_count(selected, labels.length),
-        MUTED_FG,
-        PANEL_BG,
-        scale: SUBTITLE_FONT_SCALE,
-        align: :right
-      )
+      draw_selection_count(y, selected, labels.length)
     end
 
     if full_redraw || previous_remaining != remaining
@@ -1031,7 +1040,11 @@ module ShengHeadlessGenerationMenu
         previous_remaining: previous_remaining
       )
     end
-    render_console(generations, selected, remaining) unless rendered
+    unless rendered
+      System.run("chvt", "3")
+      @console_path = FALLBACK_CONSOLE_PATH
+      render_console(generations, selected, remaining)
+    end
   end
 
   def render_booting(label = "NixOS - Default", status = "Starting system")
@@ -1043,7 +1056,7 @@ module ShengHeadlessGenerationMenu
 
     framebuffer_info()
     width = panel_width()
-    height = 380
+    height = 420
     x = panel_x()
     y = [(@fb_height - height) / 2, PANEL_MIN_Y].max
     title, details = generation_parts(label, 0)
@@ -1060,28 +1073,30 @@ module ShengHeadlessGenerationMenu
       PANEL_BG,
       scale: TITLE_FONT_SCALE
     )
+    draw_rounded_rect(x + PANEL_PADDING, y + 128,
+      width - PANEL_PADDING * 2, 144, 32, SELECT_BG, PANEL_BG)
     draw_text_box(
-      x + PANEL_PADDING,
-      y + 147,
-      width - PANEL_PADDING * 2,
+      x + PANEL_PADDING + 40,
+      y + 149,
+      width - PANEL_PADDING * 2 - 80,
       34,
       title,
-      TITLE_FG,
-      PANEL_BG
+      SELECT_FG,
+      SELECT_BG
     )
     draw_text_box(
-      x + PANEL_PADDING,
-      y + 202,
-      width - PANEL_PADDING * 2,
+      x + PANEL_PADDING + 40,
+      y + 211,
+      width - PANEL_PADDING * 2 - 80,
       28,
       details,
-      MUTED_FG,
-      PANEL_BG,
+      SELECT_MUTED_FG,
+      SELECT_BG,
       scale: SUBTITLE_FONT_SCALE
     )
     draw_text_box(
       x + PANEL_PADDING,
-      y + 292,
+      y + 314,
       width - PANEL_PADDING * 2,
       28,
       status,
@@ -1089,7 +1104,8 @@ module ShengHeadlessGenerationMenu
       PANEL_BG,
       scale: SUBTITLE_FONT_SCALE
     )
-    draw_rect(x + PANEL_PADDING, y + 339, width - PANEL_PADDING * 2, 3, BOOT_FG)
+    draw_rounded_rect(x + PANEL_PADDING, y + 366,
+      width - PANEL_PADDING * 2, 10, 5, BOOT_FG, PANEL_BG)
     present_framebuffer()
   rescue => error
     $logger.warn("Could not render sheng generation menu boot status: #{error}")
@@ -1228,6 +1244,7 @@ class Tasks::SwitchRoot
   def selected_generation()
     return @selected_generation if @selected_generation
 
+    ShengBootAnimation.stop()
     ShengEarlyChargeGuard.wait_if_critical()
     charger_boot = ShengEarlyChargeGuard.charger_mode?()
     ShengEarlyChargeGuard.prepare_offline_charging_handoff() if charger_boot
@@ -1236,11 +1253,13 @@ class Tasks::SwitchRoot
 
     if pending_generation
       @selected_generation = pending_generation
+      ShengBootAnimation.start("start")
     elsif wants_menu &&
        ShengHeadlessStage1.enabled? &&
        ShengHeadlessGenerationMenu.enabled?
       ShengHeadlessGenerationMenu.consume_request()
       @selected_generation, manual_selection = ShengHeadlessGenerationMenu.choose(self)
+      ShengBootAnimation.start("start")
       if manual_selection
         ShengHeadlessGenerationMenu.reboot_with_pending_selection(@selected_generation)
       end

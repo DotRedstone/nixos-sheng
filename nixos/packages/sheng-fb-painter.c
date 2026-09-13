@@ -271,7 +271,6 @@ static int map_framebuffer_target(struct target *target, const char *path) {
     close(target->fd);
     return -1;
   }
-  (void)ioctl(target->fd, FBIOBLANK, FB_BLANK_UNBLANK);
   return 0;
 }
 
@@ -378,7 +377,13 @@ static unsigned long parse_number(const char *value, const char *name) {
   return result;
 }
 
+#include "sheng-boot-animation.h"
+
 int main(int argc, char **argv) {
+  if (argc > 1 && (!strcmp(argv[1], "--animate") || !strcmp(argv[1], "--animate-file")))
+    return boot_animate(argc, argv);
+  if (argc == 3 && (!strcmp(argv[1], "--stop") || !strcmp(argv[1], "--details")))
+    return boot_request_stop(argv[2], !strcmp(argv[1], "--details"));
   const char *command_path;
   struct target target;
   struct stat command_status;

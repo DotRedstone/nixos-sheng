@@ -8,12 +8,14 @@ import select
 import struct
 import subprocess
 import sys
+import tempfile
 import time
 
 
 SYSTEMCTL = "@systemctl@"
 FRAMEBUFFER_PAINTER = "@framebufferPainter@"
 FRAMEBUFFER_COMMAND_PATH = "/run/sheng-offline-charging.fbops"
+NORMAL_REBOOT_MARKER_PATH = "/var/lib/sheng-offline-charging/force-normal-once"
 FONT_PATH = "@chargingFont@"
 
 EVENT = struct.Struct("llHHI")
@@ -348,6 +350,38 @@ def normal_boot_allowed(capacity):
     return capacity is not None and capacity >= MINIMUM_BOOT_CAPACITY
 
 
+def request_normal_reboot(path=NORMAL_REBOOT_MARKER_PATH):
+    """Persist the one-shot stage-1 handoff before rebooting from charger mode."""
+    directory = os.path.dirname(path)
+    temporary = None
+    try:
+        os.makedirs(directory, mode=0o755, exist_ok=True)
+        descriptor, temporary = tempfile.mkstemp(
+            prefix=".force-normal-once.", dir=directory
+        )
+        with os.fdopen(descriptor, "w", encoding="ascii") as handle:
+            handle.write("normal-reboot\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+        temporary = None
+        directory_descriptor = os.open(directory, os.O_RDONLY)
+        try:
+            os.fsync(directory_descriptor)
+        finally:
+            os.close(directory_descriptor)
+        return True
+    except OSError as error:
+        print(f"Offline charging: could not preserve normal boot request: {error}", flush=True)
+        return False
+    finally:
+        if temporary is not None:
+            try:
+                os.unlink(temporary)
+            except OSError:
+                pass
+
+
 def start_normal_boot(display):
     capacity = battery_capacity()
     if not normal_boot_allowed(capacity):
@@ -359,15 +393,23 @@ def start_normal_boot(display):
         )
         return False
 
-    print("Offline charging: power key held; starting the normal system.", flush=True)
+    if not request_normal_reboot():
+        return False
+
+    # A charger PON reason survives a warm reboot on this device.  Entering
+    # graphical.target in the current manager skips stage 1, which in turn
+    # skips the generation picker and native boot animation.  The marker is
+    # consumed by stage 1 so this reboot follows the same full path as a
+    # power-key boot while preserving the unchanged battery screen until then.
+    print("Offline charging: power key held; restarting into the normal system.", flush=True)
     display.unblank()
     result = subprocess.run(
-        [SYSTEMCTL, "--no-block", "isolate", "graphical.target"],
+        [SYSTEMCTL, "--no-block", "reboot", "--force"],
         check=False,
     )
     if result.returncode == 0:
         return True
-    print("Offline charging: failed to start the normal system.", flush=True)
+    print("Offline charging: failed to restart into the normal system.", flush=True)
     display.blank()
     return False
 

@@ -45,6 +45,7 @@ jobs:
             build \
             './nixos#checks.aarch64-linux.generationMenuRenderer' \
             './nixos#checks.aarch64-linux.offlineCharging' \
+            './nixos#checks.aarch64-linux.bootAnimation' \
             --no-link
 
       - name: Build boot image
