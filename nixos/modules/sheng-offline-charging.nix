@@ -71,6 +71,21 @@ in
     };
   };
 
+  # Mobile NixOS starts the stage-2 manager without running this custom
+  # generator in every boot path. Clean the one-shot handoff marker from a
+  # regular early service as well, after stage 1 has made its decision.
+  systemd.services.sheng-consume-normal-reboot-marker = {
+    description = "Consume the completed normal reboot marker";
+    wantedBy = [ "basic.target" ];
+    after = [ "local-fs.target" ];
+    before = [ "shutdown.target" ];
+    unitConfig.ConditionPathExists = "/var/lib/sheng-offline-charging/force-normal-once";
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${pkgs.coreutils}/bin/rm -f /var/lib/sheng-offline-charging/force-normal-once";
+    };
+  };
+
   systemd.generators.sheng-offline-charging = offlineChargingGenerator;
 
   systemd.targets.sheng-offline-charging = {
