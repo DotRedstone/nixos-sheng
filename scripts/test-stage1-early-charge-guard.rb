@@ -54,6 +54,13 @@ def charger_mode_for(values)
   ShengEarlyChargeGuard.charger_mode?
 end
 
+ShengEarlyChargeGuard.define_singleton_method(:normal_reboot_requested?) { true }
+assert(
+  !charger_mode_for("bootinfo.pureason" => "0x800011"),
+  "normal reboot marker did not override USB charger PON reason"
+)
+ShengEarlyChargeGuard.define_singleton_method(:normal_reboot_requested?) { false }
+
 assert(
   charger_mode_for("androidboot.mode" => "charger"),
   "androidboot charger mode was not detected"
