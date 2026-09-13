@@ -11,6 +11,10 @@ module ShengEarlyChargeGuard
   # over USB_CHG so booting normally while connected is never forced offline.
   PON_USB_CHG = 1 << 4
   PON_KPDPWR_N = 1 << 7
+  # A normal reboot while USB power is present can expose the same USB_CHG PON
+  # bit as a real charger insertion. Stage 2 writes this one-shot marker before
+  # rebooting; it remains in place until the stage-2 generator consumes it.
+  NORMAL_REBOOT_MARKER_PATH = "/mnt/var/lib/sheng-offline-charging/force-normal-once"
 
   def config()
     Configuration["sheng_early_charge_guard"] || {}
@@ -65,6 +69,12 @@ module ShengEarlyChargeGuard
     false
   end
 
+  def normal_reboot_requested?()
+    File.exist?(NORMAL_REBOOT_MARKER_PATH)
+  rescue
+    false
+  end
+
   def power_key_power_on_reason?(value)
     return false if value.nil? || value.empty?()
 
@@ -75,6 +85,7 @@ module ShengEarlyChargeGuard
   end
 
   def charger_mode?()
+    return false if normal_reboot_requested?()
     return false if boot_value("androidboot.force_normal_boot") == "1"
     pureason = boot_value("bootinfo.pureason")
     return false if power_key_power_on_reason?(pureason)

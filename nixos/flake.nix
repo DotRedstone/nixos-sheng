@@ -247,6 +247,10 @@
             ${./patches/stage-1-udev-trigger-tolerant.rb}
           grep -F 'output_dir="$2"' \
             ${mobileEval.config.systemd.generators.sheng-offline-charging}
+          grep -F 'normal_reboot_marker=/var/lib/sheng-offline-charging/force-normal-once' \
+            ${mobileEval.config.systemd.generators.sheng-offline-charging}
+          grep -F 'before = [ "shutdown.target" "systemd-reboot.service" ];' \
+            ${./modules/sheng-offline-charging.nix}
           python3 \
             ${../scripts/test-offline-charging.py} \
             ${./scripts/sheng-offline-charging.py} \
