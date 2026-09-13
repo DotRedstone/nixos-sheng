@@ -13,7 +13,8 @@ module ShengEarlyChargeGuard
   PON_KPDPWR_N = 1 << 7
   # A normal reboot while USB power is present can expose the same USB_CHG PON
   # bit as a real charger insertion. Stage 2 writes this one-shot marker before
-  # rebooting; it remains in place until the stage-2 generator consumes it.
+  # rebooting. Stage 1 consumes it and caches the result because charger_mode?
+  # is evaluated more than once during root selection.
   NORMAL_REBOOT_MARKER_PATH = "/mnt/var/lib/sheng-offline-charging/force-normal-once"
 
   def config()
@@ -69,8 +70,18 @@ module ShengEarlyChargeGuard
     false
   end
 
+  def normal_reboot_marker_path()
+    NORMAL_REBOOT_MARKER_PATH
+  end
+
   def normal_reboot_requested?()
-    File.exist?(NORMAL_REBOOT_MARKER_PATH)
+    return @normal_reboot_requested if defined?(@normal_reboot_requested)
+
+    @normal_reboot_requested = File.exist?(normal_reboot_marker_path())
+    File.delete(normal_reboot_marker_path()) if @normal_reboot_requested
+    @normal_reboot_requested
+  rescue Errno::ENOENT
+    @normal_reboot_requested = false
   rescue
     false
   end
