@@ -3,14 +3,19 @@
 [简体中文](boot-animation_zh.md)
 
 Normal boot uses a restrained black and white loop. Once the Linux framebuffer
-is available, a white arc turns continuously over a dim gray circular track
-while its center dot breathes gently. Only the `NixOS` wordmark remains; stage
+is available, the white Nix snowflake fades in. Soft light travels through its
+six interlocking lambda arms while the upright mark breathes by at most 1.8%.
+Only the `NixOS` wordmark accompanies it; stage
 labels and colored battery-like bars have been removed. The rounded generation
 menu retains its three-second timeout and volume-key selection. Selecting a
 system returns to the same seamless animation through stage-1 and stage-2; the
 display manager stops the writer before taking over scanout. No artificial
 progress percentage or fixed animation delay is added. Offline charging keeps
 its static battery.
+
+Snowflake geometry is adapted from [NixOS artwork](https://github.com/NixOS/nixos-artwork/tree/master/logo),
+by Simon Frankau and Tim Cuthbertson, under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+This version adds grayscale lighting and scale animation.
 
 ## Console and ownership
 

@@ -13,12 +13,24 @@ output.mkdir(parents=True, exist_ok=True)
 size, supersample, frames = 720, 2, 60
 record = struct.Struct('<HHHHBBBB')
 black = (0, 0, 0)
-white = (246, 246, 246)
-track = (34, 34, 34)
+white = (238, 238, 238)
 colors = [(round(255 * level / 31),) * 3 for level in range(32)]
 palette = Image.new('P', (1, 1))
 palette.putpalette([c for color in colors for c in color] + [0] * (768 - 3 * len(colors)))
-title_font = ImageFont.truetype(font_path, 42 * supersample)
+title_font = ImageFont.truetype(font_path, 34 * supersample)
+
+# Nix snowflake by Simon Frankau and Tim Cuthbertson, CC BY 4.0.
+# Geometry adapted from NixOS/nixos-artwork/logo/nix-snowflake-colours.svg:
+# preserve the six interlocking lambda silhouettes; animate only light/spacing.
+arm_steps = (
+    (122.19683, 211.67512), (-56.15706, .5268), (-32.6236, -56.8692),
+    (-32.85645, 56.5653), (-27.90237, -.011), (-14.29086, -24.6896),
+    (46.81047, -80.4901), (-33.22946, -57.8257),
+)
+arm = [(309.54892 - 407.3, -710.38827 + 715.8)]
+for dx, dy in arm_steps:
+    x, y = arm[-1]
+    arm.append((x + dx, y + dy))
 
 
 def encode(canvas):
@@ -55,36 +67,22 @@ for phase in ('prepare', 'start'):
         canvas = Image.new('RGB', (size * supersample, size * supersample), black)
         draw = ImageDraw.Draw(canvas)
 
-        # A single white arc turns over a quiet gray track. Rounded caps and a
-        # breathing center dot keep the motion soft without implying progress.
-        center_x, center_y, radius = 360, 286, 74
-        bounds = tuple(round(value * supersample) for value in (
-            center_x - radius, center_y - radius,
-            center_x + radius, center_y + radius,
-        ))
-        draw.ellipse(bounds, outline=track, width=5 * supersample)
+        # The mark stays upright. Light travels through its six arms, with a
+        # tiny shared expansion: no spinning badge or fictional progress bar.
+        time = 2 * math.pi * frame / frames
+        breath = (1 - math.cos(time)) / 2
+        scale = .43 * (1 + .018 * breath)
+        for index in range(6):
+            angle = math.radians(index * 60)
+            cosine, sine = math.cos(angle), math.sin(angle)
+            light = ((1 + math.cos(time - angle)) / 2) ** 3
+            level = round(166 + 80 * light + 8 * breath)
+            points = [((360 + scale * (x * cosine - y * sine)) * supersample,
+                       (300 + scale * (x * sine + y * cosine)) * supersample)
+                      for x, y in arm]
+            draw.polygon(points, fill=(level,) * 3)
 
-        end_angle = -90 + 360 * frame / frames
-        start_angle = end_angle - 112
-        stroke_width = 8
-        draw.arc(bounds, start=start_angle, end=end_angle, fill=white,
-                 width=stroke_width * supersample)
-        cap_radius = stroke_width / 2
-        for angle in (start_angle, end_angle):
-            radians = math.radians(angle)
-            x = center_x + radius * math.cos(radians)
-            y = center_y + radius * math.sin(radians)
-            draw.ellipse(tuple(round(value * supersample) for value in (
-                x - cap_radius, y - cap_radius, x + cap_radius, y + cap_radius,
-            )), fill=white)
-
-        breath = (1 - math.cos(2 * math.pi * frame / frames)) / 2
-        core_radius = 8 + 3 * breath
-        draw.ellipse(tuple(round(value * supersample) for value in (
-            center_x - core_radius, center_y - core_radius,
-            center_x + core_radius, center_y + core_radius,
-        )), fill=white)
-        draw.text((360 * supersample, 432 * supersample), 'NixOS',
+        draw.text((360 * supersample, 486 * supersample), 'NixOS',
                   font=title_font, fill=white, anchor='ms')
         (output / f'{phase}-{frame:02d}.sfb').write_bytes(encode(canvas))
 print(f'{frames * 2} boot frames, {sum(p.stat().st_size for p in output.glob("*.sfb"))} bytes')
