@@ -1,4 +1,4 @@
-"""Bake the rounded Sheng boot loop into rectangle-only SFB1 frames."""
+"""Bake the monochrome Sheng boot loop into rectangle-only SFB1 frames."""
 
 import math
 from pathlib import Path
@@ -13,18 +13,12 @@ output.mkdir(parents=True, exist_ok=True)
 size, supersample, frames = 720, 2, 60
 record = struct.Struct('<HHHHBBBB')
 black = (0, 0, 0)
-mint = (130, 214, 184)
-white = (229, 236, 233)
-muted = (137, 150, 147)
-track = (24, 31, 30)
-outline = (72, 86, 81)
-colors = [black]
-for color in (mint, white, muted, track, outline):
-    colors.extend(tuple(round(c * level / 8) for c in color) for level in range(1, 9))
+white = (246, 246, 246)
+track = (34, 34, 34)
+colors = [(round(255 * level / 31),) * 3 for level in range(32)]
 palette = Image.new('P', (1, 1))
 palette.putpalette([c for color in colors for c in color] + [0] * (768 - 3 * len(colors)))
 title_font = ImageFont.truetype(font_path, 42 * supersample)
-label_font = ImageFont.truetype(font_path, 21 * supersample)
 
 
 def encode(canvas):
@@ -56,28 +50,41 @@ def encode(canvas):
     return b'SFB1' + b''.join(record.pack(*rectangle) for rectangle in rectangles)
 
 
-for phase, label in [('prepare', 'Preparing device'), ('start', 'Starting system')]:
+for phase in ('prepare', 'start'):
     for frame in range(frames):
         canvas = Image.new('RGB', (size * supersample, size * supersample), black)
         draw = ImageDraw.Draw(canvas)
 
-        def rounded(bounds, radius, color):
-            draw.rounded_rectangle(tuple(round(v * supersample) for v in bounds),
-                                   radius=round(radius * supersample), fill=color)
+        # A single white arc turns over a quiet gray track. Rounded caps and a
+        # breathing center dot keep the motion soft without implying progress.
+        center_x, center_y, radius = 360, 286, 74
+        bounds = tuple(round(value * supersample) for value in (
+            center_x - radius, center_y - radius,
+            center_x + radius, center_y + radius,
+        ))
+        draw.ellipse(bounds, outline=track, width=5 * supersample)
 
-        # The same restrained shell and soft mint fill as the charging battery.
-        # The travelling breath is indeterminate: it never claims boot progress.
-        rounded((246, 210, 474, 362), 40, outline)
-        rounded((249, 213, 471, 359), 37, black)
-        for index in range(4):
-            x = 280 + index * 42
-            rounded((x, 242, x + 34, 330), 17, track)
-            wave = (1 + math.sin(2 * math.pi * frame / frames - index * 0.65)) / 2
-            height = 34 + 54 * wave
-            rounded((x, 286 - height / 2, x + 34, 286 + height / 2), 17, mint)
-        draw.text((360 * supersample, 433 * supersample), 'NixOS Sheng',
+        end_angle = -90 + 360 * frame / frames
+        start_angle = end_angle - 112
+        stroke_width = 8
+        draw.arc(bounds, start=start_angle, end=end_angle, fill=white,
+                 width=stroke_width * supersample)
+        cap_radius = stroke_width / 2
+        for angle in (start_angle, end_angle):
+            radians = math.radians(angle)
+            x = center_x + radius * math.cos(radians)
+            y = center_y + radius * math.sin(radians)
+            draw.ellipse(tuple(round(value * supersample) for value in (
+                x - cap_radius, y - cap_radius, x + cap_radius, y + cap_radius,
+            )), fill=white)
+
+        breath = (1 - math.cos(2 * math.pi * frame / frames)) / 2
+        core_radius = 8 + 3 * breath
+        draw.ellipse(tuple(round(value * supersample) for value in (
+            center_x - core_radius, center_y - core_radius,
+            center_x + core_radius, center_y + core_radius,
+        )), fill=white)
+        draw.text((360 * supersample, 432 * supersample), 'NixOS',
                   font=title_font, fill=white, anchor='ms')
-        draw.text((360 * supersample, 486 * supersample), label,
-                  font=label_font, fill=muted, anchor='ms')
         (output / f'{phase}-{frame:02d}.sfb').write_bytes(encode(canvas))
 print(f'{frames * 2} boot frames, {sum(p.stat().st_size for p in output.glob("*.sfb"))} bytes')

@@ -2,13 +2,15 @@
 
 [简体中文](boot-animation_zh.md)
 
-Normal boot uses the original battery screen's black background, Inter type,
-mint fill and soft corners. Once the Linux framebuffer is available, four
-rounded bars fade in and breathe in a travelling wave. The rounded generation
+Normal boot uses a restrained black and white loop. Once the Linux framebuffer
+is available, a white arc turns continuously over a dim gray circular track
+while its center dot breathes gently. Only the `NixOS` wordmark remains; stage
+labels and colored battery-like bars have been removed. The rounded generation
 menu retains its three-second timeout and volume-key selection. Selecting a
-system returns to the animation through stage-1 and stage-2; the display manager
-stops the writer before taking over scanout. No artificial progress percentage
-or fixed animation delay is added. Offline charging keeps its static battery.
+system returns to the same seamless animation through stage-1 and stage-2; the
+display manager stops the writer before taking over scanout. No artificial
+progress percentage or fixed animation delay is added. Offline charging keeps
+its static battery.
 
 ## Console and ownership
 

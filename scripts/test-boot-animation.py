@@ -10,6 +10,18 @@ import time
 
 painter, assets = map(Path, sys.argv[1:3])
 
+asset_paths = sorted(assets.glob('*.sfb'))
+assert len(asset_paths) == 120, 'Expected 60 frames for each boot phase'
+for asset in asset_paths:
+    data = asset.read_bytes()
+    assert data[:4] == b'SFB1' and (len(data) - 4) % 12 == 0, f'Invalid frame: {asset}'
+    for offset in range(4, len(data), 12):
+        red, green, blue = data[offset + 8:offset + 11]
+        assert red == green == blue, f'Non-monochrome pixel command in {asset}'
+for index in range(60):
+    assert (assets / f'prepare-{index:02d}.sfb').read_bytes() == \
+        (assets / f'start-{index:02d}.sfb').read_bytes(), 'Boot phase changes visual style'
+
 
 def wait_ready(process, control):
     deadline = time.monotonic() + 4
@@ -41,7 +53,9 @@ with tempfile.TemporaryDirectory(prefix='sheng-boot-test-') as temporary:
             for row in range(height):
                 assert data[row * stride + stride - 96:(row + 1) * stride] == b'\xa5' * 96
             assert data[:bpp // 8] == b'\0' * (bpp // 8), 'Old content was not cleared'
-            assert any(data[height // 2 * stride:height // 2 * stride + stride - 96]), 'Blank splash'
+            row_bytes = width * (bpp // 8)
+            assert any(any(data[row * stride:row * stride + row_bytes])
+                       for row in range(height)), 'Blank splash'
         print(f'{width}x{height}: 16/24/32bpp, padded stride preserved')
 
     raw.write_bytes(bytes((720 * 4 + 96) * 720))
@@ -119,4 +133,4 @@ with tempfile.TemporaryDirectory(prefix='sheng-boot-test-') as temporary:
     assert failure.returncode != 0, 'Malformed assets were accepted'
     assert raw.read_bytes() == before, 'Failed preparation touched the display'
 
-print('boot animation pixels, loop, exclusive ownership, stop, diagnostics and failure tests passed')
+print('monochrome boot animation pixels, loop, exclusive ownership, stop, diagnostics and failure tests passed')

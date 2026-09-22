@@ -1,6 +1,6 @@
 # ---
 # Module: Sheng Boot Animation
-# Description: Bake rounded boot animation frames for the native framebuffer painter
+# Description: Bake monochrome boot animation frames for the native framebuffer painter
 # Scope: System
 # ---
 { runCommand, buildPackages, inter }:
