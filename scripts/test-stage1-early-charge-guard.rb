@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 
 require "logger"
+require "tmpdir"
 
 module Configuration
   def self.[](_key)
@@ -53,6 +54,57 @@ def charger_mode_for(values)
   end
   ShengEarlyChargeGuard.charger_mode?
 end
+
+Dir.mktmpdir do |directory|
+  marker = File.join(directory, "force-normal-once")
+  File.write(marker, "normal-reboot\n")
+  ShengEarlyChargeGuard.define_singleton_method(:normal_reboot_marker_path) { marker }
+  ShengEarlyChargeGuard.remove_instance_variable(:@normal_reboot_requested) if
+    ShengEarlyChargeGuard.instance_variable_defined?(:@normal_reboot_requested)
+  ShengEarlyChargeGuard.remove_instance_variable(:@normal_reboot_requested_checked) if
+    ShengEarlyChargeGuard.instance_variable_defined?(:@normal_reboot_requested_checked)
+  assert(
+    !charger_mode_for("bootinfo.pureason" => "0x800011"),
+    "normal reboot marker did not override USB charger PON reason"
+  )
+  assert(!File.exist?(marker), "normal reboot marker was not consumed by stage 1")
+  assert(
+    ShengEarlyChargeGuard.normal_reboot_requested?(),
+    "normal reboot marker was not cached for the second stage-1 check"
+  )
+end
+
+Dir.mktmpdir do |directory|
+  marker = File.join(directory, "root-not-ready", "force-normal-once")
+  ShengEarlyChargeGuard.define_singleton_method(:normal_reboot_marker_path) { marker }
+  ShengEarlyChargeGuard.remove_instance_variable(:@normal_reboot_requested) if
+    ShengEarlyChargeGuard.instance_variable_defined?(:@normal_reboot_requested)
+  ShengEarlyChargeGuard.remove_instance_variable(:@normal_reboot_requested_checked) if
+    ShengEarlyChargeGuard.instance_variable_defined?(:@normal_reboot_requested_checked)
+
+  assert(
+    !ShengEarlyChargeGuard.normal_reboot_requested?(),
+    "missing root marker directory was treated as a normal reboot"
+  )
+  assert(
+    !ShengEarlyChargeGuard.instance_variable_defined?(:@normal_reboot_requested_checked),
+    "missing root marker directory was cached before the mount"
+  )
+
+  Dir.mkdir(File.dirname(marker))
+  File.write(marker, "normal-reboot\n")
+  assert(
+    ShengEarlyChargeGuard.normal_reboot_requested?(),
+    "normal reboot marker was not rechecked after the root mount"
+  )
+  assert(!File.exist?(marker), "normal reboot marker was not consumed after the root mount")
+end
+
+ShengEarlyChargeGuard.define_singleton_method(:normal_reboot_marker_path) { "/missing" }
+ShengEarlyChargeGuard.remove_instance_variable(:@normal_reboot_requested) if
+  ShengEarlyChargeGuard.instance_variable_defined?(:@normal_reboot_requested)
+ShengEarlyChargeGuard.remove_instance_variable(:@normal_reboot_requested_checked) if
+  ShengEarlyChargeGuard.instance_variable_defined?(:@normal_reboot_requested_checked)
 
 assert(
   charger_mode_for("androidboot.mode" => "charger"),

@@ -81,6 +81,7 @@
             });
         };
         gjs-osk = final.callPackage ./packages/gjs-osk.nix { };
+        sheng-boot-animation = final.callPackage ./packages/sheng-boot-animation.nix { };
         sheng-fb-painter = final.callPackage ./packages/sheng-fb-painter.nix { };
         sheng-libssc = final.callPackage ./hardware/xiaomi-sheng/sensors/libssc.nix { };
         sheng-touch-firmware = final.callPackage ./packages/xiaomi-sheng-touch-firmware.nix { };
@@ -222,9 +223,26 @@
       };
 
       checks.${system} = {
-        offlineCharging = pkgs.runCommand "sheng-offline-charging-check" {
+        bootAnimation = pkgs.runCommand "sheng-boot-animation-check" {
           nativeBuildInputs = [
-            pkgs.python3
+            pkgs.ruby pkgs.mruby pkgs.sheng-fb-painter
+            (pkgs.python3.withPackages (ps: [ ps.pillow ]))
+          ];
+        } ''
+          mrbc -c ${./patches/stage-1-boot-animation.rb}
+          ruby ${../scripts/test-stage1-boot-animation.rb} \
+            ${./patches/stage-1-boot-animation.rb} \
+            ${./patches/stage-1-early-charge-guard.rb}
+          python3 ${../scripts/test-boot-animation.py} \
+            ${pkgs.sheng-fb-painter}/bin/sheng-fb-painter \
+            ${pkgs.sheng-boot-animation}
+          touch $out
+        '';
+
+        offlineCharging = pkgs.runCommand "sheng-offline-charging-check" {
+          SHENG_CHARGING_FONT = "${pkgs.inter}/share/fonts/truetype/Inter.ttc";
+          nativeBuildInputs = [
+            (pkgs.python3.withPackages (ps: [ ps.pillow ]))
             pkgs.ruby
             pkgs.mruby
             pkgs.sheng-fb-painter
@@ -246,6 +264,10 @@
             ${./patches/stage-1-udev-trigger-tolerant.rb}
           grep -F 'output_dir="$2"' \
             ${mobileEval.config.systemd.generators.sheng-offline-charging}
+          grep -F 'normal_reboot_marker=/var/lib/sheng-offline-charging/force-normal-once' \
+            ${mobileEval.config.systemd.generators.sheng-offline-charging}
+          grep -F 'before = [ "shutdown.target" "systemd-reboot.service" ];' \
+            ${./modules/sheng-offline-charging.nix}
           python3 \
             ${../scripts/test-offline-charging.py} \
             ${./scripts/sheng-offline-charging.py} \
@@ -257,6 +279,7 @@
             pkgs.coreutils
             pkgs.mruby
             pkgs.sheng-fb-painter
+            (pkgs.python3.withPackages (ps: [ ps.pillow ]))
           ];
         } ''
           commands="$TMPDIR/sheng-menu.fbops"
@@ -265,7 +288,8 @@
           mruby \
             ${./tests/test-stage1-generation-menu-renderer.rb} \
             ${./patches/stage-1-headless-generation-menu.rb} \
-            "$commands"
+            "$commands" ${pkgs.sheng-fb-painter}/share/sheng/menu-font.rb \
+            ${pkgs.sheng-boot-animation}
 
           truncate -s $((2032 * 12288)) "$framebuffer"
           started_at="$(date +%s%N)"
@@ -280,12 +304,14 @@
             test "$blue,$green,$red,$alpha" = "$3"
           }
 
-          check_pixel 0 0 "11,10,8,0"
-          check_pixel 600 57 "199,210,115,0"
-          check_pixel 600 300 "67,67,35,0"
-          check_pixel 2400 450 "29,27,24,0"
-          test "$(sha256sum "$framebuffer" | cut -d' ' -f1)" = \
-            "16eab7f3420f865c18e5398bb15d553d4d890357bf59820ed38bd71015465128"
+          check_pixel 0 0 "0,0,0,0"
+          # Rounded corner, blue selection, and the next charcoal card.
+          check_pixel 940 434 "0,0,0,0"
+          check_pixel 1000 540 "54,35,20,0"
+          check_pixel 1000 680 "23,19,17,0"
+
+          python3 ${../scripts/preview-generation-menu.py} "$commands" \
+            ${pkgs.sheng-fb-painter}/bin/sheng-fb-painter --assets ${pkgs.sheng-boot-animation}
 
           echo "native framebuffer render completed in ''${elapsed_ms}ms"
           touch $out
