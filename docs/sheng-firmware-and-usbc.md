@@ -49,9 +49,13 @@ generated rootfs.
 
 This project's Mobile NixOS rootfs uses custom `populateCommands` and
 `lib.mkForce`. That override bypasses parts of the usual rootfs assembly path,
-so `sheng-firmware` must be explicitly injected into `/lib/firmware` in the
-final image. Stage-1 also needs the same firmware through
-`mobile.boot.stage-1.firmware`.
+so a device-specific rootfs firmware set must be explicitly injected into
+`/lib/firmware`. It contains `sheng-firmware`, the NT36532E Novatek blob, and
+the wireless regulatory database, and is shared by the GNOME and minimal rootfs
+images. Copying the complete `hardware.firmware` aggregate would also pull in
+the large generic Linux firmware set enabled by `hardware.enableRedistributableFirmware`.
+Stage-1 still carries only the Qualcomm firmware needed for early boot so the
+boot image remains within the `boot_b` size limit.
 
 Whenever firmware is added or adjusted, verify the final `rootfs.img` contents.
 Do not rely only on the Nix expression.
@@ -91,7 +95,7 @@ sudo mkdir -p /mnt/sheng-rootfs
 sudo mount -o loop,ro out/mobile-rootfs/rootfs.img /mnt/sheng-rootfs
 
 find /mnt/sheng-rootfs/lib/firmware /mnt/sheng-rootfs/usr/lib/firmware -maxdepth 10 -type f 2>/dev/null \
-  | grep -Ei 'qcom|sm8550|sheng|adsp|cdsp|ipa|a740' \
+  | grep -Ei 'qcom|sm8550|sheng|adsp|cdsp|ipa|a740|novatek|nt36532' \
   | sort \
   | head -100
 
@@ -105,6 +109,7 @@ Expected examples:
 /lib/firmware/qcom/sm8550/sheng/cdsp.mbn
 /lib/firmware/qcom/sm8550/sheng/ipa_fws.mbn
 /lib/firmware/qcom/a740_sqe.fw
+/lib/firmware/novatek/novatek_nt36532_n81a_fw_csot.bin
 ```
 
 If these files are missing, do not flash. Fix rootfs generation first.
