@@ -2,10 +2,11 @@
 
 [简体中文](boot-animation_zh.md)
 
-Normal boot uses a restrained black and white loop. Once the Linux framebuffer
-is available, the white Nix snowflake fades in. Soft light travels through its
+Normal boot uses a black background and the NixOS blues. Once the Linux framebuffer
+is available, the two-tone Nix snowflake fades in. Soft light travels through its
 six interlocking lambda arms while the upright mark breathes by at most 1.8%.
-Only the `NixOS` wordmark accompanies it; stage
+The `NixOS` wordmark accompanies it, with a muted `by dotredstone` credit anchored
+to the screen's bottom-right corner. Stage
 labels and colored battery-like bars have been removed. The rounded generation
 menu retains its three-second timeout and volume-key selection. Selecting a
 system returns to the same seamless animation through stage-1 and stage-2; the
@@ -15,7 +16,9 @@ its static battery.
 
 Snowflake geometry is adapted from [NixOS artwork](https://github.com/NixOS/nixos-artwork/tree/master/logo),
 by Simon Frankau and Tim Cuthbertson, under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
-This version adds grayscale lighting and scale animation.
+This version retains deep blue `#5277C3` and light blue `#7EBAE4`, adding lighting
+between 84–100% of each original color and scale animation. The corner credit
+identifies this project's boot animation; it does not replace the logo attribution.
 
 ## Console and ownership
 
@@ -31,7 +34,11 @@ at the end of early stage-2 activation.
 
 The implementation uses the existing native SFB1 painter, with frames baked at
 build time. It does not re-enable the LVGL boot path. The loop runs at 20fps and
-updates only a central 720px composition, scaling for small screens. File locks
+updates only the central composition and corner credit. A 5760px master produces
+720px and 1440px assets, with 8x and 4x supersampling respectively. Neutral tones
+use 64 gray levels to smooth text edges and fades. Displays with
+a short edge of at least 1600px use the 1440px asset without upscaling; smaller
+displays use the 720px asset, scaled down when needed. File locks
 exclude competing writers. Before switch_root, the child must load its frames
 and open the control and VT descriptors it carries across the mount move. The
 stage-2 service retires the old process before starting its own, freeing initrd
@@ -70,6 +77,12 @@ python3 scripts/preview-boot-animation.py "$PAINTER/bin/sheng-fb-painter" \
 ```
 
 Generate the optional menu directory with `scripts/preview-generation-menu.py`.
+Use `--width 3048 --height 2032` for native tablet landscape previews, or swap the
+dimensions for portrait. Still PNGs retain native resolution; GIF and lossless
+APNG previews default to a 1536px long edge to bound memory use. Set
+`--animation-max-size 0` for native-resolution animations (tablet sizes need
+several GB of memory). Inspect the
+PNG for pixel detail, since GIF is limited to 256 colors.
 The animation file-target mode never opens the host's real display. Tests cover
 16/24/32bpp, padded strides, landscape/portrait/small screens, loop continuity,
 writer exclusion, acknowledged stop, moved control directories, diagnostic
