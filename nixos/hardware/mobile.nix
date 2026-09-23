@@ -7,13 +7,20 @@
 { config, lib, pkgs, stage2Only ? false, ... }:
 
 let
-  headlessStage1Task = pkgs.writeTextDir "zz-sheng-headless-stage1.rb" (
+  headlessStage1Source = pkgs.writeText "sheng-headless-stage1.rb" (
     (builtins.readFile ../patches/stage-1-headless-no-gui.rb)
     + "\n"
     + (builtins.readFile ../patches/stage-1-early-charge-guard.rb)
     + "\n"
     + (builtins.readFile ../patches/stage-1-headless-generation-menu.rb)
+    + "\n"
+    + (builtins.readFile ../patches/stage-1-boot-animation.rb)
   );
+  headlessStage1Task = pkgs.runCommand "sheng-headless-stage1-task" { } ''
+    mkdir -p $out
+    cat ${pkgs.sheng-fb-painter}/share/sheng/menu-font.rb \
+      ${headlessStage1Source} > $out/zz-sheng-headless-stage1.rb
+  '';
   udevTolerantTask = pkgs.writeTextDir "zz-sheng-udev-tolerant.rb" (
     builtins.readFile ../patches/stage-1-udev-trigger-tolerant.rb
   );
@@ -179,6 +186,7 @@ in
       boot.fail.shell = true;
       gui.enable = false;
       splash.disabled = true;
+      sheng_boot_animation.enable = true;
       sheng_generation_menu = {
         enable = true;
         timeout = 3;
@@ -199,6 +207,10 @@ in
       headlessStage1Task
       rootFsckTask
       udevTolerantTask
+    ];
+
+    contents = [
+      { object = pkgs.sheng-boot-animation; symlink = "/etc/sheng-boot-animation"; }
     ];
 
     extraUtils = [

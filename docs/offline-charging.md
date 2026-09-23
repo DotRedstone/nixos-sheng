@@ -15,7 +15,14 @@ default cannot override charger mode.
 
 - The first frame is painted before the panel is unblanked, preventing a brief
   flash of boot-console text.
-- A static battery icon and percentage are drawn directly to `/dev/fb0`.
+- A rounded horizontal battery and antialiased Inter percentage are drawn
+  directly to `/dev/fb0`, with a black background and mint, amber or red fill.
+  Both are 50% larger on the native tablet display than the previous layout.
+- A gentle highlight travels through the actual filled region while the bolt
+  breathes, in a 3.2-second loop capped at 10 fps. Only the battery interior is
+  repainted. Full, unknown and unplugged states are static; blanking stops all
+  drawing. Pillow and the bundled font are used only when rendering, not during
+  boot-mode detection.
 - Charger boots hand off directly to the minimal charging target instead of
   waiting in a black stage-1.
 - The display turns off after eight seconds to reduce idle power.
@@ -48,13 +55,42 @@ This feature changes both initramfs stage-1 and NixOS stage-2. Build and flash
 the matching `boot_b` image, then activate or flash the matching rootfs/system
 generation. A device-side `nixos-rebuild` alone cannot update stage-1.
 
+The larger battery and charging animation only change stage-2. On a device with the charger
+boot support already installed, activate the updated system generation; no
+additional boot flash is needed. Switching to the previous system generation
+restores the previous renderer.
+
+For an off-device PNG preview, run `scripts/preview-offline-charging.py OUTPUT.png`
+with Pillow available and `SHENG_CHARGING_FONT` pointing to `Inter.ttc`.
+`--capacity`, `--width`, and `--height` select the battery level and framebuffer
+size. Add `--animate` to export a GIF/APNG loop. Use
+`--painter /path/to/sheng-fb-painter` to run the actual painter against a temporary
+file without touching the display. Preview and device use the same SFB1 commands.
+
+The visual hierarchy follows familiar Android battery/percentage displays; the
+artwork and animation are implemented here. References:
+[Android charging assets](https://android.googlesource.com/platform/system/core/+/344bff4/healthd/images/)
+and [Xiaomi charging animation](https://www.mi.com/sa-en/support/faq/details/KA-483284/).
+
+Offscreen regression checks, with Pillow and Inter available:
+
+```sh
+SHENG_CHARGING_FONT=/path/to/Inter.ttc python3 scripts/test-offline-charging.py \
+  nixos/scripts/sheng-offline-charging.py /path/to/sheng-fb-painter
+```
+
+Checks cover landscape/portrait bounds, loops without stale pixels, stationary
+text, full/unplugged states and no drawing while blanked. The same tests can run
+on the device using temporary files; they do not replace visible panel checks.
+
 ## Hardware Validation
 
 1. Boot normally while connected to power and confirm the desktop still starts.
 2. Shut the tablet down fully, then insert a charger without pressing power.
 3. Confirm that the generation menu and desktop do not appear.
-4. Confirm that the battery UI appears, blanks after eight seconds, and returns
-   after a short power-key press.
+4. Confirm the larger rounded battery and percentage are sharp, with moving
+   light and no text flicker. It should blank after eight seconds, return after
+   a short power-key press and remain static at full charge.
 5. Hold power for two seconds and confirm the normal graphical system starts.
 6. Repeat the charger boot, unplug power, and confirm shutdown after ten seconds.
 7. Test standard PD and MiPPS separately and inspect battery current and thermal

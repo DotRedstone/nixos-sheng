@@ -11,6 +11,11 @@ module ShengEarlyChargeGuard
   # over USB_CHG so booting normally while connected is never forced offline.
   PON_USB_CHG = 1 << 4
   PON_KPDPWR_N = 1 << 7
+  # A normal reboot while USB power is present can expose the same USB_CHG PON
+  # bit as a real charger insertion. Stage 2 writes this one-shot marker before
+  # rebooting. Stage 1 consumes it and caches the result because charger_mode?
+  # is evaluated more than once during root selection.
+  NORMAL_REBOOT_MARKER_PATH = "/mnt/var/lib/sheng-offline-charging/force-normal-once"
 
   def config()
     Configuration["sheng_early_charge_guard"] || {}
@@ -65,6 +70,30 @@ module ShengEarlyChargeGuard
     false
   end
 
+  def normal_reboot_marker_path()
+    NORMAL_REBOOT_MARKER_PATH
+  end
+
+  def normal_reboot_requested?()
+    return @normal_reboot_requested if @normal_reboot_requested_checked
+
+    marker_path = normal_reboot_marker_path()
+    # SwitchRoot can probe charger_mode? before the root filesystem has been
+    # mounted at /mnt. A missing parent then is not a negative answer: caching
+    # it would permanently classify a USB-connected normal reboot as charger
+    # mode. Wait until the persistent marker directory is visible.
+    return false unless File.directory?(File.dirname(marker_path))
+
+    @normal_reboot_requested_checked = true
+    @normal_reboot_requested = File.exist?(marker_path)
+    File.delete(marker_path) if @normal_reboot_requested
+    @normal_reboot_requested
+  rescue Errno::ENOENT
+    @normal_reboot_requested = false
+  rescue
+    false
+  end
+
   def power_key_power_on_reason?(value)
     return false if value.nil? || value.empty?()
 
@@ -75,6 +104,7 @@ module ShengEarlyChargeGuard
   end
 
   def charger_mode?()
+    return false if normal_reboot_requested?()
     return false if boot_value("androidboot.force_normal_boot") == "1"
     pureason = boot_value("bootinfo.pureason")
     return false if power_key_power_on_reason?(pureason)
