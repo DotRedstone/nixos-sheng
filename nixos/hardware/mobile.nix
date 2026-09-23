@@ -24,6 +24,16 @@ let
     mkdir -p $out/lib/firmware
     cp -r ${pkgs.sheng-firmware}/lib/firmware/qcom $out/lib/firmware/
   '';
+  rootfsFirmware = pkgs.buildEnv {
+    name = "sheng-rootfs-firmware";
+    paths = [
+      pkgs.sheng-firmware
+      pkgs.sheng-touch-firmware
+      pkgs.wireless-regdb
+    ];
+    pathsToLink = [ "/lib/firmware" ];
+    ignoreCollisions = false;
+  };
   closureInfo = pkgs.buildPackages.closureInfo {
     rootPaths = config.system.build.toplevel;
   };
@@ -111,10 +121,13 @@ in
       ln -s ${config.system.build.toplevel} ./nix/var/nix/profiles/system-1-link
       ln -s system-1-link ./nix/var/nix/profiles/system
 
-      echo "Injecting sheng-firmware into /lib/firmware..."
+      echo "Injecting sheng rootfs firmware into /lib/firmware..."
       mkdir -p ./lib/firmware
-      cp -r ${pkgs.sheng-firmware}/lib/firmware/* ./lib/firmware/
-      cp -r ${pkgs.wireless-regdb}/lib/firmware/* ./lib/firmware/
+      # Mobile NixOS' custom rootfs population does not copy the NixOS
+      # firmware aggregate automatically. Merge the device-specific packages
+      # first, then materialize them once so read-only store directories cannot
+      # block a later package from adding files to the same subtree.
+      cp -rL ${rootfsFirmware}/lib/firmware/. ./lib/firmware/
 
       echo "Injecting kernel modules into /lib/modules..."
       if [ -d ${kernelModulesTree}/lib/modules ]; then
