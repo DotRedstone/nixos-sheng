@@ -45,8 +45,11 @@ ADSP/CDSP 固件没加载时，`msm/adsp/charger_pd` 起不来，`ucsi_glink` �
 
 本项目的 Mobile NixOS rootfs 使用自定义 `populateCommands` 和 `lib.mkForce`
 生成。这个覆盖会绕开一部分常规 rootfs 组装路径，所以必须显式把
-`sheng-firmware` 注入到最终镜像的 `/lib/firmware`。stage-1 也需要通过
-`mobile.boot.stage-1.firmware` 带上同一份固件。
+设备专用 rootfs 固件集合注入最终镜像的 `/lib/firmware`。该集合包含
+`sheng-firmware`、NT36532E 的 Novatek 固件和无线监管数据库，GNOME 与 minimal
+两种 rootfs 使用同一份集合。这里不能直接复制完整的 `hardware.firmware` 聚合结果，
+因为 `hardware.enableRedistributableFirmware` 会同时加入庞大的通用 Linux 固件集合。
+stage-1 仍只携带早期启动所需的 Qualcomm 固件，以免 boot image 超过 `boot_b` 容量。
 
 以后凡是新增或调整 firmware，都要验证最终 `rootfs.img` 里真的存在对应文件，
 不要只看 Nix 表达式是否写了 `hardware.firmware`。
@@ -86,7 +89,7 @@ sudo mkdir -p /mnt/sheng-rootfs
 sudo mount -o loop,ro out/mobile-rootfs/rootfs.img /mnt/sheng-rootfs
 
 find /mnt/sheng-rootfs/lib/firmware /mnt/sheng-rootfs/usr/lib/firmware -maxdepth 10 -type f 2>/dev/null \
-  | grep -Ei 'qcom|sm8550|sheng|adsp|cdsp|ipa|a740' \
+  | grep -Ei 'qcom|sm8550|sheng|adsp|cdsp|ipa|a740|novatek|nt36532' \
   | sort \
   | head -100
 
@@ -100,6 +103,7 @@ sudo umount /mnt/sheng-rootfs
 /lib/firmware/qcom/sm8550/sheng/cdsp.mbn
 /lib/firmware/qcom/sm8550/sheng/ipa_fws.mbn
 /lib/firmware/qcom/a740_sqe.fw
+/lib/firmware/novatek/novatek_nt36532_n81a_fw_csot.bin
 ```
 
 如果看不到这些固件，不要刷机，先修 rootfs 生成逻辑。
