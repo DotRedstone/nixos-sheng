@@ -1,6 +1,6 @@
 # ---
 # Module: Sheng Boot Animation
-# Description: Bake monochrome boot animation frames for the native framebuffer painter
+# Description: Bake blue snowflake boot frames and corner credits at two resolutions
 # Scope: System
 # ---
 { runCommand, buildPackages, inter }:

@@ -8,19 +8,20 @@ import sys
 import tempfile
 import time
 
-painter, assets = map(Path, sys.argv[1:3])
+painter, assets = (Path(argument).resolve() for argument in sys.argv[1:3])
 
 asset_paths = sorted(assets.glob('*.sfb'))
-assert len(asset_paths) == 120, 'Expected 60 frames for each boot phase'
+assert len(asset_paths) == 242, 'Expected two resolutions of both boot phases and credits'
 for asset in asset_paths:
     data = asset.read_bytes()
     assert data[:4] == b'SFB1' and (len(data) - 4) % 12 == 0, f'Invalid frame: {asset}'
     for offset in range(4, len(data), 12):
         red, green, blue = data[offset + 8:offset + 11]
-        assert red == green == blue, f'Non-monochrome pixel command in {asset}'
-for index in range(60):
-    assert (assets / f'prepare-{index:02d}.sfb').read_bytes() == \
-        (assets / f'start-{index:02d}.sfb').read_bytes(), 'Boot phase changes visual style'
+        assert red <= green <= blue, f'Color outside the blue/neutral palette in {asset}'
+for suffix in ('', '-hd'):
+    for index in range(60):
+        assert (assets / f'prepare{suffix}-{index:02d}.sfb').read_bytes() == \
+            (assets / f'start{suffix}-{index:02d}.sfb').read_bytes(), 'Boot phase changes visual style'
 
 
 def wait_ready(process, control):
@@ -44,7 +45,7 @@ with tempfile.TemporaryDirectory(prefix='sheng-boot-test-') as temporary:
         return [str(painter), '--animate-file', str(raw), str(width), str(height),
                 str(stride), str(bpp), str(output), str(directory), phase, str(control), str(count)]
 
-    for width, height in [(3048, 2032), (2032, 3048), (1280, 720), (480, 800)]:
+    for width, height in [(3048, 2032), (2032, 3048), (1600, 1600), (1280, 720), (480, 800)]:
         for bpp in (16, 24, 32):
             stride = width * (bpp // 8) + 96
             raw.write_bytes(b'\xa5' * (stride * height))
@@ -56,6 +57,24 @@ with tempfile.TemporaryDirectory(prefix='sheng-boot-test-') as temporary:
             row_bytes = width * (bpp // 8)
             assert any(any(data[row * stride:row * stride + row_bytes])
                        for row in range(height)), 'Blank splash'
+            if bpp == 32:
+                # A real corner credit must survive frame updates and must be
+                # anchored to the display, rather than the central square.
+                corner = [data[y * stride + x * 4:y * stride + x * 4 + 3]
+                          for y in range(height - min(130, height // 4), height)
+                          for x in range(width - min(330, width // 2), width)]
+                assert any(pixel[0] for pixel in corner), 'Corner credit is missing'
+                assert all(pixel[0] == pixel[1] == pixel[2] for pixel in corner), 'Credit is not neutral'
+                assert max(pixel[0] for pixel in corner) < 150, 'Credit overpowers the logo'
+                assert (frames / '000.raw').read_bytes()[-stride * 130:] == data[-stride * 130:], \
+                    'Corner credit flickers between frames'
+                # Count colored columns around the logo to catch accidental
+                # reuse of the 720px asset on a high-resolution display.
+                row = data[(height // 2 - (120 if min(width, height) >= 1600 else 60)) * stride:]
+                colored = [x for x in range(width) if row[x * 4] > row[x * 4 + 2] + 15]
+                assert colored, 'Blue snowflake missing'
+                if min(width, height) >= 1600:
+                    assert max(colored) - min(colored) > 350, 'HD logo rendered at low resolution'
         print(f'{width}x{height}: 16/24/32bpp, padded stride preserved')
 
     raw.write_bytes(bytes((720 * 4 + 96) * 720))
@@ -133,4 +152,13 @@ with tempfile.TemporaryDirectory(prefix='sheng-boot-test-') as temporary:
     assert failure.returncode != 0, 'Malformed assets were accepted'
     assert raw.read_bytes() == before, 'Failed preparation touched the display'
 
-print('monochrome boot animation pixels, loop, exclusive ownership, stop, diagnostics and failure tests passed')
+    # The separate credit must also be validated before acquiring the display.
+    (broken / 'start-30.sfb').unlink()
+    (broken / 'start-30.sfb').symlink_to(assets / 'start-30.sfb')
+    (broken / 'credit-00.sfb').unlink()
+    (broken / 'credit-00.sfb').write_bytes(b'SFB1broken')
+    failure = subprocess.run(command(directory=broken), timeout=4)
+    assert failure.returncode != 0, 'Malformed credit was accepted'
+    assert raw.read_bytes() == before, 'Failed credit preparation touched the display'
+
+print('blue/neutral assets, HD sizing, corner credit, loop, ownership, stop and failure tests passed')

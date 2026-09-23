@@ -1,5 +1,5 @@
 /* Native boot loop, sharing the exact SFB1 painter used by the generation menu.
- * Only the 720px composition is refreshed. The console and display manager have
+ * Only the central composition and corner credit are refreshed. The console and display manager have
  * explicit ownership boundaries; animation never runs on top of another VT. */
 #include <glob.h>
 #include <linux/input.h>
@@ -77,7 +77,13 @@ static int boot_request_stop(const char *control, int details) {
 static int boot_load_frame(struct boot_frame *frame, const char *directory,
                            const char *phase, unsigned index, struct target *target) {
   char path[4096];
-  if (snprintf(path, sizeof(path), "%s/%s-%02u.sfb", directory, phase, index) >= (int)sizeof(path)) return -1;
+  unsigned span = target->width < target->height ? target->width : target->height;
+  unsigned density = span >= 1600 ? 2 : 1;
+  unsigned source_size = BOOT_SIZE * density;
+  unsigned maximum_span = 800 * density;
+  if (span > maximum_span) span = maximum_span;
+  if (snprintf(path, sizeof(path), "%s/%s%s-%02u.sfb", directory, phase,
+      density == 2 ? "-hd" : "", index) >= (int)sizeof(path)) return -1;
   int fd = open(path, O_RDONLY | O_CLOEXEC);
   if (fd < 0) return -1;
   struct stat status;
@@ -97,23 +103,36 @@ static int boot_load_frame(struct boot_frame *frame, const char *directory,
   close(fd);
   if (memcmp(frame->data, COMMAND_MAGIC, 4)) return -1;
   frame->count = (length - 4) / 12;
-  unsigned span = target->width < target->height ? target->width : target->height;
-  if (span > 800) span = 800;
   unsigned extent = BOOT_SIZE * span / 800;
-  unsigned ox = (target->width - extent) / 2, oy = (target->height - extent) / 2;
+  int credit = !strcmp(phase, "credit");
+  unsigned ox = (target->width - extent) / (credit ? 1 : 2);
+  unsigned oy = (target->height - extent) / (credit ? 1 : 2);
   for (size_t i = 0; i < frame->count; i++) {
     uint8_t *record = frame->data + 4 + i * 12;
     unsigned x = read_le16(record), y = read_le16(record + 2);
     unsigned w = read_le16(record + 4), h = read_le16(record + 6);
-    if (record[11] || x + w > BOOT_SIZE || y + h > BOOT_SIZE || !w || !h) return -1;
-    unsigned coordinates[4] = {ox + x * span / 800, oy + y * span / 800,
-      (x + w) * span / 800 - x * span / 800,
-      (y + h) * span / 800 - y * span / 800};
+    if (record[11] || x + w > source_size || y + h > source_size || !w || !h) return -1;
+    unsigned coordinates[4] = {ox + x * extent / source_size, oy + y * extent / source_size,
+      (x + w) * extent / source_size - x * extent / source_size,
+      (y + h) * extent / source_size - y * extent / source_size};
     for (unsigned c = 0; c < 4; c++) {
       record[c * 2] = coordinates[c] & 255;
       record[c * 2 + 1] = coordinates[c] >> 8;
     }
   }
+  return 0;
+}
+
+static int boot_paint_frame(struct target *target, const struct boot_frame *frame,
+                            const struct timespec *started_at, unsigned brightness) {
+  if (prepare_surface(target, frame->data, frame->count) < 0) return -1;
+  for (size_t i = 0; i < frame->count; i++) {
+    uint8_t record[12]; memcpy(record, frame->data + 4 + i * 12, 12);
+    for (unsigned c = 8; c < 11; c++) record[c] = record[c] * brightness / 10;
+    if (paint_rectangle(target, record, started_at) < 0) return -1;
+  }
+  if (commit_surface(target, started_at) < 0) return -1;
+  free(target->surface); target->surface = NULL;
   return 0;
 }
 
@@ -149,6 +168,7 @@ static int boot_animate(int argc, char **argv) {
   if (!max_frames || max_frames > 2400) return 2;
   struct target target = { .fd = -1 };
   struct boot_frame frames[BOOT_FRAME_COUNT] = {{0}};
+  struct boot_frame credit = {0};
   int lock_fd = -1, tty_fd = -1, result = 1, details = 0, owns_vt = 0;
   int control_fd = -1, directory_fd = -1, diagnostic_fd = -1;
   char parent[4096], ready_name[4096], disabled_name[4096];
@@ -199,6 +219,7 @@ static int boot_animate(int argc, char **argv) {
   if (!target.row_buffer) goto out;
   for (unsigned i = 0; i < BOOT_FRAME_COUNT; i++)
     if (boot_load_frame(&frames[i], directory, phase, i, &target) < 0) goto out;
+  if (boot_load_frame(&credit, directory, "credit", 0, &target) < 0) goto out;
   if (!testing) {
     diagnostic_fd = open("/dev/tty3", O_RDWR | O_CLOEXEC);
     tty_fd = open("/dev/tty2", O_RDWR | O_CLOEXEC);
@@ -234,15 +255,9 @@ static int boot_animate(int argc, char **argv) {
     struct boot_frame *frame = &frames[tick % BOOT_FRAME_COUNT];
     struct timespec started_at;
     clock_gettime(CLOCK_MONOTONIC, &started_at);
-    if (prepare_surface(&target, frame->data, frame->count) < 0) goto out;
-    for (size_t i = 0; i < frame->count; i++) {
-      uint8_t record[12]; memcpy(record, frame->data + 4 + i * 12, 12);
-      if (!strcmp(phase, "prepare") && tick < 10)
-        for (unsigned c = 8; c < 11; c++) record[c] = record[c] * (tick + 1) / 10;
-      if (paint_rectangle(&target, record, &started_at) < 0) goto out;
-    }
-    if (commit_surface(&target, &started_at) < 0) goto out;
-    free(target.surface); target.surface = NULL;
+    unsigned brightness = !strcmp(phase, "prepare") && tick < 10 ? tick + 1 : 10;
+    if (boot_paint_frame(&target, frame, &started_at, brightness) < 0 ||
+        boot_paint_frame(&target, &credit, &started_at, brightness) < 0) goto out;
     if (!tick) {
       if (!testing) (void)ioctl(target.fd, FBIOBLANK, FB_BLANK_UNBLANK);
       (void)boot_marker_at(directory_fd, ready_name, "ready");
@@ -270,6 +285,7 @@ static int boot_animate(int argc, char **argv) {
 out:
   for (size_t i = 0; i < input_count; i++) close(input_fds[i]);
   for (unsigned i = 0; i < BOOT_FRAME_COUNT; i++) free(frames[i].data);
+  free(credit.data);
   if (tty_fd >= 0) {
     if (owns_vt) (void)ioctl(tty_fd, KDSETMODE, KD_TEXT);
     close(tty_fd);
