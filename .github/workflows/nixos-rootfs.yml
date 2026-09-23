@@ -135,7 +135,7 @@ jobs:
             }
           done
 
-      - name: Verify hardware firmware in rootfs
+      - name: Verify hardware payloads in rootfs
         run: |
           set -euo pipefail
 
@@ -156,6 +156,14 @@ jobs:
           do
             test -s "$mount_dir/$firmware" || {
               echo "ERROR: rootfs is missing $firmware" >&2
+              exit 1
+            }
+          done
+
+          for module in hid-nanosic-wn8030.ko nt36532e_ts.ko; do
+            find -L "$mount_dir/lib/modules" -type f -name "$module*" -size +0c \
+              -print -quit | grep -q . || {
+              echo "ERROR: rootfs is missing $module" >&2
               exit 1
             }
           done
