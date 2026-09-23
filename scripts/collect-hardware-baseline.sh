@@ -73,6 +73,22 @@ if command -v systemd-analyze >/dev/null 2>&1; then
 	systemd-analyze critical-chain graphical.target --no-pager 2>&1 || true
 fi
 
+section "nix-build-policy"
+if command -v nix >/dev/null 2>&1; then
+	nix show-config 2>/dev/null | grep -E '^(cores|max-jobs) =' || true
+fi
+if command -v systemctl >/dev/null 2>&1; then
+	systemctl show nix-daemon.service --no-pager \
+		--property=ActiveState,SubState,NRestarts,CPUWeight,IOWeight,IOSchedulingClass,IOSchedulingPriority,ControlGroup \
+		2>&1 || true
+	control_group="$(systemctl show nix-daemon.service \
+		--property=ControlGroup --value 2>/dev/null)"
+	if [ -n "$control_group" ] && [ -d "/sys/fs/cgroup$control_group" ]; then
+		read_value cpu_weight "/sys/fs/cgroup$control_group/cpu.weight"
+		read_value io_weight "/sys/fs/cgroup$control_group/io.weight"
+	fi
+fi
+
 section "hardware-services"
 if command -v systemctl >/dev/null 2>&1; then
 	for unit in \
@@ -92,7 +108,13 @@ if command -v systemctl >/dev/null 2>&1; then
 fi
 if command -v coredumpctl >/dev/null 2>&1; then
 	printf '\n[coredumps-this-boot]\n'
-	coredumpctl list --since boot --no-pager 2>&1 || true
+	boot_epoch="$(awk '$1 == "btime" { print $2 }' /proc/stat 2>/dev/null)"
+	boot_time="$(date -d "@$boot_epoch" --iso-8601=seconds 2>/dev/null)"
+	if [ -n "$boot_time" ]; then
+		coredumpctl list --since="$boot_time" --no-pager 2>&1 || true
+	else
+		coredumpctl list --no-pager 2>&1 || true
+	fi
 fi
 if command -v journalctl >/dev/null 2>&1; then
 	printf '\n[journal-disk-usage]\n'
@@ -121,6 +143,10 @@ for policy in /sys/devices/system/cpu/cpufreq/policy[0-9]*; do
 	for item in related_cpus scaling_governor scaling_min_freq scaling_max_freq scaling_cur_freq cpuinfo_min_freq cpuinfo_max_freq; do
 		read_value "$item" "$policy/$item"
 	done
+	for item in "$policy"/schedutil/* "$policy"/energy_performance_*; do
+		[ -f "$item" ] || continue
+		read_value "$(basename "$item")" "$item"
+	done
 done
 
 section "device-frequency"
@@ -128,6 +154,9 @@ for devfreq in /sys/class/devfreq/*; do
 	[ -d "$devfreq" ] || continue
 	printf '[%s]\n' "$(basename "$devfreq")"
 	for item in name governor cur_freq min_freq max_freq available_governors available_frequencies; do
+		read_value "$item" "$devfreq/$item"
+	done
+	for item in busy_time total_time trans_stat; do
 		read_value "$item" "$devfreq/$item"
 	done
 done
@@ -155,8 +184,37 @@ done
 
 section "memory-and-zram"
 grep -E '^(MemTotal|MemAvailable|SwapTotal|SwapFree|Dirty|Writeback):' /proc/meminfo 2>/dev/null || true
+printf '\n[vm-policy]\n'
+for key in vm.swappiness vm.page-cluster vm.dirty_background_ratio vm.dirty_ratio kernel.numa_balancing; do
+	if command -v sysctl >/dev/null 2>&1; then
+		value="$(sysctl -n "$key" 2>/dev/null)" || continue
+		printf '%s=%s\n' "$key" "$value"
+	fi
+done
+printf '\n[pressure-stall-information]\n'
+for pressure in cpu memory io; do
+	read_value "$pressure" "/proc/pressure/$pressure"
+done
+printf '\n[memory-management]\n'
+read_value mglru_enabled /sys/kernel/mm/lru_gen/enabled
+read_value thp_enabled /sys/kernel/mm/transparent_hugepage/enabled
+read_value thp_defrag /sys/kernel/mm/transparent_hugepage/defrag
 if command -v zramctl >/dev/null 2>&1; then
 	zramctl 2>&1 || true
+fi
+for zram in /sys/block/zram[0-9]*; do
+	[ -d "$zram" ] || continue
+	printf '[%s]\n' "$(basename "$zram")"
+	for item in comp_algorithm disksize mem_limit mm_stat io_stat bd_stat; do
+		read_value "$item" "$zram/$item"
+	done
+done
+if command -v systemctl >/dev/null 2>&1; then
+	printf '\n[oomd]\n'
+	systemctl show systemd-oomd.service --no-pager \
+		--property=ActiveState,SubState,Result,NRestarts 2>&1 || true
+	systemctl show user.slice --no-pager \
+		--property=ManagedOOMMemoryPressure,ManagedOOMMemoryPressureLimit 2>&1 || true
 fi
 
 section "storage"
@@ -166,6 +224,7 @@ for blockdev in /sys/block/sd[a-z]; do
 	for item in queue/scheduler queue/read_ahead_kb queue/nr_requests queue/rotational; do
 		read_value "$item" "$blockdev/$item"
 	done
+	read_value stat "$blockdev/stat"
 done
 
 section "power-management"
