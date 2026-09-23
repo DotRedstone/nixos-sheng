@@ -155,6 +155,19 @@ for width, height in ((3048, 2032), (2032, 3048), (1280, 720), (480, 800)):
     )
     assert_true(charged_area(extremes[0]) == 0, "empty battery has a colored fill")
     assert_true(charged_area(extremes[1]) > 0, "one-percent battery fill disappeared")
+    for capacity in (0, 100, None):
+        assert_true(not module.build_animation_commands(width, height, capacity, 0),
+                    "empty, full or unknown battery should be static")
+    frame0 = module.build_animation_commands(width, height, 67, 0)
+    assert_true(frame0 != module.build_animation_commands(width, height, 67, 12),
+                "charging animation is static")
+    assert_true(frame0 == module.build_animation_commands(width, height, 67, module.ANIMATION_FRAMES),
+                "charging loop has a seam")
+    for frame in range(module.ANIMATION_FRAMES):
+        ops = decode_commands(module.build_animation_commands(width, height, 67, frame))
+        assert_true(0 < len(ops) < 10000, "animation exceeds rectangle budget")
+        assert_true(all(0 < x < x + w <= width and 0 < y < y + h <= height
+                        for x, y, w, h, *_ in ops), "animation clears the screen or escapes it")
 
 with tempfile.TemporaryDirectory() as directory:
     events = []
@@ -192,6 +205,23 @@ with tempfile.TemporaryDirectory() as directory:
             events == ["paint"],
             "visible frame refresh unnecessarily blanked the panel",
         )
+        events.clear()
+        assert_true(display.animate(67, True, 10.0), "visible battery did not animate")
+        assert_true(not display.animate(67, True, 10.01), "animation ignored its rate limit")
+        assert_true(events == ["paint"], "animation toggled the backlight")
+        events.clear()
+        assert_true(display.animate(67, False, 10.2), "unplug did not restore the static frame")
+        assert_true(not display.animation_active, "animation remained active without power")
+        assert_true(events == ["paint"], "unplug unexpectedly blanked the display")
+        display.animate(67, True, 11.0)
+        events.clear()
+        assert_true(display.animate(100, True, 11.2), "full battery did not restore its static frame")
+        assert_true(not display.animate(100, True, 11.4), "full battery kept animating")
+        assert_true(events == ["paint"], "full battery triggered more than one static repaint")
+        display.blank()
+        events.clear()
+        assert_true(not display.animate(67, True, 12.0), "animation woke the sleeping display")
+        assert_true(not events, "animation wrote pixels while the panel was asleep")
     finally:
         module.FRAMEBUFFER_COMMAND_PATH = original_command_path
         module.framebuffer_geometry = original_geometry
@@ -223,5 +253,23 @@ if painter is not None:
             any(framebuffer.read_bytes()),
             "native framebuffer painter produced a blank charging UI",
         )
+        base = framebuffer.read_bytes()
+        first = None
+        for frame in (0, 8, 16, 31, 0):
+            commands.write_bytes(module.build_animation_commands(width, height, 67, frame))
+            subprocess.run([str(painter), "--file", str(framebuffer), str(width), str(height),
+                            str(width * 4), "32", str(commands)], check=True, timeout=4)
+            data = framebuffer.read_bytes()
+            # Only the battery interior moves; text and the surrounding black
+            # canvas must survive each partial native paint without flicker.
+            size = round(360 * min(width / 440, height / 440, 3))
+            bottom = (height - size) // 2 + round(145 * size / 360)
+            assert_true(data[bottom * width * 4:] == base[bottom * width * 4:],
+                        "charging animation changed the percentage or lower background")
+            assert_true(data != base, "native charging animation did not change any pixels")
+            if frame == 0:
+                if first is not None:
+                    assert_true(data == first, "partial animation retained stale pixels after a loop")
+                first = data
 
 print("offline charging detector and renderer tests passed")

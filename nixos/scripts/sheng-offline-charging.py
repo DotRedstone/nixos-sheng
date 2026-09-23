@@ -2,6 +2,7 @@
 
 import glob
 import functools
+import math
 import os
 import re
 import select
@@ -24,6 +25,8 @@ EV_KEY = 1
 KEY_POWER = 116
 HOLD_SECONDS = 2.0
 DISPLAY_SECONDS = 8.0
+ANIMATION_FPS = 10
+ANIMATION_FRAMES = 32
 MINIMUM_BOOT_CAPACITY = 5
 POWER_DISCOVERY_GRACE_SECONDS = 30.0
 DISCONNECT_SECONDS = 10.0
@@ -180,7 +183,7 @@ def build_framebuffer_commands(width, height, capacity):
 
     if capacity is not None:
         capacity = max(0, min(100, capacity))
-    scale = min(width / 440, height / 440, 2.0)
+    scale = min(width / 440, height / 440, 3.0)
     supersample = 2
     size = max(1, round(360 * scale))
     factor = size * supersample / 360
@@ -266,10 +269,49 @@ def build_framebuffer_commands(width, height, capacity):
         raise ValueError("charging frame exceeds the native painter limit")
     return b"SFB1" + b"".join(RECTANGLE.pack(*op) for op in operations)
 
+
+@functools.lru_cache(maxsize=64)
+def build_animation_commands(width, height, capacity, frame):
+    """Repaint only the real fill and bolt; never clear or wake the panel."""
+    if capacity is None or not 0 < capacity < 100:
+        return b""
+    data = build_framebuffer_commands(width, height, capacity)
+    size = max(1, round(360 * min(width / 440, height / 440, 3.0)))
+    factor = size / 360
+    ox, oy = (width - size) // 2, (height - size) // 2
+    phase = (frame % ANIMATION_FRAMES) / ANIMATION_FRAMES
+    fill_color = charge_color(capacity)
+    operations = []
+    for offset in range(4, len(data), RECTANGLE.size):
+        x, y, w, h, r, g, b, _ = RECTANGLE.unpack_from(data, offset)
+        # Keep the percentage, silhouette, rounded antialiasing and true fill
+        # boundary fixed. Interior bands carry a soft, periodic highlight.
+        inside = (x >= ox + 102 * factor and x + w <= ox + 253 * factor
+                  and y >= oy + 75 * factor and y + h <= oy + 138 * factor)
+        if not inside:
+            continue
+        if (r, g, b) == fill_color:
+            step = max(1, round(2 * factor))
+            for left in range(x, x + w, step):
+                band_width = min(step, x + w - left)
+                position = ((left + band_width / 2 - ox) / factor - 103) / 148
+                light = ((1 + math.cos(2 * math.pi * (phase - position))) / 2) ** 8
+                tint = tuple(round(c + (255 - c) * .24 * light) for c in fill_color)
+                add_rect(operations, left, y, band_width, h, tint)
+        elif (r, g, b) == OUTLINE:
+            breath = .76 + .24 * (1 - math.cos(2 * math.pi * phase)) / 2
+            add_rect(operations, x, y, w, h, tuple(round(c * breath) for c in OUTLINE))
+    if len(operations) > 10000:
+        raise ValueError("charging animation exceeds the native painter limit")
+    return b"SFB1" + b"".join(RECTANGLE.pack(*op) for op in operations)
+
+
 class Display:
     def __init__(self):
         self.saved_backlights = {}
         self.visible = False
+        self.last_animation_at = None
+        self.animation_active = False
 
     def capture_backlights(self):
         for path in glob.glob("/sys/class/backlight/*/brightness"):
@@ -301,6 +343,8 @@ class Display:
         for path in glob.glob("/sys/class/graphics/fb*/blank"):
             write_text(path, "1\n")
         self.visible = False
+        self.animation_active = False
+        self.last_animation_at = None
 
     def render(self, capacity):
         geometry = framebuffer_geometry()
@@ -312,6 +356,35 @@ class Display:
             # before the painter ran exposed one frame of the boot console.
             self.blank()
         commands = build_framebuffer_commands(*geometry, capacity)
+        painted = self.paint(commands)
+        if painted:
+            self.animation_active = False
+            self.last_animation_at = None
+            if not was_visible:
+                self.unblank()
+        return painted
+
+    def animate(self, capacity, online, now):
+        if not self.visible:
+            return False
+        if not online or capacity is None or not 0 < capacity < 100:
+            if self.animation_active:
+                return self.render(capacity)
+            return False
+        if self.last_animation_at is not None and now - self.last_animation_at < 1 / ANIMATION_FPS:
+            return False
+        geometry = framebuffer_geometry()
+        if geometry is None:
+            return False
+        frame = int(now * ANIMATION_FPS) % ANIMATION_FRAMES
+        commands = build_animation_commands(*geometry, capacity, frame)
+        # No catch-up frames: input handling and display timeout take priority.
+        self.last_animation_at = now
+        painted = self.paint(commands)
+        self.animation_active = self.animation_active or painted
+        return painted
+
+    def paint(self, commands):
         try:
             with open(FRAMEBUFFER_COMMAND_PATH, "wb") as handle:
                 handle.write(commands)
@@ -322,8 +395,6 @@ class Display:
             )
             if result.returncode != 0:
                 return False
-            if not was_visible:
-                self.unblank()
             return True
         except (OSError, subprocess.TimeoutExpired):
             return False
@@ -466,6 +537,7 @@ def monitor():
             if capacity != last_capacity:
                 display.render(capacity)
                 last_capacity = capacity
+            display.animate(capacity, online, now)
         elif visible_until is not None and now >= visible_until:
             display.blank()
             visible_until = None
