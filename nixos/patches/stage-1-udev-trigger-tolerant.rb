@@ -48,5 +48,9 @@ class Tasks::UDev < SingletonTask
     rescue System::CommandError => e
       $logger.warn("udevadm settle returned non-zero (#{e}); continuing")
     end
+
+    if ShengEarlyChargeGuard.charger_mode?()
+      ShengEarlyChargeGuard.prepare_offline_charging_handoff()
+    end
   end
 end

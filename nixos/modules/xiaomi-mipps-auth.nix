@@ -439,9 +439,27 @@ in
 
     systemd.services.sheng-usb-device-role = {
       description = "Restore the sheng USB device role for ADB";
+      # A cable can already be attached while charger mode hands off to the
+      # normal system, so a Type-C `add` uevent is not guaranteed at boot.
+      # Start this once for every normal boot as well as on later hotplugs.
+      wantedBy = [ "multi-user.target" ];
+      before = [ "adbd.service" ];
       serviceConfig = {
         Type = "oneshot";
         ExecStart = "${usbDeviceRolePackage}/bin/sheng-usb-device-role";
+      };
+    };
+
+    # Mobile NixOS starts stage-2 adbd by reusing the FunctionFS gadget from
+    # stage-1. On sheng that gadget can exit cleanly if the Type-C role is not
+    # device yet. Retrying lets the role-recovery unit finish instead of
+    # leaving ADB absent until the next cable replug or reboot.
+    systemd.services.adbd = {
+      wants = [ "sheng-usb-device-role.service" ];
+      after = [ "sheng-usb-device-role.service" ];
+      serviceConfig = {
+        Restart = "always";
+        RestartSec = 2;
       };
     };
 
