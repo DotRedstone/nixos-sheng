@@ -174,8 +174,8 @@ in
         enable = true;
         critical_capacity = 2;
         boot_capacity = 5;
-        # A normal boot may continue after this timeout. Charger-mode boots
-        # stay in low-power stage-1 until the battery reaches boot_capacity.
+        # Charger-mode boots hand off to the low-power userspace target. This
+        # timeout only guards an explicitly requested normal boot.
         max_wait_seconds = 30;
       };
     };
