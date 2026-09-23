@@ -1357,7 +1357,9 @@ class Tasks::SwitchRoot
     return @selected_generation if @selected_generation
 
     ShengEarlyChargeGuard.wait_if_critical()
-    wants_menu = ShengEarlyChargeGuard.interactive_boot_safe?()
+    charger_boot = ShengEarlyChargeGuard.charger_mode?()
+    ShengEarlyChargeGuard.prepare_offline_charging_handoff() if charger_boot
+    wants_menu = !charger_boot
     pending_generation = ShengHeadlessGenerationMenu.consume_pending_selection(self)
 
     if pending_generation
