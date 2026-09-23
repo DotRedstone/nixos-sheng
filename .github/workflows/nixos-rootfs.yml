@@ -135,6 +135,31 @@ jobs:
             }
           done
 
+      - name: Verify hardware firmware in rootfs
+        run: |
+          set -euo pipefail
+
+          image="$(find out -maxdepth 1 -type f -name 'nixos-sheng-*.img' -print -quit)"
+          test -n "$image"
+          mount_dir="$(mktemp -d)"
+          cleanup() {
+            mountpoint -q "$mount_dir" && sudo umount "$mount_dir"
+            rmdir "$mount_dir"
+          }
+          trap cleanup EXIT
+          sudo mount -o loop,ro "$image" "$mount_dir"
+
+          for firmware in \
+            lib/firmware/novatek/novatek_nt36532_n81a_fw_csot.bin \
+            lib/firmware/qcom/sm8550/sheng/adsp.mbn \
+            lib/firmware/qcom/sm8550/sheng/cdsp.mbn
+          do
+            test -s "$mount_dir/$firmware" || {
+              echo "ERROR: rootfs is missing $firmware" >&2
+              exit 1
+            }
+          done
+
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
