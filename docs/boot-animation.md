@@ -14,6 +14,13 @@ display manager stops the writer before taking over scanout. No artificial
 progress percentage or fixed animation delay is added. Offline charging keeps
 its static battery.
 
+The generation menu uses the same baked snowflake, charcoal rounded cards,
+blue selection outlines and a thin countdown track. Selection starts the loop
+directly, without the old loading card; its fallback still matches the native
+loop's first frame pixel for pixel. Stage-1 and the selected stage-2 generation
+carry their own assets, so flashing only `boot_b` leaves the old system animation
+in place. Update and activate the downstream system with the same platform commit.
+
 Snowflake geometry is adapted from [NixOS artwork](https://github.com/NixOS/nixos-artwork/tree/master/logo),
 by Simon Frankau and Tim Cuthbertson, under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 This version retains deep blue `#5277C3` and light blue `#7EBAE4`, adding lighting
@@ -52,6 +59,11 @@ filesystem has mounted.
 Vendor logos and unlock warnings precede Linux and are outside this code's
 control. An early kernel crash or an unavailable display driver may still
 require serial/ADB diagnostics.
+
+Enter fastboot manually on this device; do not rely on `adb reboot bootloader`.
+Verify the installed `sheng-boot-splash` unit's `ExecStart` references the new
+assets. Updating the development checkout or Home Manager alone does not update
+the device's system service. Roll back both the boot image and system generation.
 
 ## Build, preview and deployment
 
