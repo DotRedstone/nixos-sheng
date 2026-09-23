@@ -12,7 +12,7 @@ menu retains its three-second timeout and volume-key selection. Selecting a
 system returns to the same seamless animation through stage-1 and stage-2; the
 display manager stops the writer before taking over scanout. No artificial
 progress percentage or fixed animation delay is added. Offline charging keeps
-its static battery.
+its separate rounded battery with a gentle charging glow.
 
 The generation menu uses the same baked snowflake, charcoal rounded cards,
 blue selection outlines and a thin countdown track. Selection starts the loop
