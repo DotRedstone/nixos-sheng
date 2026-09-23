@@ -11,7 +11,8 @@ end
 menu_source = ARGV[0]
 command_path = ARGV[1]
 font_metrics = ARGV[2]
-raise "usage: #{$0} MENU_SOURCE COMMAND_OUTPUT FONT_METRICS" unless menu_source && command_path && font_metrics
+animation_assets = ARGV[3]
+raise "usage: #{$0} MENU_SOURCE COMMAND_OUTPUT FONT_METRICS ANIMATION_ASSETS" unless menu_source && command_path && font_metrics && animation_assets
 
 Configuration = {
   "sheng_generation_menu" => {
@@ -121,6 +122,7 @@ module ShengHeadlessGenerationMenu
 end
 
 menu = ShengHeadlessGenerationMenu
+menu.define_singleton_method(:animation_assets) { animation_assets }
 raise "unexpected default menu timeout" unless menu.timeout() == 3
 raise "keyboard up is not mapped" unless menu.input_action_for_code(menu::KEY_UP) == :up
 raise "keyboard down is not mapped" unless menu.input_action_for_code(menu::KEY_DOWN) == :down
@@ -230,7 +232,7 @@ operations = menu.captured_operations
 raise "renderer queued no operations" if operations.empty?
 # Antialiased 32px card corners add bounded scanlines; keep a budget well
 # below the native painter limit and verify partial updates independently.
-raise "renderer queued too many operations: #{operations.length}" if operations.length > 3000
+raise "renderer queued too many operations: #{operations.length}" if operations.length > 5000
 raise "renderer preparation took #{elapsed}s" if elapsed > 2.0
 
 operations.each do |operation|
@@ -272,7 +274,7 @@ menu.render_framebuffer(
   previous_remaining: 3
 )
 partial_operations = menu.captured_operations
-raise "partial redraw queued too many operations" if partial_operations.length > 800
+raise "partial redraw queued too many operations" if partial_operations.length > 1200
 
 menu.render_framebuffer(
   generations,
@@ -284,7 +286,7 @@ menu.render_framebuffer(
   previous_remaining: nil
 )
 last_row_operations = menu.captured_operations
-raise "last row unexpectedly redrew the whole page" if last_row_operations.length > 800
+raise "last row unexpectedly redrew the whole page" if last_row_operations.length > 1200
 
 menu.render_framebuffer(
   generations,

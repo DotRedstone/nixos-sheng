@@ -37,16 +37,16 @@ module ShengHeadlessGenerationMenu
   MAX_LINE_SAMPLES = 48
   BG = [0, 0, 0]
   PANEL_BG = BG
-  PANEL_BORDER_COLOR = [24, 31, 30]
-  ROW_BG = [16, 21, 19]
-  CONTROL_BG = [24, 31, 30]
-  SELECT_BG = [130, 214, 184]
-  ACCENT = [130, 214, 184]
-  TITLE_FG = [229, 236, 233]
-  SELECT_FG = [14, 31, 24]
-  SELECT_MUTED_FG = [35, 70, 56]
-  NORMAL_FG = [207, 214, 212]
-  MUTED_FG = [137, 150, 147]
+  PANEL_BORDER_COLOR = [82, 119, 195]
+  ROW_BG = [17, 19, 23]
+  CONTROL_BG = [25, 29, 36]
+  SELECT_BG = [20, 35, 54]
+  ACCENT = [126, 186, 228]
+  TITLE_FG = [238, 238, 238]
+  SELECT_FG = TITLE_FG
+  SELECT_MUTED_FG = [156, 181, 205]
+  NORMAL_FG = [210, 215, 222]
+  MUTED_FG = [140, 148, 160]
   BOOT_FG = ACCENT
   EV_KEY = 1
   KEY_VOLUMEUP = 115
@@ -647,6 +647,40 @@ module ShengHeadlessGenerationMenu
     draw_rect(cx - 1, cy - 19, 3, 20, color)
   end
 
+  def animation_assets()
+    "/etc/sheng-boot-animation"
+  end
+
+  # Share baked, antialiased artwork with the native animation. Decode once;
+  # only the small logo is used during interactive menu redraws.
+  def draw_animation_asset(name, x, y, source_size, extent)
+    @animation_artwork ||= {}
+    records = @animation_artwork[name]
+    unless records
+      data = File.read("#{animation_assets()}/#{name}.sfb")
+      raise IOError, "invalid boot artwork" unless data[0, 4] == "SFB1" && (data.bytesize - 4) % 12 == 0
+      count = (data.bytesize - 4) / 12
+      raise IOError, "boot artwork exceeds painter budget" if count > MAX_FRAMEBUFFER_RECTANGLES
+      records = []
+      count.times do |index|
+        record = data[4 + index * 12, 12]
+        sx, sy, width, height = record[0, 8].unpack("v4")
+        color = record[8, 4].unpack("C4")
+        if width <= 0 || height <= 0 || sx + width > source_size || sy + height > source_size || color[3] != 0
+          raise IOError, "invalid boot artwork rectangle"
+        end
+        records << [sx, sy, width, height, color[0, 3]]
+      end
+      @animation_artwork[name] = records
+    end
+    records.each do |sx, sy, width, height, color|
+      left, top = sx * extent / source_size, sy * extent / source_size
+      draw_rect(x + left, y + top,
+        (sx + width) * extent / source_size - left,
+        (sy + height) * extent / source_size - top, color)
+    end
+  end
+
   def panel_width()
     framebuffer_info()
     min_width = [PANEL_MIN_WIDTH, @fb_width].min
@@ -802,13 +836,18 @@ module ShengHeadlessGenerationMenu
     text_x = content_x() + 40
     text_width = width - 144
 
-    # Match the charging battery's soft silhouette and mint fill. Clear the
-    # whole row first so rounded corners never retain the previous selection.
-    draw_rounded_rect(content_x(), row_y, width, ROW_HEIGHT, 32, bg, PANEL_BG)
+    # Dark rounded cards keep the snowflake's blue accents restrained.
+    # Clear the old selection completely before drawing its replacement.
+    border = is_selected ? PANEL_BORDER_COLOR : bg
+    draw_rounded_rect(content_x(), row_y, width, ROW_HEIGHT, 32, border, PANEL_BG)
+    if is_selected
+      draw_rounded_rect(content_x() + 2, row_y + 2, width - 4, ROW_HEIGHT - 4,
+        30, bg, border, clear: false)
+    end
     if is_selected
       icon_x = content_x() + width - 68
       draw_rounded_rect(icon_x - 22, row_y + ROW_HEIGHT / 2 - 22,
-        44, 44, 16, CONTROL_BG, bg)
+        44, 44, 16, PANEL_BORDER_COLOR, bg)
       draw_chevron(icon_x, row_y + ROW_HEIGHT / 2, :right, TITLE_FG, 9, 3)
     end
     draw_text_box(
@@ -879,11 +918,11 @@ module ShengHeadlessGenerationMenu
       scale: SUBTITLE_FONT_SCALE,
       align: :right
     )
-    draw_rounded_rect(content_x(), track_y, width, 10, 5, CONTROL_BG, PANEL_BG)
+    draw_rounded_rect(content_x(), track_y, width, 4, 2, CONTROL_BG, PANEL_BG)
     progress = remaining ? clamp(remaining, 0, timeout()) : 0
     fill_width = width * progress / [timeout(), 1].max
     if fill_width > 0
-      draw_rounded_rect(content_x(), track_y, fill_width, 10, 5,
+      draw_rounded_rect(content_x(), track_y, fill_width, 4, 2,
         ACCENT, CONTROL_BG, clear: false)
     end
   end
@@ -940,18 +979,19 @@ module ShengHeadlessGenerationMenu
     rows_y = y + HEADER_HEIGHT
     footer_y = rows_y + rows_height(visible_count)
     title_scale = content_width() < 900 ? 4 : TITLE_FONT_SCALE
-    brand_x = content_x()
+    brand_x = content_x() + 144
     count_width = 190
 
     if full_redraw
       draw_rect(0, 0, @fb_width, @fb_height, BG)
       draw_panel(x, y, width, height)
+      draw_animation_asset("menu-logo", content_x(), y + 26, 112, 112)
       draw_text_box(
         brand_x,
         y + 35,
-        content_width() - count_width,
+        content_width() - count_width - 144,
         48,
-        "NixOS Sheng",
+        "NixOS",
         TITLE_FG,
         PANEL_BG,
         scale: title_scale
@@ -959,9 +999,9 @@ module ShengHeadlessGenerationMenu
       draw_text_box(
         brand_x,
         y + 101,
-        content_width(),
+        content_width() - 144,
         28,
-        "Boot generations",
+        "Choose your system",
         MUTED_FG,
         PANEL_BG,
         scale: SUBTITLE_FONT_SCALE
@@ -1055,57 +1095,17 @@ module ShengHeadlessGenerationMenu
     end
 
     framebuffer_info()
-    width = panel_width()
-    height = 420
-    x = panel_x()
-    y = [(@fb_height - height) / 2, PANEL_MIN_Y].max
-    title, details = generation_parts(label, 0)
-
+    # The short handoff frame is from the same loop, not a separate loading
+    # card. Match the C painter's exact sizing, placement and corner credit.
+    span = [@fb_width, @fb_height].min
+    density = span >= 1600 ? 2 : 1
+    extent = 720 * [span, 800 * density].min / 800
+    suffix = density == 2 ? "-hd" : ""
     draw_rect(0, 0, @fb_width, @fb_height, BG)
-    draw_panel(x, y, width, height)
-    draw_text_box(
-      x + PANEL_PADDING,
-      y + 46,
-      width - PANEL_PADDING * 2,
-      48,
-      "NixOS Sheng",
-      TITLE_FG,
-      PANEL_BG,
-      scale: TITLE_FONT_SCALE
-    )
-    draw_rounded_rect(x + PANEL_PADDING, y + 128,
-      width - PANEL_PADDING * 2, 144, 32, SELECT_BG, PANEL_BG)
-    draw_text_box(
-      x + PANEL_PADDING + 40,
-      y + 149,
-      width - PANEL_PADDING * 2 - 80,
-      34,
-      title,
-      SELECT_FG,
-      SELECT_BG
-    )
-    draw_text_box(
-      x + PANEL_PADDING + 40,
-      y + 211,
-      width - PANEL_PADDING * 2 - 80,
-      28,
-      details,
-      SELECT_MUTED_FG,
-      SELECT_BG,
-      scale: SUBTITLE_FONT_SCALE
-    )
-    draw_text_box(
-      x + PANEL_PADDING,
-      y + 314,
-      width - PANEL_PADDING * 2,
-      28,
-      status,
-      BOOT_FG,
-      PANEL_BG,
-      scale: SUBTITLE_FONT_SCALE
-    )
-    draw_rounded_rect(x + PANEL_PADDING, y + 366,
-      width - PANEL_PADDING * 2, 10, 5, BOOT_FG, PANEL_BG)
+    draw_animation_asset("start#{suffix}-00", (@fb_width - extent) / 2,
+      (@fb_height - extent) / 2, 720 * density, extent)
+    draw_animation_asset("credit#{suffix}-00", @fb_width - extent,
+      @fb_height - extent, 720 * density, extent)
     present_framebuffer()
   rescue => error
     $logger.warn("Could not render sheng generation menu boot status: #{error}")
@@ -1234,8 +1234,11 @@ module ShengHeadlessGenerationMenu
     set_console_keyboard(true)
     restore_console_logs()
     set_console_echo(true)
-    boot_status = manual_selection ? "Restarting" : "Starting system"
-    render_booting(generation_label(chosen_generation, selected), boot_status)
+    # The caller starts the native loop immediately. Avoid an extra Ruby
+    # raster pass on the timed switch_root path while animation is enabled.
+    unless ShengBootAnimation.enabled?
+      render_booting(generation_label(chosen_generation, selected))
+    end
     [chosen_generation, manual_selection]
   end
 end

@@ -11,6 +11,7 @@ from PIL import Image
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("commands", type=Path, help="Base path emitted by the mruby renderer test")
 parser.add_argument("painter", type=Path)
+parser.add_argument("--assets", type=Path, required=True, help="Shared NixOS animation artwork")
 parser.add_argument("--output", type=Path, help="Optional preview directory")
 args = parser.parse_args()
 if args.output:
@@ -60,4 +61,12 @@ with tempfile.TemporaryDirectory(prefix="sheng-menu-") as temporary:
             for state in ("empty", "booting"):
                 paint(actual, state)
                 preview(state)
+            # The menu handoff must be byte-for-byte identical to the native
+            # loop's first frame, including HD sizing and the corner credit.
+            expected.write_bytes(bytes(height * stride))
+            subprocess.run([str(args.painter), "--animate-file", str(expected),
+                            str(width), str(height), str(stride), str(bpp), "-",
+                            str(args.assets), "start", str(Path(temporary) / "control"), "1"],
+                           check=True, timeout=5)
+            assert actual.read_bytes() == expected.read_bytes(), (width, bpp, "boot handoff differs")
             print(f"{width}x{height}, {bpp}bpp: full/partial pixels identical; all states rendered")

@@ -11,7 +11,7 @@ import time
 painter, assets = (Path(argument).resolve() for argument in sys.argv[1:3])
 
 asset_paths = sorted(assets.glob('*.sfb'))
-assert len(asset_paths) == 242, 'Expected two resolutions of both boot phases and credits'
+assert len(asset_paths) == 243, 'Expected two resolutions of both boot phases, credits and menu logo'
 for asset in asset_paths:
     data = asset.read_bytes()
     assert data[:4] == b'SFB1' and (len(data) - 4) % 12 == 0, f'Invalid frame: {asset}'

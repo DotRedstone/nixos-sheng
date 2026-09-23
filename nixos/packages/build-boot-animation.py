@@ -93,6 +93,11 @@ for frame in range(frames):
                   for x, y in arm]
         draw.polygon(points, fill=tint)
 
+    if frame == 15:
+        # The menu uses the exact same geometry and lighting as the boot loop.
+        logo = canvas.crop(tuple(value * supersample for value in (220, 160, 500, 440)))
+        (output / 'menu-logo.sfb').write_bytes(encode(logo, 112, make_palette(tints)))
+
     draw.text((360 * supersample, 486 * supersample), 'NixOS',
               font=title_font, fill=white, anchor='ms')
     palette = make_palette(tints)
@@ -110,5 +115,5 @@ ImageDraw.Draw(credit).text((692 * supersample, 692 * supersample),
 for suffix, extent in (('', 720), ('-hd', 1440)):
     (output / f'credit{suffix}-00.sfb').write_bytes(
         encode(credit, extent, make_palette([]), clear=False))
-print(f'{frames * 4} boot frames + 2 credits, '
+print(f'{frames * 4} boot frames + 2 credits + menu logo, '
       f'{sum(p.stat().st_size for p in output.glob("*.sfb"))} bytes')

@@ -288,7 +288,8 @@
           mruby \
             ${./tests/test-stage1-generation-menu-renderer.rb} \
             ${./patches/stage-1-headless-generation-menu.rb} \
-            "$commands" ${pkgs.sheng-fb-painter}/share/sheng/menu-font.rb
+            "$commands" ${pkgs.sheng-fb-painter}/share/sheng/menu-font.rb \
+            ${pkgs.sheng-boot-animation}
 
           truncate -s $((2032 * 12288)) "$framebuffer"
           started_at="$(date +%s%N)"
@@ -304,13 +305,13 @@
           }
 
           check_pixel 0 0 "0,0,0,0"
-          # Rounded corner, mint selection, and the next dark card.
+          # Rounded corner, blue selection, and the next charcoal card.
           check_pixel 940 434 "0,0,0,0"
-          check_pixel 1000 540 "184,214,130,0"
-          check_pixel 1000 680 "19,21,16,0"
+          check_pixel 1000 540 "54,35,20,0"
+          check_pixel 1000 680 "23,19,17,0"
 
           python3 ${../scripts/preview-generation-menu.py} "$commands" \
-            ${pkgs.sheng-fb-painter}/bin/sheng-fb-painter
+            ${pkgs.sheng-fb-painter}/bin/sheng-fb-painter --assets ${pkgs.sheng-boot-animation}
 
           echo "native framebuffer render completed in ''${elapsed_ms}ms"
           touch $out
