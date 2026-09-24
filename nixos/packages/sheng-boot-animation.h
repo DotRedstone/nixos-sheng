@@ -280,7 +280,9 @@ static int boot_animate(int argc, char **argv) {
     clock_gettime(CLOCK_MONOTONIC, &started_at);
     /* Keep both stages on the same monotonic timeline; skip late frames
      * instead of slowing the whole loop down under boot I/O load. */
-    unsigned frame_index = testing && strcmp(argv[7], "-") ? tick % BOOT_FRAME_COUNT :
+    /* A one-frame file render is the deterministic menu/static preview oracle,
+     * even when no separate frame-export directory was requested. */
+    unsigned frame_index = testing && (strcmp(argv[7], "-") || max_frames == 1) ? tick % BOOT_FRAME_COUNT :
       ((uint64_t)started_at.tv_sec * 20 + started_at.tv_nsec / 50000000) % BOOT_FRAME_COUNT;
     struct boot_frame *frame = &frames[frame_index];
     unsigned brightness = !strcmp(phase, "prepare") && tick < 10 ? tick + 1 : 10;
