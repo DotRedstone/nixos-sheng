@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from unittest.mock import patch
 
 guard, generator, detector = map(Path, sys.argv[1:4])
 menu = Path(sys.argv[4])
@@ -138,6 +139,26 @@ end
         marker.unlink(missing_ok=True)
         assert generate(run) == expected
         shutil.rmtree(run)
+
+    # A diagnostic request winning the lock between the initial check and
+    # acquisition must not have its console replaced by the battery monitor.
+    charging.BOOT_CONTROL = str(root / "ownership")
+    charging.BOOT_MODE_PATH = str(root / "charger.mode")
+    Path(charging.BOOT_MODE_PATH).write_text("charger\n")
+    original_lockf = charging.fcntl.lockf
+    original_open = charging.os.open
+
+    def diagnostic_wins(*args):
+        original_lockf(*args)
+        Path(charging.BOOT_CONTROL + ".disabled").touch()
+
+    def no_display_open(path, *args):
+        assert path != "/dev/tty2", "charging stole the diagnostic console"
+        return original_open(path, *args)
+
+    with patch.object(charging.fcntl, "lockf", diagnostic_wins), patch.object(charging.os, "open", no_display_open):
+        assert charging.monitor() == 0
+    Path(charging.BOOT_CONTROL + ".disabled").unlink()
 
     # A monitor accidentally started in a normal boot must leave the display alone.
     charging.BOOT_MODE_PATH = str(root / "normal.mode")
