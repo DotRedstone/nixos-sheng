@@ -141,6 +141,55 @@ with tempfile.TemporaryDirectory(prefix='sheng-boot-test-') as temporary:
             process.kill(); process.wait()
     Path(str(control) + '.disabled').unlink()
 
+    # Real cross-process takeover: load first, retire old writer, publish the
+    # new PID. Readiness from the outgoing process must not satisfy the service.
+    process = subprocess.Popen(command(count=2400, output='-'))
+    incoming = None
+    try:
+        wait_ready(process, control)
+        assert Path(str(control) + '.ready').read_text().strip() == str(process.pid)
+        takeover = command(count=2400, output='-')
+        takeover[1] = '--animate-file-handoff'
+        incoming = subprocess.Popen(takeover)
+        assert process.wait(timeout=4) == 0
+        wait_ready(incoming, control)
+        assert Path(str(control) + '.ready').read_text().strip() == str(incoming.pid)
+        subprocess.run([str(painter), '--stop', str(control)], check=True, timeout=4)
+        assert incoming.wait(timeout=2) == 0
+    finally:
+        for child in (process, incoming):
+            if child is not None and child.poll() is None:
+                child.kill(); child.wait()
+
+    # Python's charging monitor uses the same POSIX lock, unlike an unrelated
+    # flock. A battery owner must exclude the native boot animation entirely.
+    import fcntl
+    with open(str(control) + '.lock', 'r+') as lock:
+        fcntl.lockf(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        before = raw.read_bytes()
+        assert subprocess.run(command(count=1), timeout=4).returncode == 75
+        assert raw.read_bytes() == before
+
+    # Simulate a starting writer initializing its control file after the stop
+    # request was sent. Stop must remain asserted until the writer lets go.
+    with open(str(control) + '.lock', 'r+') as lock:
+        fcntl.lockf(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        control.write_text('run')
+        stopping = subprocess.Popen([str(painter), '--stop', str(control)])
+        try:
+            for reset in range(2):
+                deadline = time.monotonic() + 1
+                while control.read_text() != 'stop':
+                    assert time.monotonic() < deadline, 'Startup swallowed the stop request'
+                    time.sleep(.01)
+                if reset == 0:
+                    control.write_text('run')
+            fcntl.lockf(lock, fcntl.LOCK_UN)
+            assert stopping.wait(timeout=2) == 0
+        finally:
+            if stopping.poll() is None:
+                stopping.kill(); stopping.wait()
+
     broken = root / 'broken'
     broken.mkdir()
     for path in assets.glob('*.sfb'):
@@ -151,6 +200,21 @@ with tempfile.TemporaryDirectory(prefix='sheng-boot-test-') as temporary:
     failure = subprocess.run(command(directory=broken), timeout=4)
     assert failure.returncode != 0, 'Malformed assets were accepted'
     assert raw.read_bytes() == before, 'Failed preparation touched the display'
+
+    process = subprocess.Popen(command(count=2400, output='-'))
+    try:
+        wait_ready(process, control)
+        takeover = command(directory=broken)
+        takeover[1] = '--animate-file-handoff'
+        assert subprocess.run(takeover, timeout=4).returncode != 0
+        assert process.poll() is None, 'Bad incoming assets stopped the old animation'
+        assert Path(str(control) + '.ready').read_text().strip() == str(process.pid)
+        subprocess.run([str(painter), '--stop', str(control)], check=True, timeout=4)
+        process.wait(timeout=2)
+    finally:
+        if process.poll() is None:
+            process.kill(); process.wait()
+    before = raw.read_bytes()
 
     # The separate credit must also be validated before acquiring the display.
     (broken / 'start-30.sfb').unlink()

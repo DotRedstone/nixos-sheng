@@ -96,6 +96,9 @@ class Tasks::Splash
 
   def kill()
     ShengBootAnimation.stop()
+    # Upstream System.failure -> Progress.kill is the caller. Successful
+    # switch_root does not kill the splash; keep real failures diagnosable.
+    ShengBootAnimation.details()
     sheng_kill_without_animation
   end
 end

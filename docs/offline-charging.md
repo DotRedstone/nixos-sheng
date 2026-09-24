@@ -51,6 +51,20 @@ overrides every charger-boot reason supplied by the bootloader.
 
 ## Deployment
 
+The per-boot decision in `/run/sheng-boot-ui.mode` is authoritative. The battery
+monitor paints only for an explicit `charger` decision; it cannot infer permission
+from a retained USB PON bit. Generator reruns and reboot-marker cleanup preserve
+the decision. A valid pending generation selection explicitly requests normal boot.
+
+Battery and NixOS animation share a POSIX writer lock. The charging monitor stops
+with its target and conflicts with the desktop, splash and diagnostic services.
+It exits on losing VT2 or entering diagnostics. Minimal's early text-console
+transition applies only to normal boots. Validate both profiles, USB-connected
+reboots, manual generation selection, long-press boot and diagnostic transitions.
+After `systemctl daemon-reload`, the mode must remain unchanged and charging and
+desktop services must not both be active. Offline regression checks do not replace
+device boot and display acceptance.
+
 This feature changes both initramfs stage-1 and NixOS stage-2. Build and flash
 the matching `boot_b` image, then activate or flash the matching rootfs/system
 generation. A device-side `nixos-rebuild` alone cannot update stage-1.

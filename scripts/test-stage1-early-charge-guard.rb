@@ -67,7 +67,7 @@ Dir.mktmpdir do |directory|
     !charger_mode_for("bootinfo.pureason" => "0x800011"),
     "normal reboot marker did not override USB charger PON reason"
   )
-  assert(!File.exist?(marker), "normal reboot marker was not consumed by stage 1")
+  assert(File.exist?(marker), "stage 1 removed the legacy stage-2 fallback marker")
   assert(
     ShengEarlyChargeGuard.normal_reboot_requested?(),
     "normal reboot marker was not cached for the second stage-1 check"
@@ -97,7 +97,7 @@ Dir.mktmpdir do |directory|
     ShengEarlyChargeGuard.normal_reboot_requested?(),
     "normal reboot marker was not rechecked after the root mount"
   )
-  assert(!File.exist?(marker), "normal reboot marker was not consumed after the root mount")
+  assert(File.exist?(marker), "stage 1 removed the marker after the root mount")
 end
 
 ShengEarlyChargeGuard.define_singleton_method(:normal_reboot_marker_path) { "/missing" }

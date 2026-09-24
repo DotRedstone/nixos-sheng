@@ -23,8 +23,10 @@ in
   systemd.services."kmsconvt@tty2".enable = false;
 
   boot.postBootCommands = lib.mkAfter (lib.optionalString (!hasDisplayManager) ''
-    ${painter} --stop ${control} || true
-    ${painter} --details ${control} || true
+    if ! grep -qx charger ${control}.mode 2>/dev/null; then
+      ${painter} --stop ${control} || true
+      ${painter} --details ${control} || true
+    fi
   '');
 
   systemd.services.sheng-boot-splash = {
@@ -40,15 +42,14 @@ in
     };
     serviceConfig = {
       Type = "simple";
-      # Retire the stage-1 process and its initrd mappings before starting the
-      # stage-2 process. Both retain the last frame during this short handoff.
-      ExecStartPre = "${painter} --stop ${control}";
-      ExecStart = "${painter} --animate ${pkgs.sheng-boot-animation} start ${control}";
+      # Preload stage-2 assets while stage 1 still paints, then retire its
+      # process and mappings. Preserve graphics mode and the last frame.
+      ExecStart = "${painter} --animate-handoff ${pkgs.sheng-boot-animation} start ${control}";
       # Type=simple alone would allow GDM to stop us before the child had
       # acquired its writer lock. Complete startup only after its first paint.
       ExecStartPost = pkgs.writeShellScript "sheng-boot-splash-ready" ''
         for attempt in $(${pkgs.coreutils}/bin/seq 1 50); do
-          test -e ${control}.ready && exit 0
+          test "$(cat ${control}.ready 2>/dev/null)" = "$MAINPID" && exit 0
           test -e ${control}.disabled && exit 1
           ${pkgs.coreutils}/bin/sleep 0.1
         done

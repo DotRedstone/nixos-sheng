@@ -18,6 +18,7 @@ module System
 end
 class Log
   def warn(_message); end
+  def info(_message); end
 end
 $logger = Log.new
 module Tasks
@@ -52,7 +53,7 @@ Dir.mktmpdir("sheng-stage1-animation-") do |directory|
   raise "Early splash cached a missing root marker" if ShengEarlyChargeGuard.instance_variable_defined?(:@normal_reboot_requested)
   File.write(marker, "normal")
   raise "USB reboot lost its one-shot normal-boot marker" if ShengEarlyChargeGuard.charger_mode?
-  raise "Reboot marker was not consumed" if File.exist?(marker)
+  raise "Stage-1 removed the legacy stage-2 fallback marker" unless File.exist?(marker)
   ShengEarlyChargeGuard.commit_boot_mode("normal")
   raise "Stage-1 normal decision was not persisted" unless File.read(boot_mode) == "normal\n"
   ShengBootAnimation.start("start")
@@ -73,7 +74,7 @@ Dir.mktmpdir("sheng-stage1-animation-") do |directory|
   raise "User diagnostics were overwritten" unless System.spawns.length == previous
   File.delete("#{System.control}.disabled")
   splash.kill
-  raise "Normal splash shutdown revealed diagnostics" if System.commands.last.include?("--details")
+  raise "Stage-1 failure hid diagnostics" unless System.commands.last.include?("--details")
 
   File.delete(boot_mode)
   ShengEarlyChargeGuard.remove_instance_variable(:@boot_mode) if

@@ -48,9 +48,14 @@ a short edge of at least 1600px use the 1440px asset without upscaling; smaller
 displays use the 720px asset, scaled down when needed. File locks
 exclude competing writers. Before switch_root, the child must load its frames
 and open the control and VT descriptors it carries across the mount move. The
-stage-2 service retires the old process before starting its own, freeing initrd
-mappings. The display manager waits for an explicit stop acknowledgement.
-Stage-2 waits for the first frame before allowing the display manager to start.
+stage-2 service preloads and validates its assets while the old process still
+paints, then retires that process and acquires the same writer lock. It preserves
+graphics mode and the last frame without clearing the screen. Both loops select
+frames from the same monotonic clock, skipping late frames under load. The
+surface buffer is reused; opaque full-region fills skip framebuffer readback.
+The corner credit is painted on the first frame and during its fade only.
+The display manager waits for an explicit stop acknowledgement. Stage 2 checks
+the new process PID in the first-frame readiness marker before allowing startup.
 Once the desktop takes over, a per-boot completion marker prevents replaying the
 animation during later system switches.
 Early charger detection does not cache the normal-reboot marker before the root
@@ -58,7 +63,17 @@ filesystem has mounted. Before switch_root, stage 1 commits its final `normal`
 or `charger` decision to `/run/sheng-boot-ui.mode`. The stage-2 charging
 generator honors that decision before consulting PON, so it cannot route a boot
 that has already shown the generation menu back into offline charging. The
-persistent reboot marker remains only as a fallback when no decision exists.
+persistent reboot marker remains only as a fallback when no decision exists;
+stage 1 retains it for compatibility with an older rootfs generator.
+The generator also latches fallback decisions from older initrds, so rerunning
+it after marker cleanup cannot change boot mode. Manual generation reboots write
+the normal marker, and a valid pending generation explicitly requests normal boot.
+
+The battery monitor shares the native animation's POSIX writer lock and VT2.
+Charging, splash, display-manager and diagnostics have explicit conflicts and
+stop ordering. Diagnostics disable further animation and wait for the writer
+before switching to text. Upstream `Splash.kill()` is a stage-1 failure path;
+its diagnostic transition must remain enabled.
 
 Vendor logos and unlock warnings precede Linux and are outside this code's
 control. An early kernel crash or an unavailable display driver may still
