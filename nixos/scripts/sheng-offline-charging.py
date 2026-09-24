@@ -1,11 +1,14 @@
 #!@python@
 
 import glob
+import contextlib
+import fcntl
 import functools
 import math
 import os
 import re
 import select
+import signal
 import struct
 import subprocess
 import sys
@@ -18,6 +21,8 @@ FRAMEBUFFER_PAINTER = "@framebufferPainter@"
 FRAMEBUFFER_COMMAND_PATH = "/run/sheng-offline-charging.fbops"
 NORMAL_REBOOT_MARKER_PATH = "/var/lib/sheng-offline-charging/force-normal-once"
 FONT_PATH = "@chargingFont@"
+BOOT_CONTROL = "/run/sheng-boot-ui"
+BOOT_MODE_PATH = BOOT_CONTROL + ".mode"
 
 EVENT = struct.Struct("llHHI")
 RECTANGLE = struct.Struct("<HHHHBBBB")
@@ -124,6 +129,38 @@ def detect_charger_boot(cmdline, bootconfig):
 
 def detect_from_files(cmdline_path="/proc/cmdline", bootconfig_path="/proc/bootconfig"):
     return detect_charger_boot(read_text(cmdline_path), read_text(bootconfig_path))
+
+
+def charger_selected():
+    # Detection belongs to stage 1 / the generator. A monitor must never infer
+    # permission to paint over a running system from a retained USB PON bit.
+    return read_text(BOOT_MODE_PATH) == "charger"
+
+
+@contextlib.contextmanager
+def charging_display_owner():
+    """Share the native loop's POSIX writer lock and graphics VT for our life."""
+    lock = os.open(BOOT_CONTROL + ".lock", os.O_RDWR | os.O_CREAT, 0o600)
+    tty = None
+    try:
+        fcntl.lockf(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        tty = os.open("/dev/tty2", os.O_RDWR | os.O_CLOEXEC)
+        fcntl.ioctl(tty, 0x4B3A, 1)  # KDSETMODE, KD_GRAPHICS
+        fcntl.ioctl(tty, 0x5606, 2)  # VT_ACTIVATE
+        fcntl.ioctl(tty, 0x5607, 2)  # VT_WAITACTIVE
+        yield tty
+    finally:
+        # Retain graphics mode until the next owner explicitly selects its VT.
+        if tty is not None:
+            os.close(tty)
+        os.close(lock)
+
+
+def charging_display_active(tty):
+    state = bytearray(6)
+    fcntl.ioctl(tty, 0x5603, state, True)  # VT_GETSTATE
+    active, _, _ = struct.unpack("HHH", state)
+    return charger_selected() and active == 2 and not os.path.exists(BOOT_CONTROL + ".disabled")
 
 
 def battery_capacity():
@@ -485,13 +522,15 @@ def start_normal_boot(display):
     return False
 
 
-def monitor():
+def monitor_loop(tty):
     reason = detect_from_files()
     print(f"Offline charging mode is active ({reason or 'generator-selected'}).", flush=True)
     print("Short-press power to show charge; hold power to boot normally.", flush=True)
 
     display = Display()
-    power_key = None
+    # Open before first-frame composition so presses during font/raster loading
+    # remain queued instead of being lost during the most visible pause.
+    power_key = open_power_key()
     pressed_at = None
     offline_since = None
     ever_online = False
@@ -505,9 +544,14 @@ def monitor():
             break
         time.sleep(0.1)
     last_capacity = battery_capacity()
+    if not charging_display_active(tty):
+        return 0
     display.render(last_capacity)
+    visible_until = time.monotonic() + DISPLAY_SECONDS
 
     while True:
+        if not charging_display_active(tty):
+            return 0
         if power_key is None:
             power_key = open_power_key()
 
@@ -534,7 +578,7 @@ def monitor():
             last_report = now
 
         if visible_until is not None and now < visible_until:
-            if capacity != last_capacity:
+            if capacity != last_capacity or not display.visible:
                 display.render(capacity)
                 last_capacity = capacity
             display.animate(capacity, online, now)
@@ -583,7 +627,22 @@ def monitor():
             visible_until = time.monotonic() + DISPLAY_SECONDS
 
 
+def monitor():
+    if not charger_selected() or os.path.exists(BOOT_CONTROL + ".disabled"):
+        return 0
+
+    def stop(_signum, _frame):
+        raise SystemExit(0)
+
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGINT, stop)
+    with charging_display_owner() as tty:
+        return monitor_loop(tty)
+
+
 def main(argv):
+    if len(argv) == 2 and argv[1] == "is-charger":
+        return 0 if charger_selected() else 1
     if len(argv) >= 2 and argv[1] == "detect":
         cmdline_path = argv[2] if len(argv) >= 3 else "/proc/cmdline"
         bootconfig_path = argv[3] if len(argv) >= 4 else "/proc/bootconfig"

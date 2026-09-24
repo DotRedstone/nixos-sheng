@@ -84,7 +84,7 @@ module ShengEarlyChargeGuard
   end
 
   def boot_mode()
-    return @boot_mode if defined?(@boot_mode)
+    return @boot_mode if @boot_mode
 
     value = File.read(boot_mode_path()).strip
     @boot_mode = value if value == "normal" || value == "charger"
@@ -95,14 +95,15 @@ module ShengEarlyChargeGuard
 
   def commit_boot_mode(mode)
     raise ArgumentError, "invalid Sheng boot mode: #{mode}" unless ["normal", "charger"].include?(mode)
+    raise "Sheng boot mode is already committed" if boot_mode() && boot_mode() != mode
 
     path = boot_mode_path()
     temporary = "#{path}.tmp"
     File.write(temporary, "#{mode}\n")
     File.rename(temporary, path)
     @boot_mode = mode
-  rescue => error
-    $logger.warn("Could not persist Sheng boot mode: #{error}")
+    $logger.info("Sheng boot decision: #{mode}")
+    mode
   end
 
   def normal_reboot_requested?()

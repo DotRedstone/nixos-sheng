@@ -18,6 +18,7 @@ module System
 end
 class Log
   def warn(_message); end
+  def info(_message); end
 end
 $logger = Log.new
 module Tasks
@@ -73,7 +74,7 @@ Dir.mktmpdir("sheng-stage1-animation-") do |directory|
   raise "User diagnostics were overwritten" unless System.spawns.length == previous
   File.delete("#{System.control}.disabled")
   splash.kill
-  raise "Normal splash shutdown revealed diagnostics" if System.commands.last.include?("--details")
+  raise "Stage-1 failure hid diagnostics" unless System.commands.last.include?("--details")
 
   File.delete(boot_mode)
   ShengEarlyChargeGuard.remove_instance_variable(:@boot_mode) if

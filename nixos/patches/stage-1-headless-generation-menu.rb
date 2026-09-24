@@ -158,6 +158,11 @@ module ShengHeadlessGenerationMenu
 
   def reboot_with_pending_selection(generation)
     persist_pending_selection(generation)
+    # This forced reboot bypasses stage-2's reboot.target marker service.
+    marker = ShengEarlyChargeGuard.normal_reboot_marker_path()
+    FileUtils.mkdir_p(File.dirname(marker))
+    File.write("#{marker}.tmp", "normal-reboot\n")
+    File.rename("#{marker}.tmp", marker)
     System.run("sync")
     $logger.info(
       "Saved sheng generation '#{generation.path}'; rebooting so stage-2 starts within the Qualcomm SSC registration window."
@@ -1248,12 +1253,15 @@ class Tasks::SwitchRoot
     return @selected_generation if @selected_generation
 
     ShengBootAnimation.stop()
+    pending_generation = ShengHeadlessGenerationMenu.consume_pending_selection(self)
+    # A valid pending choice is an explicit normal boot request, including on
+    # legacy systems whose menu reboot did not write force-normal-once.
+    ShengEarlyChargeGuard.commit_boot_mode("normal") if pending_generation
     ShengEarlyChargeGuard.wait_if_critical()
     charger_boot = ShengEarlyChargeGuard.charger_mode?()
     ShengEarlyChargeGuard.commit_boot_mode(charger_boot ? "charger" : "normal")
     ShengEarlyChargeGuard.prepare_offline_charging_handoff() if charger_boot
     wants_menu = !charger_boot
-    pending_generation = ShengHeadlessGenerationMenu.consume_pending_selection(self)
 
     if pending_generation
       @selected_generation = pending_generation
