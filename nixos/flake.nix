@@ -268,8 +268,11 @@
             ${mobileEval.config.systemd.generators.sheng-offline-charging}
           grep -F 'boot_mode=/run/sheng-boot-ui.mode' \
             ${mobileEval.config.systemd.generators.sheng-offline-charging}
-          grep -F 'stage-1-decision=charger' \
-            ${mobileEval.config.systemd.generators.sheng-offline-charging}
+          python3 ${../scripts/test-boot-mode-handoff.py} \
+            ${./patches/stage-1-early-charge-guard.rb} \
+            ${./scripts/sheng-offline-charging-generator.sh} \
+            ${./scripts/sheng-offline-charging.py} \
+            ${./patches/stage-1-headless-generation-menu.rb}
           grep -F 'before = [ "shutdown.target" "systemd-reboot.service" ];' \
             ${./modules/sheng-offline-charging.nix}
           python3 \

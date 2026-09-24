@@ -24,48 +24,13 @@ let
       (builtins.readFile ../scripts/sheng-offline-charging.py)
   );
 
-  offlineChargingGenerator = pkgs.writeShellScript "sheng-offline-charging-generator" ''
-    set -eu
-
-    # NixOS installs /etc/systemd/system/default.target. Only generator.early
-    # precedes that path in systemd's unit lookup order.
-    output_dir="$2"
-    boot_mode=/run/sheng-boot-ui.mode
-    normal_reboot_marker=/var/lib/sheng-offline-charging/force-normal-once
-    if [ -r "$boot_mode" ]; then
-      IFS= read -r decided_mode < "$boot_mode" || decided_mode=
-      case "$decided_mode" in
-        normal)
-          echo "Sheng stage-1 selected the normal boot target." >&2
-          exit 0
-          ;;
-        charger)
-          reason="stage-1-decision=charger"
-          ;;
-        *)
-          echo "Sheng stage-1 boot decision is invalid; falling back to PON detection." >&2
-          reason=
-          ;;
-      esac
-    fi
-    if [ -z "''${reason:-}" ] && [ -e "$normal_reboot_marker" ]; then
-      # Stage 1 saw this marker before deciding whether to enter charger mode.
-      # This is a fallback for paths that reach stage 2 without the explicit
-      # /run decision. An actual poweroff starts with a fresh /run.
-      rm -f "$normal_reboot_marker"
-      echo "Sheng normal reboot marker detected; keeping the normal boot target." >&2
-      exit 0
-    fi
-    if [ -z "''${reason:-}" ] && ! reason="$(${offlineChargingProgram} detect 2>/dev/null)"; then
-      exit 0
-    fi
-
-    echo "Sheng charger boot detected: $reason" >&2
-    ${pkgs.coreutils}/bin/mkdir -p "$output_dir"
-    ${pkgs.coreutils}/bin/ln -sfn \
-      /etc/systemd/system/sheng-offline-charging.target \
-      "$output_dir/default.target"
-  '';
+  offlineChargingGenerator = pkgs.writeShellScript "sheng-offline-charging-generator" (
+    builtins.replaceStrings
+      [ "@detect@" "@mv@" "@mkdir@" "@ln@" ]
+      [ "${offlineChargingProgram}" "${pkgs.coreutils}/bin/mv"
+        "${pkgs.coreutils}/bin/mkdir" "${pkgs.coreutils}/bin/ln" ]
+      (builtins.readFile ../scripts/sheng-offline-charging-generator.sh)
+  );
 in
 {
   systemd.services.sheng-normal-reboot-marker = {
@@ -124,18 +89,25 @@ in
     ];
     unitConfig = {
       AllowIsolate = true;
-      Conflicts = "graphical.target shutdown.target";
+      Conflicts = "graphical.target display-manager.service sheng-boot-splash.service shutdown.target";
     };
   };
 
   systemd.services.sheng-offline-charging = {
     description = "Monitor sheng offline charging mode";
     wantedBy = [ "sheng-offline-charging.target" ];
+    partOf = [ "sheng-offline-charging.target" ];
+    conflicts = [ "display-manager.service" "sheng-boot-splash.service" "sheng-boot-details.service" ];
+    before = [ "display-manager.service" "sheng-boot-splash.service" "sheng-boot-details.service" ];
     serviceConfig = {
       Type = "simple";
+      ExecCondition = "${offlineChargingProgram} is-charger";
+      # Stop the initrd writer too, even if the stage-2 splash unit never ran.
+      ExecStartPre = "${pkgs.sheng-fb-painter}/bin/sheng-fb-painter --stop /run/sheng-boot-ui";
       ExecStart = "${offlineChargingProgram} monitor";
       Restart = "on-failure";
       RestartSec = 2;
+      TimeoutStopSec = 6;
     };
   };
 
