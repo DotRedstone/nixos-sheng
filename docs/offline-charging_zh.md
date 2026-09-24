@@ -39,6 +39,15 @@ NixOS 固定在 `/etc/systemd/system/default.target` 的桌面目标，确保充
 系统镜像不能把 `androidboot.force_normal_boot=1` 固定写入内核参数；该参数只适合
 一次性的救援启动，否则 bootloader 提供的充电启动原因会被永久覆盖。
 
+启动决定保存在 `/run/sheng-boot-ui.mode`，一次开机内只允许确定为 `normal` 或 `charger`。
+充电服务只能在明确的 `charger` 决定下绘制；不能自行根据残留的 USB PON 位抢占屏幕。
+generator 重跑、正常重启标记清理、切换系统配置均不应改变该决定。有效的待启动世代选择
+也代表一次明确的正常开机请求。
+
+电池画面和 NixOS 动画共享 POSIX 绘制锁；充电服务随充电 target 停止，并与桌面、
+动画及诊断服务互斥。失去 VT2 或切入诊断后监控退出。minimal 的早期文本控制台切换
+只在正常启动执行，不能打断充电画面。
+
 ## 部署
 
 本功能同时修改 initramfs stage-1 和 NixOS stage-2。需要构建并刷入匹配的
@@ -86,7 +95,15 @@ cat /proc/cmdline
 grep -E 'androidboot.(mode|force_normal_boot)|bootinfo.pureason' /proc/bootconfig
 journalctl -b -u sheng-offline-charging.service --no-pager
 systemctl status sheng-offline-charging.target --no-pager
+cat /run/sheng-boot-ui.mode
+systemctl daemon-reload
+cat /run/sheng-boot-ui.mode
+systemctl is-active sheng-offline-charging.service display-manager.service
 ```
+
+正常启动的 mode 两次均应为 `normal`，充电服务应不活动；充电启动两次均应为
+`charger`，桌面应不活动。还需分别验证插电主动重启、手动世代选择、充电长按开机、
+诊断切换及 minimal。离机测试覆盖这些状态交接和显示锁，但不能证明设备已经能稳定启动。
 
 如果模式没有被识别，应保留该次插电启动的完整 cmdline。没有确认正常电源键启动仍可
 区分前，不应继续扩大 PON 位掩码。
