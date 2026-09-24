@@ -52,7 +52,7 @@ Dir.mktmpdir("sheng-stage1-animation-") do |directory|
   raise "Early splash cached a missing root marker" if ShengEarlyChargeGuard.instance_variable_defined?(:@normal_reboot_requested)
   File.write(marker, "normal")
   raise "USB reboot lost its one-shot normal-boot marker" if ShengEarlyChargeGuard.charger_mode?
-  raise "Reboot marker was not consumed" if File.exist?(marker)
+  raise "Stage-1 removed the legacy stage-2 fallback marker" unless File.exist?(marker)
   ShengEarlyChargeGuard.commit_boot_mode("normal")
   raise "Stage-1 normal decision was not persisted" unless File.read(boot_mode) == "normal\n"
   ShengBootAnimation.start("start")
