@@ -144,6 +144,11 @@ def charging_display_owner():
     tty = None
     try:
         fcntl.lockf(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        # Diagnostics may have won the lock after monitor()'s initial check.
+        # Recheck under ownership before switching away from its console.
+        if not charger_selected() or os.path.exists(BOOT_CONTROL + ".disabled"):
+            yield None
+            return
         tty = os.open("/dev/tty2", os.O_RDWR | os.O_CLOEXEC)
         fcntl.ioctl(tty, 0x4B3A, 1)  # KDSETMODE, KD_GRAPHICS
         fcntl.ioctl(tty, 0x5606, 2)  # VT_ACTIVATE
@@ -637,7 +642,7 @@ def monitor():
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
     with charging_display_owner() as tty:
-        return monitor_loop(tty)
+        return 0 if tty is None else monitor_loop(tty)
 
 
 def main(argv):

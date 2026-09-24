@@ -170,6 +170,26 @@ with tempfile.TemporaryDirectory(prefix='sheng-boot-test-') as temporary:
         assert subprocess.run(command(count=1), timeout=4).returncode == 75
         assert raw.read_bytes() == before
 
+    # Simulate a starting writer initializing its control file after the stop
+    # request was sent. Stop must remain asserted until the writer lets go.
+    with open(str(control) + '.lock', 'r+') as lock:
+        fcntl.lockf(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        control.write_text('run')
+        stopping = subprocess.Popen([str(painter), '--stop', str(control)])
+        try:
+            for reset in range(2):
+                deadline = time.monotonic() + 1
+                while control.read_text() != 'stop':
+                    assert time.monotonic() < deadline, 'Startup swallowed the stop request'
+                    time.sleep(.01)
+                if reset == 0:
+                    control.write_text('run')
+            fcntl.lockf(lock, fcntl.LOCK_UN)
+            assert stopping.wait(timeout=2) == 0
+        finally:
+            if stopping.poll() is None:
+                stopping.kill(); stopping.wait()
+
     broken = root / 'broken'
     broken.mkdir()
     for path in assets.glob('*.sfb'):

@@ -75,6 +75,9 @@ static int boot_request_stop(const char *control, int details) {
     if ((errno != EACCES && errno != EAGAIN) || elapsed_ms(&start) > 3000) {
       close(fd); return 1;
     }
+    /* A starting writer may still initialize its control file to "run".
+     * Keep the request asserted until ownership has actually been released. */
+    if (boot_control_write(control, details ? "details" : "stop") < 0) { close(fd); return 1; }
     struct timespec delay = {0, 10000000}; nanosleep(&delay, NULL);
   }
   if (details) boot_details(control);
@@ -202,6 +205,7 @@ static int boot_animate(int argc, char **argv) {
   lock_fd = boot_lock(control, 1);
   if (lock_fd < 0) goto out;
   if (boot_try_lock(lock_fd) < 0) { result = 75; goto out; }
+  if (access(disabled, F_OK) == 0) { result = 0; goto out; }
   /* Open control state once. /run, /dev and /proc move during switch_root;
    * inherited directory/device descriptors remain valid across that handoff. */
   const char *slash = strrchr(control, '/');
@@ -244,6 +248,11 @@ static int boot_animate(int argc, char **argv) {
       if (boot_load_frame(&frames[i], directory, phase, i, &target) < 0) goto out;
     if (boot_load_frame(&credit, directory, "credit", 0, &target) < 0) goto out;
   }
+  /* A diagnostic request can arrive during asset loading, even before the
+   * control file is initialized. Its persistent veto must survive that race. */
+  if (faccessat(directory_fd, disabled_name, F_OK, 0) == 0) {
+    details = 1; result = 0; goto out;
+  }
   if (!testing) {
     diagnostic_fd = open("/dev/tty3", O_RDWR | O_CLOEXEC);
     tty_fd = open("/dev/tty2", O_RDWR | O_CLOEXEC);
@@ -266,6 +275,7 @@ static int boot_animate(int argc, char **argv) {
   struct timespec lifetime;
   clock_gettime(CLOCK_MONOTONIC, &lifetime);
   for (unsigned tick = 0; tick < max_frames && !boot_stop; tick++) {
+    if (faccessat(directory_fd, disabled_name, F_OK, 0) == 0) { details = 1; break; }
     char request[16] = {0};
     if (pread(control_fd, request, sizeof(request)-1, 0) < 0) request[0] = 0;
     if (!strncmp(request, "details", 7)) { details = 1; break; }
