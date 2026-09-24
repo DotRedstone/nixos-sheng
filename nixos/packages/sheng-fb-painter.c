@@ -27,6 +27,7 @@ struct target {
   uint8_t *row_buffer;
   size_t map_length;
   size_t surface_stride;
+  size_t surface_capacity;
   unsigned int width;
   unsigned int height;
   unsigned int stride;
@@ -327,11 +328,24 @@ static int prepare_surface(struct target *target, const uint8_t *commands,
   target->surface_height = max_y - min_y;
   target->surface_stride =
       (size_t)target->surface_width * target->bytes_per_pixel;
-  target->surface = malloc(target->surface_stride * target->surface_height);
-  if (!target->surface) {
-    perror("allocate framebuffer composition surface");
-    return -1;
+  size_t needed = target->surface_stride * target->surface_height;
+  if (needed > target->surface_capacity) {
+    uint8_t *resized = realloc(target->surface, needed);
+    if (!resized) {
+      perror("allocate framebuffer composition surface");
+      return -1;
+    }
+    target->surface = resized;
+    target->surface_capacity = needed;
   }
+
+  /* Opaque boot frames begin with a fill covering the entire composition.
+   * Reading uncached scanout memory first wastes several MB per frame. Partial
+   * battery updates and glyph overlays still copy their previous pixels. */
+  const uint8_t *first = commands + COMMAND_HEADER_SIZE;
+  if (!first[11] && read_le16(first) == min_x && read_le16(first + 2) == min_y &&
+      read_le16(first + 4) >= max_x - min_x && read_le16(first + 6) >= max_y - min_y)
+    return 0;
 
   for (row = 0; row < target->surface_height; row++) {
     const uint8_t *source = target->map +
@@ -380,7 +394,8 @@ static unsigned long parse_number(const char *value, const char *name) {
 #include "sheng-boot-animation.h"
 
 int main(int argc, char **argv) {
-  if (argc > 1 && (!strcmp(argv[1], "--animate") || !strcmp(argv[1], "--animate-file")))
+  if (argc > 1 && (!strcmp(argv[1], "--animate") || !strcmp(argv[1], "--animate-file") ||
+      !strcmp(argv[1], "--animate-handoff") || !strcmp(argv[1], "--animate-file-handoff")))
     return boot_animate(argc, argv);
   if (argc == 3 && (!strcmp(argv[1], "--stop") || !strcmp(argv[1], "--details")))
     return boot_request_stop(argv[2], !strcmp(argv[1], "--details"));
