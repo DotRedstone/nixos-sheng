@@ -1250,6 +1250,7 @@ class Tasks::SwitchRoot
     ShengBootAnimation.stop()
     ShengEarlyChargeGuard.wait_if_critical()
     charger_boot = ShengEarlyChargeGuard.charger_mode?()
+    ShengEarlyChargeGuard.commit_boot_mode(charger_boot ? "charger" : "normal")
     ShengEarlyChargeGuard.prepare_offline_charging_handoff() if charger_boot
     wants_menu = !charger_boot
     pending_generation = ShengHeadlessGenerationMenu.consume_pending_selection(self)

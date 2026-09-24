@@ -40,6 +40,8 @@ Dir.mktmpdir("sheng-stage1-animation-") do |directory|
   eval(File.read(guard), TOPLEVEL_BINDING, guard)
   marker = File.join(directory, "force-normal-once")
   ShengEarlyChargeGuard.define_singleton_method(:normal_reboot_marker_path) { marker }
+  boot_mode = File.join(directory, "boot-mode")
+  ShengEarlyChargeGuard.define_singleton_method(:boot_mode_path) { boot_mode }
   eval(File.read(source).sub('"/run/sheng-boot-ui"', System.control.inspect), TOPLEVEL_BINDING, source)
   splash = Tasks::Splash.new
   raise "Early splash lacks proc dependency" unless splash.dependencies.include?([:Mount, "/proc"])
@@ -51,6 +53,8 @@ Dir.mktmpdir("sheng-stage1-animation-") do |directory|
   File.write(marker, "normal")
   raise "USB reboot lost its one-shot normal-boot marker" if ShengEarlyChargeGuard.charger_mode?
   raise "Reboot marker was not consumed" if File.exist?(marker)
+  ShengEarlyChargeGuard.commit_boot_mode("normal")
+  raise "Stage-1 normal decision was not persisted" unless File.read(boot_mode) == "normal\n"
   ShengBootAnimation.start("start")
   raise "Normal reboot did not start its handoff animation" unless System.spawns.last.include?("start")
   raise "Normal-boot marker missing" unless File.exist?("#{System.control}.normal")
@@ -69,6 +73,14 @@ Dir.mktmpdir("sheng-stage1-animation-") do |directory|
   raise "User diagnostics were overwritten" unless System.spawns.length == previous
   File.delete("#{System.control}.disabled")
   splash.kill
-  raise "Stage-1 failure did not show diagnostics" unless System.commands.any? { |c| c.include?("--details") }
+  raise "Normal splash shutdown revealed diagnostics" if System.commands.last.include?("--details")
+
+  File.delete(boot_mode)
+  ShengEarlyChargeGuard.remove_instance_variable(:@boot_mode) if
+    ShengEarlyChargeGuard.instance_variable_defined?(:@boot_mode)
+  ShengEarlyChargeGuard.commit_boot_mode("charger")
+  previous = System.spawns.length
+  ShengBootAnimation.start("start")
+  raise "Committed charger decision started the normal animation" unless System.spawns.length == previous
 end
 puts "stage-1 animation ordering, charger isolation, reboot-marker and diagnostics tests passed"
