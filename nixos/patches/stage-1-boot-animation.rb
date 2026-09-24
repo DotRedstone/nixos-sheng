@@ -48,7 +48,10 @@ module ShengBootAnimation
   end
 
   def self.stop()
-    System.run(PAINTER, "--stop", CONTROL) if @pid
+    # The previous stage can leave a painter alive across switch_root even when
+    # this Ruby instance no longer owns its pid. The control protocol is safe
+    # to send when no painter exists and makes the writer handoff explicit.
+    System.run(PAINTER, "--stop", CONTROL)
     Process.wait(@pid, Process::WNOHANG) if @pid
     @pid = nil
   rescue => error
@@ -93,7 +96,6 @@ class Tasks::Splash
 
   def kill()
     ShengBootAnimation.stop()
-    ShengBootAnimation.details()
     sheng_kill_without_animation
   end
 end

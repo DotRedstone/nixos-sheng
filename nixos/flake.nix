@@ -266,6 +266,10 @@
             ${mobileEval.config.systemd.generators.sheng-offline-charging}
           grep -F 'normal_reboot_marker=/var/lib/sheng-offline-charging/force-normal-once' \
             ${mobileEval.config.systemd.generators.sheng-offline-charging}
+          grep -F 'boot_mode=/run/sheng-boot-ui.mode' \
+            ${mobileEval.config.systemd.generators.sheng-offline-charging}
+          grep -F 'stage-1-decision=charger' \
+            ${mobileEval.config.systemd.generators.sheng-offline-charging}
           grep -F 'before = [ "shutdown.target" "systemd-reboot.service" ];' \
             ${./modules/sheng-offline-charging.nix}
           python3 \

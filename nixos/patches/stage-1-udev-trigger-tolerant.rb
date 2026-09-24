@@ -49,8 +49,8 @@ class Tasks::UDev < SingletonTask
       $logger.warn("udevadm settle returned non-zero (#{e}); continuing")
     end
 
-    if ShengEarlyChargeGuard.charger_mode?()
-      ShengEarlyChargeGuard.prepare_offline_charging_handoff()
-    end
+    # SwitchRoot owns the final charger/normal decision after the persistent
+    # reboot marker is available. Making it here could race that mount and
+    # send a requested normal reboot back to the charging target.
   end
 end

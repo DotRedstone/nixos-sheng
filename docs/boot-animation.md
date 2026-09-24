@@ -54,7 +54,11 @@ Stage-2 waits for the first frame before allowing the display manager to start.
 Once the desktop takes over, a per-boot completion marker prevents replaying the
 animation during later system switches.
 Early charger detection does not cache the normal-reboot marker before the root
-filesystem has mounted.
+filesystem has mounted. Before switch_root, stage 1 commits its final `normal`
+or `charger` decision to `/run/sheng-boot-ui.mode`. The stage-2 charging
+generator honors that decision before consulting PON, so it cannot route a boot
+that has already shown the generation menu back into offline charging. The
+persistent reboot marker remains only as a fallback when no decision exists.
 
 Vendor logos and unlock warnings precede Linux and are outside this code's
 control. An early kernel crash or an unavailable display driver may still

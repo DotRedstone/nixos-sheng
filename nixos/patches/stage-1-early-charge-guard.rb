@@ -16,6 +16,10 @@ module ShengEarlyChargeGuard
   # rebooting. Stage 1 consumes it and caches the result because charger_mode?
   # is evaluated more than once during root selection.
   NORMAL_REBOOT_MARKER_PATH = "/mnt/var/lib/sheng-offline-charging/force-normal-once"
+  # Stage 2 must not rediscover the mode from PON after stage 1 has selected a
+  # generation. /run is carried over switch_root along with the boot UI control
+  # files, so this is the per-boot authority rather than persistent state.
+  BOOT_MODE_PATH = "/run/sheng-boot-ui.mode"
 
   def config()
     Configuration["sheng_early_charge_guard"] || {}
@@ -74,6 +78,32 @@ module ShengEarlyChargeGuard
     NORMAL_REBOOT_MARKER_PATH
   end
 
+  def boot_mode_path()
+    BOOT_MODE_PATH
+  end
+
+  def boot_mode()
+    return @boot_mode if defined?(@boot_mode)
+
+    value = File.read(boot_mode_path()).strip
+    @boot_mode = value if value == "normal" || value == "charger"
+    @boot_mode
+  rescue
+    nil
+  end
+
+  def commit_boot_mode(mode)
+    raise ArgumentError, "invalid Sheng boot mode: #{mode}" unless ["normal", "charger"].include?(mode)
+
+    path = boot_mode_path()
+    temporary = "#{path}.tmp"
+    File.write(temporary, "#{mode}\n")
+    File.rename(temporary, path)
+    @boot_mode = mode
+  rescue => error
+    $logger.warn("Could not persist Sheng boot mode: #{error}")
+  end
+
   def normal_reboot_requested?()
     return @normal_reboot_requested if @normal_reboot_requested_checked
 
@@ -104,6 +134,8 @@ module ShengEarlyChargeGuard
   end
 
   def charger_mode?()
+    mode = boot_mode()
+    return mode == "charger" unless mode.nil?()
     return false if normal_reboot_requested?()
     return false if boot_value("androidboot.force_normal_boot") == "1"
     pureason = boot_value("bootinfo.pureason")
@@ -191,6 +223,10 @@ module ShengEarlyChargeGuard
   def prepare_offline_charging_handoff()
     return if @offline_charging_handoff_prepared
 
+    # A framebuffer blank alone leaves an initrd painter alive. Stop it before
+    # the stage-2 charging monitor gets the framebuffer, otherwise the two
+    # independent writers can alternate frames during switch_root.
+    ShengBootAnimation.stop() if defined?(ShengBootAnimation)
     Dir.glob("/sys/class/graphics/fb*/blank").each do |path|
       File.write(path, "1\n")
     rescue
