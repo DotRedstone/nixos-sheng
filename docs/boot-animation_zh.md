@@ -61,7 +61,7 @@ stage-2 服务在首帧准备好后才允许显示管理器启动，避免启动
 在 switch_root 前，stage-1 会把本次已确定的 `normal` 或 `charger` 决定写入
 `/run/sheng-boot-ui.mode`。stage-2 的充电 generator 优先使用该决定，不会再用保留的
 USB PON 原因把已经显示世代菜单的正常启动改回关机充电；持久化重启标记只作为未写入决定
-时的后备路径。
+时的后备路径。stage-1 保留该标记到 stage-2，因此仍可兼容尚未更新 generator 的旧 rootfs。
 
 ## 构建与预览
 
