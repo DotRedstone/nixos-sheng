@@ -59,8 +59,15 @@ static int boot_try_lock(int fd) {
 static int boot_request_stop(const char *control, int details) {
   int fd = boot_lock(control, 0);
   int saved_errno = errno;
-  if (details) boot_details(control);
-  if (fd < 0) return saved_errno == ENOENT ? 0 : 1;
+  if (details) {
+    char disabled[4096];
+    if (snprintf(disabled, sizeof(disabled), "%s.disabled", control) >= (int)sizeof(disabled) ||
+        boot_control_write(disabled, "details\n") < 0) { if (fd >= 0) close(fd); return 1; }
+  }
+  if (fd < 0) {
+    if (details) boot_details(control);
+    return saved_errno == ENOENT ? 0 : 1;
+  }
   if (boot_control_write(control, details ? "details" : "stop") < 0) { close(fd); return 1; }
   struct timespec start;
   clock_gettime(CLOCK_MONOTONIC, &start);
@@ -70,6 +77,7 @@ static int boot_request_stop(const char *control, int details) {
     }
     struct timespec delay = {0, 10000000}; nanosleep(&delay, NULL);
   }
+  if (details) boot_details(control);
   close(fd);
   return 0;
 }
@@ -132,7 +140,6 @@ static int boot_paint_frame(struct target *target, const struct boot_frame *fram
     if (paint_rectangle(target, record, started_at) < 0) return -1;
   }
   if (commit_surface(target, started_at) < 0) return -1;
-  free(target->surface); target->surface = NULL;
   return 0;
 }
 
@@ -158,7 +165,8 @@ static int boot_esc_pressed(int *fds, size_t *count, unsigned tick) {
 }
 
 static int boot_animate(int argc, char **argv) {
-  int testing = !strcmp(argv[1], "--animate-file");
+  int testing = !strcmp(argv[1], "--animate-file") || !strcmp(argv[1], "--animate-file-handoff");
+  int handoff = !strcmp(argv[1], "--animate-handoff") || !strcmp(argv[1], "--animate-file-handoff");
   if ((!testing && argc != 5) || (testing && argc != 12)) return 2;
   const char *directory = argv[testing ? 8 : 2];
   const char *phase = argv[testing ? 9 : 3];
@@ -177,9 +185,23 @@ static int boot_animate(int argc, char **argv) {
   if (snprintf(ready, sizeof(ready), "%s.ready", control) >= (int)sizeof(ready) ||
       snprintf(disabled, sizeof(disabled), "%s.disabled", control) >= (int)sizeof(disabled)) return 2;
   if (access(disabled, F_OK) == 0) return 0;
+  /* Load the incoming generation while the initrd continues animating. Do not
+   * retire the outgoing writer until every asset has been validated. */
+  if (handoff) {
+    int mapped = testing
+      ? map_regular_target(&target, argv[2], parse_number(argv[3], "width"),
+          parse_number(argv[4], "height"), parse_number(argv[5], "stride"), parse_number(argv[6], "bpp"))
+      : map_framebuffer_target(&target, "/dev/fb0");
+    if (mapped < 0) goto out;
+    for (unsigned i = 0; i < BOOT_FRAME_COUNT; i++)
+      if (boot_load_frame(&frames[i], directory, phase, i, &target) < 0) goto out;
+    if (boot_load_frame(&credit, directory, "credit", 0, &target) < 0) goto out;
+    if (boot_request_stop(control, 0) != 0) goto out;
+    if (access(disabled, F_OK) == 0) { result = 0; goto out; }
+  }
   lock_fd = boot_lock(control, 1);
-  if (lock_fd < 0) return 1;
-  if (boot_try_lock(lock_fd) < 0) { close(lock_fd); return 75; }
+  if (lock_fd < 0) goto out;
+  if (boot_try_lock(lock_fd) < 0) { result = 75; goto out; }
   /* Open control state once. /run, /dev and /proc move during switch_root;
    * inherited directory/device descriptors remain valid across that handoff. */
   const char *slash = strrchr(control, '/');
@@ -198,12 +220,12 @@ static int boot_animate(int argc, char **argv) {
   control_fd = open(control, O_RDONLY | O_CLOEXEC);
   if (control_fd < 0) goto out;
   signal(SIGTERM, boot_signal); signal(SIGINT, boot_signal);
-  if (testing) {
+  if (!handoff && testing) {
     if (map_regular_target(&target, argv[2], parse_number(argv[3], "width"),
         parse_number(argv[4], "height"), parse_number(argv[5], "stride"),
         parse_number(argv[6], "bpp")) < 0) goto out;
     /* argv[7] is a frame output directory, or '-' for lifecycle-only tests. */
-  } else {
+  } else if (!handoff) {
     for (int attempt = 0; attempt < 100 && !boot_stop; attempt++) {
       char request[16] = {0};
       if (pread(control_fd, request, sizeof(request)-1, 0) < 0) request[0] = 0;
@@ -217,9 +239,11 @@ static int boot_animate(int argc, char **argv) {
   }
   target.row_buffer = malloc((size_t)target.width * target.bytes_per_pixel);
   if (!target.row_buffer) goto out;
-  for (unsigned i = 0; i < BOOT_FRAME_COUNT; i++)
-    if (boot_load_frame(&frames[i], directory, phase, i, &target) < 0) goto out;
-  if (boot_load_frame(&credit, directory, "credit", 0, &target) < 0) goto out;
+  if (!handoff) {
+    for (unsigned i = 0; i < BOOT_FRAME_COUNT; i++)
+      if (boot_load_frame(&frames[i], directory, phase, i, &target) < 0) goto out;
+    if (boot_load_frame(&credit, directory, "credit", 0, &target) < 0) goto out;
+  }
   if (!testing) {
     diagnostic_fd = open("/dev/tty3", O_RDWR | O_CLOEXEC);
     tty_fd = open("/dev/tty2", O_RDWR | O_CLOEXEC);
@@ -236,7 +260,7 @@ static int boot_animate(int argc, char **argv) {
     if (state.v_active != 2) goto out;
   }
   /* Paint black once, including any old menu outside the central composition. */
-  for (unsigned y = 0; y < target.height; y++)
+  for (unsigned y = 0; !handoff && y < target.height; y++)
     memset(target.map + (size_t)(y + target.yoffset) * target.stride +
       target.xoffset * target.bytes_per_pixel, 0, (size_t)target.width * target.bytes_per_pixel);
   struct timespec lifetime;
@@ -252,15 +276,21 @@ static int boot_animate(int argc, char **argv) {
       if (boot_esc_pressed(input_fds, &input_count, tick)) { details = 1; break; }
       if (elapsed_ms(&lifetime) >= 120000) { details = 1; break; }
     }
-    struct boot_frame *frame = &frames[tick % BOOT_FRAME_COUNT];
     struct timespec started_at;
     clock_gettime(CLOCK_MONOTONIC, &started_at);
+    /* Keep both stages on the same monotonic timeline; skip late frames
+     * instead of slowing the whole loop down under boot I/O load. */
+    unsigned frame_index = testing && strcmp(argv[7], "-") ? tick % BOOT_FRAME_COUNT :
+      ((uint64_t)started_at.tv_sec * 20 + started_at.tv_nsec / 50000000) % BOOT_FRAME_COUNT;
+    struct boot_frame *frame = &frames[frame_index];
     unsigned brightness = !strcmp(phase, "prepare") && tick < 10 ? tick + 1 : 10;
     if (boot_paint_frame(&target, frame, &started_at, brightness) < 0 ||
-        boot_paint_frame(&target, &credit, &started_at, brightness) < 0) goto out;
+        ((!tick || (!strcmp(phase, "prepare") && tick < 10)) &&
+         boot_paint_frame(&target, &credit, &started_at, brightness) < 0)) goto out;
     if (!tick) {
       if (!testing) (void)ioctl(target.fd, FBIOBLANK, FB_BLANK_UNBLANK);
-      (void)boot_marker_at(directory_fd, ready_name, "ready");
+      char pid[32]; snprintf(pid, sizeof(pid), "%ld\n", (long)getpid());
+      (void)boot_marker_at(directory_fd, ready_name, pid);
     }
     if (testing && strcmp(argv[7], "-")) {
       char path[4096];
@@ -287,10 +317,12 @@ out:
   for (unsigned i = 0; i < BOOT_FRAME_COUNT; i++) free(frames[i].data);
   free(credit.data);
   if (tty_fd >= 0) {
-    if (owns_vt) (void)ioctl(tty_fd, KDSETMODE, KD_TEXT);
+    /* A normal handoff preserves graphics mode and the last frame. Only the
+     * diagnostic path returns to text; toggling here exposed fbcon mid-boot. */
+    if (owns_vt && (details || result)) (void)ioctl(tty_fd, KDSETMODE, KD_TEXT);
     close(tty_fd);
   }
-  if (details || (!testing && result)) {
+  if (details || (!testing && result && result != 75)) {
     if (directory_fd >= 0) (void)boot_marker_at(directory_fd, disabled_name, "details");
     if (!testing) {
       if (diagnostic_fd >= 0) {
