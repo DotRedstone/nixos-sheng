@@ -47,7 +47,7 @@ jobs:
       - name: Install release packaging tools
         run: |
           sudo apt update
-          sudo apt install -y e2fsprogs zip
+          sudo apt install -y e2fsprogs unzip zip
 
       - name: Determine Release Info
         id: release_info
@@ -238,6 +238,13 @@ jobs:
               archive_name="${image_name%.img}.zip"
               echo "Creating split ZIP archive for $image_name"
               zip -9 -s "$max_zip_part_size" "$archive_name" "$image_name"
+              # Do not publish a split archive until the final .zip can read
+              # every volume and reconstruct the exact flashable image.
+              unzip -t "$archive_name"
+              mkdir extracted
+              unzip -q "$archive_name" -d extracted
+              cmp "$image_name" "extracted/$image_name"
+              rm -rf extracted
               rm "$image_name"
             )
           done
