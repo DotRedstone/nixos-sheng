@@ -119,6 +119,10 @@
   # Qualcomm's bundled NVM contains a placeholder controller address. Reuse
   # Android's factory-programmed address without ever writing to persist.
   systemd.services.sheng-bluetooth-address = {
+    # WCN7851 re-registers with the firmware-provided address after the mgmt
+    # public-address operation.  Keep Bluetooth usable until the vendor-side
+    # address injection path is implemented as a separately validated fix.
+    enable = false;
     description = "Load the factory Bluetooth address for sheng";
     # BlueZ owns hci0 once bluetoothd starts. It will reject the management
     # address change even if `btmgmt power off` was requested first, leaving
