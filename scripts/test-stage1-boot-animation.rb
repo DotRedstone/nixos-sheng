@@ -83,5 +83,7 @@ Dir.mktmpdir("sheng-stage1-animation-") do |directory|
   previous = System.spawns.length
   ShengBootAnimation.start("start")
   raise "Committed charger decision started the normal animation" unless System.spawns.length == previous
+  ShengEarlyChargeGuard.prepare_offline_charging_handoff()
+  raise "Charger handoff did not stop the initrd animation" unless System.commands.last.include?("--stop")
 end
 puts "stage-1 animation ordering, charger isolation, reboot-marker and diagnostics tests passed"
