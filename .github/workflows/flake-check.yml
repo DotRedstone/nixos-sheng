@@ -54,6 +54,7 @@ jobs:
           nix build \
             './nixos#checks.aarch64-linux.offlineCharging' \
             './nixos#checks.aarch64-linux.bootAnimation' \
+            './nixos#checks.aarch64-linux.bluetoothAddressOrdering' \
             --no-link
 
       - name: Build Sheng touch and stylus processor

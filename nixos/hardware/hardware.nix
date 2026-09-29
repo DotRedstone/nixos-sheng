@@ -120,16 +120,17 @@
   # Android's factory-programmed address without ever writing to persist.
   systemd.services.sheng-bluetooth-address = {
     description = "Load the factory Bluetooth address for sheng";
-    wantedBy = [ "multi-user.target" ];
-    requires = [
-      "bluetooth.service"
-      "mnt-vendor-persist.mount"
-    ];
+    # BlueZ owns hci0 once bluetoothd starts. It will reject the management
+    # address change even if `btmgmt power off` was requested first, leaving
+    # the bundled placeholder address active. The controller already exists
+    # after the module loader, so replace its address before starting BlueZ.
+    wantedBy = [ "bluetooth.service" ];
+    requires = [ "mnt-vendor-persist.mount" ];
     after = [
-      "bluetooth.service"
       "mnt-vendor-persist.mount"
       "sheng-bluetooth-modules.service"
     ];
+    before = [ "bluetooth.service" ];
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;

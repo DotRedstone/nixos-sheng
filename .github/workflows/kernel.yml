@@ -46,6 +46,7 @@ jobs:
             './nixos#checks.aarch64-linux.generationMenuRenderer' \
             './nixos#checks.aarch64-linux.offlineCharging' \
             './nixos#checks.aarch64-linux.bootAnimation' \
+            './nixos#checks.aarch64-linux.bluetoothAddressOrdering' \
             --no-link
 
       - name: Build boot image

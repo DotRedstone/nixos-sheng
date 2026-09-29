@@ -281,6 +281,16 @@
             ${pkgs.sheng-fb-painter}/bin/sheng-fb-painter
           touch $out
         '';
+        bluetoothAddressOrdering = pkgs.runCommand "sheng-bluetooth-address-ordering-check" {} ''
+          test ${if mobileEval.config.systemd.services.sheng-bluetooth-address.wantedBy == [ "bluetooth.service" ] then "1" else "0"} = 1
+          unit=${pkgs.lib.escapeShellArg mobileEval.config.systemd.units."sheng-bluetooth-address.service".text}
+          printf '%s\n' "$unit" | ${pkgs.gnugrep}/bin/grep -Fx 'Before=bluetooth.service'
+          if printf '%s\n' "$unit" | ${pkgs.gnugrep}/bin/grep -Fq 'After=bluetooth.service'; then
+            echo 'Bluetooth address loader must run before bluetoothd owns hci0' >&2
+            exit 1
+          fi
+          touch $out
+        '';
         generationMenuRenderer = pkgs.runCommand "sheng-generation-menu-renderer-check" {
           nativeBuildInputs = [
             pkgs.coreutils
