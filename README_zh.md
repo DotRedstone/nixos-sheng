@@ -15,6 +15,15 @@ Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的 Mobile NixOS 移植项目�
 欢迎给仓库点一个 star。它能帮助更多 sheng 用户找到这个移植项目，也能让深夜
 调试 boot image 的人稍微感受到一点人间温度。
 
+## 启动与关机充电界面
+
+![NixOS 启动动画](docs/assets/boot-flow.gif)
+
+![关机充电动画](docs/assets/offline-charging.gif)
+
+以上预览由平板实际使用的原生 framebuffer painter 生成。启动动画在 stage-1
+与 stage-2 交接前后保持同一套 NixOS 循环；充电动画则是实际的圆角电池界面。
+
 ## 项目亮点
 
 - 面向 Xiaomi Pad 6S Pro 12.4 (`sheng`) 的 Mobile NixOS 启动流程
