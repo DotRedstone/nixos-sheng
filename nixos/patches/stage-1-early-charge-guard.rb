@@ -227,7 +227,10 @@ module ShengEarlyChargeGuard
     # A framebuffer blank alone leaves an initrd painter alive. Stop it before
     # the stage-2 charging monitor gets the framebuffer, otherwise the two
     # independent writers can alternate frames during switch_root.
-    ShengBootAnimation.stop() if defined?(ShengBootAnimation)
+    # This patch runs in Mobile NixOS's stage-1 task context, which does not
+    # expose Kernel#defined?.  Ask Object about the optional animation module
+    # instead so a charger boot can always complete its handoff.
+    ShengBootAnimation.stop() if Object.const_defined?(:ShengBootAnimation)
     Dir.glob("/sys/class/graphics/fb*/blank").each do |path|
       File.write(path, "1\n")
     rescue
