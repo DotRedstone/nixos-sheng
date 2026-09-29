@@ -57,7 +57,7 @@ issues before flashing.
 | RootFS | Mobile NixOS generated rootfs | ext4 image labeled `linux` |
 | Display/desktop | Working | 3048x2032 panel, GNOME shell, gjs-osk onscreen keyboard, physical power key toggle, four-way rotation, and cover open/close display control work |
 | Debug access | Bring-up | Stage-1/stage-2 ADB is enabled through Mobile NixOS |
-| Wi-Fi | Working | 2.4 GHz and 5 GHz scanning, connection, and networking verified; a rare missing-5-GHz state was seen after a fresh flash and recovered after a soft reboot, but is not reproducible yet |
+| Wi-Fi | Known issue | 2.4 GHz and 5 GHz scanning, connection, and networking were verified previously, but [issue #30](https://github.com/DotRedstone/nixos-sheng/issues/30) reports failures through NetworkManager/nmtui on 0.2/0.3; do not rely on it for unattended installation |
 | Bluetooth | Partially working | hci0, bluetooth.service, and Focus Pen HID reconnect work; general pairing, Bluetooth audio, and suspend/resume need wider validation |
 | Audio | Partially working | ALSA playback/capture PCM and the userspace path are integrated; repeat playback, recording, and controlled tuning tests are still needed on the release image |
 | Cameras | Partially working | front/rear RAW10 frames captured; libcamera, auto exposure, and desktop camera app need integration |

@@ -48,7 +48,7 @@ Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的 Mobile NixOS 移植项目�
 | RootFS | Mobile NixOS 生成的 rootfs | 面向 `linux` 分区的 ext4 镜像 |
 | 显示/桌面 | 可用 | 3048x2032 面板、GNOME shell、gjs-osk 屏幕键盘、物理电源键息屏唤醒、四向旋转与盖板开合亮灭屏均可用 |
 | 调试访问 | Bring-up | Stage-1/stage-2 的 ADB 已通过 Mobile NixOS 启用 |
-| Wi-Fi | 可用 | 2.4GHz 与 5GHz 扫描、连接和联网已验证；全新刷入后的首次启动曾低概率缺失 5GHz，软重启可恢复，仍在收集不可复现现场 |
+| Wi-Fi | 已知问题 | 过去已验证 2.4GHz 与 5GHz 扫描、连接和联网，但 [#30](https://github.com/DotRedstone/nixos-sheng/issues/30) 报告 0.2/0.3 上通过 NetworkManager/nmtui 使用失败；安装过程请勿依赖无线网络 |
 | 蓝牙 | 部分可用 | hci0、bluetooth.service 与 Focus Pen HID 重连已验证；普通配对、蓝牙音频和休眠恢复仍需扩大测试 |
 | 音频 | 部分可用 | ALSA 播放/录音 PCM 与用户态链路已接入；发布镜像仍需重复播放、录音和受控音质对比 |
 | 相机 | 部分可用 | 前后摄 RAW10 实际画面已抓取；libcamera、自动曝光与桌面相机应用待完善 |
