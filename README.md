@@ -20,6 +20,16 @@ on mobile devices, please consider giving the repository a star. It helps other
 sheng users find the port and makes the late-night boot-image archaeology feel
 a little less lonely.
 
+## Boot and offline-charging UI
+
+![NixOS boot animation](docs/assets/boot-flow.gif)
+
+![Offline charging animation](docs/assets/offline-charging.gif)
+
+These previews are rendered by the native framebuffer painter used on the
+tablet. The boot loop uses the same NixOS animation before and after the
+stage-1 to stage-2 handoff; the charging loop is the actual rounded battery UI.
+
 ## Highlights
 
 - Mobile NixOS boot flow for Xiaomi Pad 6S Pro 12.4 (`sheng`)
