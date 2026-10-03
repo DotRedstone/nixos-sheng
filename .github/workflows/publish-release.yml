@@ -281,6 +281,9 @@ jobs:
       - name: Create Combined Release
         uses: softprops/action-gh-release@v2
         with:
+          # The repository's default Actions token is intentionally read-only.
+          # A repository secret with release-only use supplies the write scope.
+          token: ${{ secrets.RELEASE_TOKEN }}
           tag_name: ${{ steps.release_info.outputs.tag }}
           target_commitish: ${{ steps.artifacts.outputs.head_sha }}
           name: ${{ steps.release_info.outputs.name }}
