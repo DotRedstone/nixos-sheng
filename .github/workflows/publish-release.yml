@@ -240,11 +240,20 @@ jobs:
               zip -9 -s "$max_zip_part_size" "$archive_name" "$image_name"
               # Do not publish a split archive until the final .zip can read
               # every volume and reconstruct the exact flashable image.
-              unzip -t "$archive_name"
+              # Ubuntu's unzip cannot read split ZIP volumes in place.  Feed
+              # it a temporary concatenation so this still verifies every
+              # .zNN volume and the final .zip before anything is published.
+              split_parts=("${archive_name%.zip}".z[0-9][0-9])
+              if [ -e "${split_parts[0]}" ]; then
+                cat "${split_parts[@]}" "$archive_name" > verify-combined.zip
+              else
+                cp "$archive_name" verify-combined.zip
+              fi
+              unzip -t verify-combined.zip
               mkdir extracted
-              unzip -q "$archive_name" -d extracted
+              unzip -q verify-combined.zip -d extracted
               cmp "$image_name" "extracted/$image_name"
-              rm -rf extracted
+              rm -rf extracted verify-combined.zip
               rm "$image_name"
             )
           done
