@@ -47,7 +47,7 @@ jobs:
       - name: Install release packaging tools
         run: |
           sudo apt update
-          sudo apt install -y e2fsprogs unzip zip
+          sudo apt install -y e2fsprogs unzip zip p7zip-full
 
       - name: Determine Release Info
         id: release_info
@@ -238,17 +238,16 @@ jobs:
               archive_name="${image_name%.img}.zip"
               echo "Creating split ZIP archive for $image_name"
               zip -9 -s "$max_zip_part_size" "$archive_name" "$image_name"
-              # Do not publish a split archive until the final .zip can read
-              # every volume and reconstruct the exact flashable image.
-              # Let zip rewrite the split ZIP64 offsets into a regular
-              # temporary archive.  Concatenating .zNN files directly leaves
-              # offsets relative to the first volume, which unzip rejects.
-              zip -s 0 "$archive_name" --out verify-combined.zip
-              unzip -t verify-combined.zip
+              # Validate the actual multi-volume archive before publishing.
+              # Info-ZIP unzip does not support split archives, and its ZIP64
+              # parser may reject a valid archive reconstructed by `zip -s 0`.
+              # 7-Zip reads the .zNN volumes directly, so test and extract the
+              # same archive users receive before comparing the flashable image.
+              7z t "$archive_name"
               mkdir extracted
-              unzip -q verify-combined.zip -d extracted
+              7z x -y -oextracted "$archive_name" >/dev/null
               cmp "$image_name" "extracted/$image_name"
-              rm -rf extracted verify-combined.zip
+              rm -rf extracted
               rm "$image_name"
             )
           done
