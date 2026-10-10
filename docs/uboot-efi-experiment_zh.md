@@ -1,7 +1,7 @@
 # Sheng 的 U-Boot / EFI 实验
 
-> 状态：实验性。当前分支只建立可复现的编译预检，**不产生、也不能刷写** U-Boot
-> Android boot 镜像。
+> 状态：实验性。当前分支提供一个经过离线结构校验的 Android v0 **RAM-boot 候选**；
+> 它不是稳定刷机包，必须先用 `fastboot boot` 在设备上证明 ABL 能加载它。
 
 ## 目标与边界
 
@@ -13,7 +13,8 @@
 若 U-Boot 接管普通启动，必须为关机充电定义独立的状态机、退出条件和恢复路径后，
 才能替换现有路径。
 
-本实验不会修改 `boot_a`、`boot_b`、`linux`、`userdata` 或 GPT，也不会改变发布镜像。
+本实验不会自动修改 `boot_a`、`boot_b`、`linux`、`userdata` 或 GPT，也不会改变发布镜像。
+所有持久化刷写都留给设备验证通过后的明确操作；本仓库当前只生成候选文件。
 
 ## 第一阶段：上游编译预检
 
@@ -52,6 +53,43 @@ nix build ./nixos#packages.x86_64-linux.shengUbootEfiShengDtsPreflight --no-link
 时钟路径；寄存器、频率和分频值独立来自本项目固定 Linux 内核的 `gcc-sm8550.c`，补丁中
 保留来源。它证明源代码可编译，**不确认 UFS、USB 或显示能在设备上工作**。
 
+## 第二阶段：Android boot RAM-boot 候选
+
+`shengUbootAndroidBootimg` 将已审计的 Sheng U-Boot 组合为 Android boot header v0：
+
+- `u-boot-nodtb.bin` 使用可重复的 `gzip -n` 压缩，随后拼接同一构建产出的原始 Sheng DTB；
+- 空 gzip ramdisk 仅用于满足 Android boot 容器；它不含 NixOS rootfs、initrd 或用户数据；
+- 使用当前稳定 Sheng Android boot 的偏移和 4 KiB 页大小：kernel `0x00008000`、ramdisk
+  `0x01000000`、tags `0x01e00000`；
+- 将 U-Boot `CONFIG_TEXT_BASE` 固定为 `0x80000000`，避免从 Android envelope 进入时 ARM64
+  text offset 溢出；
+- 在构建中解析 header，逐字节核对 gzip U-Boot、紧随其后的 DTB、ramdisk、地址、页大小和
+  `boot_b` 的 192 MiB 上限。
+
+在常见 x86_64 构建机上生成候选：
+
+```bash
+nix build ./nixos#packages.x86_64-linux.shengUbootAndroidBootimg \
+  -o out/sheng-u-boot-experimental-boot_b.img
+file out/sheng-u-boot-experimental-boot_b.img
+sha256sum out/sheng-u-boot-experimental-boot_b.img
+```
+
+候选首先只能进行非持久化验证：
+
+```bash
+fastboot boot out/sheng-u-boot-experimental-boot_b.img
+```
+
+这一步需要观察 U-Boot 是否能稳定显示或通过 USB 恢复，并确认它能枚举 UFS。当前上游
+Qualcomm phone environment 会先 `scsi scan`，再执行标准 `bootefi bootmgr`；真正进入
+NixOS 还需要一个独立规划的 GPT FAT ESP，提供 `EFI/BOOT/BOOTAA64.EFI`。现有 `linux`
+rootfs 分区不是这个 ESP，本实验不会创建或修改 GPT。
+
+**禁止在 RAM boot 尚未成功前执行 `fastboot flash boot_b`。** Android header 与字节结构
+正确只说明该文件可交给 fastboot/ABL 测试，不能证明 ABL 接受压缩 U-Boot、UFS 可用、EFI
+可启动，或关机充电与回退链路安全。
+
 ## 设备支持必须逐项实现
 
 任何可启动的 Sheng U-Boot 必须在独立提交中实现并审计以下内容：
@@ -60,8 +98,8 @@ nix build ./nixos#packages.x86_64-linux.shengUbootEfiShengDtsPreflight --no-link
 2. SM8550 UFS：UniPro 时钟、分频器和 UFS 依赖链。
 3. USB gadget：PM8550B eUSB2 repeater 与 USB2 pipe clock；先验证串口/网络恢复通道。
 4. ABL framebuffer：只在 RAM boot 证实图像地址、尺寸和显示生命周期后接入。
-5. Android v0 envelope：只有设备 DTS 和恢复路径都验证后才生成；先 `fastboot boot`，
-   不直接写入 `boot_b`。
+5. Android v0 envelope：本分支已生成并离线校验候选；仍须先 `fastboot boot`，不直接写入
+   `boot_b`。
 6. EFI 存储：规划一个标准 GPT FAT ESP（例如 `linux-boot`）并让 EFI 加载
    `EFI/BOOT/BOOTAA64.EFI`。这一步会改分区表，必须在单独的、获明确授权的操作中执行。
 7. 持久化：保留 `boot_a` 和独立 Android 格式 RAM recovery；确认反复冷启动、普通重启、
@@ -78,7 +116,8 @@ nix build ./nixos#packages.x86_64-linux.shengUbootEfiShengDtsPreflight --no-link
 
 | 阶段 | 通过条件 | 禁止事项 |
 | --- | --- | --- |
-| 编译预检 | 上述两个 Nix 构建成功 | 生成或刷写 Android 镜像 |
+| 编译预检 | 上述两个 Nix 构建成功 | 声称设备可启动 |
+| Android 候选 | header、载荷和分区上限在构建中逐项通过 | 直接写入 `boot_b` |
 | RAM boot | USB 恢复通道、串口、UFS 探测和按键可重复验证 | 写入 `boot_b` |
 | EFI 原型 | 标准 ESP 上能加载一个已知 EFI 程序并回到 recovery | 改动现有 `linux` 数据 |
 | 持久化候选 | 多次冷启动、普通重启、恢复键和关机充电均可回退 | 覆盖 `boot_a` 或刷写 `userdata` |
