@@ -7,21 +7,21 @@ and reserved ABL memory.  This is intentionally not a full Linux hardware DTS.
 
 Source: DotRedstone/linux-sheng commit c4b27e2cec1371e166f443877812639d4d0d33da,
 arch/arm64/boot/dts/qcom/sm8550-xiaomi-sheng.dts (BSD-3-Clause, map220v).
-The subset was independently transcribed from that source for U-Boot; ABL owns
-regulator votes and display initialization, so Linux peripherals and RPMh
-supply programming are omitted.
+The subset is independently transcribed from that source for U-Boot. It keeps
+only the PM8550B RPMh regulator entries needed by the eUSB2 repeater; ABL owns
+the remaining regulator votes and display initialization.
 
 Signed-off-by: DotRedstone <noreply@users.noreply.github.com>
 ---
- dts/upstream/src/arm64/qcom/sm8550-xiaomi-sheng.dts | 113 +++++++++++++++++++++
- 1 file changed, 113 insertions(+)
+ dts/upstream/src/arm64/qcom/sm8550-xiaomi-sheng.dts | 135 +++++++++++++++++++++++
+ 1 file changed, 135 insertions(+)
 
 diff --git a/dts/upstream/src/arm64/qcom/sm8550-xiaomi-sheng.dts b/dts/upstream/src/arm64/qcom/sm8550-xiaomi-sheng.dts
 new file mode 100644
 index 000000000000..bbbbbbbbbbbb
 --- /dev/null
 +++ b/dts/upstream/src/arm64/qcom/sm8550-xiaomi-sheng.dts
-@@ -0,0 +1,113 @@
+@@ -0,0 +1,135 @@
 +// SPDX-License-Identifier: BSD-3-Clause
 +/*
 + * Copyright (c) 2024, map220v <map220v300@gmail.com>
@@ -119,7 +119,29 @@ index 000000000000..bbbbbbbbbbbb
 +	status = "okay";
 +};
 +
++&apps_rsc {
++	/* Only the two rails directly consumed by the PM8550B eUSB2 repeater. */
++	sheng_eusb2_regulators: regulators-sheng-eusb2 {
++		compatible = "qcom,pm8550-rpmh-regulators";
++		qcom,pmic-id = "b";
++
++		vreg_l5b_3p1: ldo5 {
++			regulator-name = "vreg_l5b_3p1";
++			regulator-min-microvolt = <3104000>;
++			regulator-max-microvolt = <3104000>;
++		};
++
++		vreg_l15b_1p8: ldo15 {
++			regulator-name = "vreg_l15b_1p8";
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++		};
++	};
++};
++
 +&pm8550b_eusb2_repeater {
++	vdd18-supply = <&vreg_l15b_1p8>;
++	vdd3-supply = <&vreg_l5b_3p1>;
 +	status = "okay";
 +};
 +

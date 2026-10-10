@@ -24,6 +24,7 @@ let
     extraPatches = [
       ../patches/u-boot/0001-arm64-dts-add-sheng-boot-subset.patch
       ../patches/u-boot/0002-clk-qcom-program-sm8550-unipro-rate.patch
+      ../patches/u-boot/0003-phy-qcom-add-pm8550b-eusb2-repeater.patch
     ];
     filesToInstall = [
       "u-boot-nodtb.bin"
@@ -50,6 +51,7 @@ let
       # ABL loads Android boot payloads near this address. 0x0 makes the ARM64
       # text offset wrap when U-Boot relocates itself from the Android envelope.
       CONFIG_TEXT_BASE=0x80000000
+      CONFIG_PHY_QCOM_EUSB2_REPEATER=y
       ${lib.optionalString autoFastboot ''
       CONFIG_ENV_DEFAULT_ENV_TEXT_FILE="board/qualcomm/sheng-ram-fastboot.env"
       # The USB probe must never expose a partition-writing fastboot command.
@@ -75,6 +77,9 @@ let
       tail -n 1 dts/upstream/src/arm64/qcom/sm8550-xiaomi-sheng.dts | grep -Fqx '};'
       grep -Fq 'case GCC_UFS_PHY_UNIPRO_CORE_CLK:' drivers/clk/qcom/clock-sm8550.c
       grep -Fq 'clk_rcg_set_rate_mnd(priv->base, 0x77098,' drivers/clk/qcom/clock-sm8550.c
+      test -s drivers/phy/qcom/phy-qcom-eusb2-repeater.c
+      grep -Fq 'generic_phy_init(&qcom_snps_eusb2->repeater)' drivers/phy/qcom/phy-qcom-snps-eusb2.c
+      grep -Fq 'qcom,pm8550b-eusb2-repeater' drivers/phy/qcom/phy-qcom-eusb2-repeater.c
     '';
   });
   payload = runCommand "sheng-uboot-android-bootimg-payload" {
@@ -104,6 +109,10 @@ runCommand (if autoFastboot then "sheng-u-boot-fastboot-probe.img" else "sheng-u
   test -s ${firmware}/u-boot.dtb
   grep -Fx 'CONFIG_DEFAULT_DEVICE_TREE="qcom/sm8550-xiaomi-sheng"' ${firmware}/.config
   grep -Fx 'CONFIG_TEXT_BASE=0x80000000' ${firmware}/.config
+  grep -Fx 'CONFIG_PHY_QCOM_EUSB2_REPEATER=y' ${firmware}/.config
+  strings ${firmware}/u-boot-nodtb.bin | grep -Fqx 'qcom-pm8550b-eusb2-repeater'
+  test "$(fdtget -t s ${firmware}/u-boot.dtb /soc@0/rsc@17a00000/regulators-sheng-eusb2/ldo5 regulator-name)" = 'vreg_l5b_3p1'
+  test "$(fdtget -t s ${firmware}/u-boot.dtb /soc@0/rsc@17a00000/regulators-sheng-eusb2/ldo15 regulator-name)" = 'vreg_l15b_1p8'
   ${lib.optionalString autoFastboot ''
     grep -Fx 'CONFIG_ENV_DEFAULT_ENV_TEXT_FILE="board/qualcomm/sheng-ram-fastboot.env"' ${firmware}/.config
     grep -Fx '# CONFIG_FASTBOOT_FLASH is not set' ${firmware}/.config
