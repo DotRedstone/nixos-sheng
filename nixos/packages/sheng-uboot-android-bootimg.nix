@@ -3,7 +3,7 @@
 # Description: Packages the audited Sheng U-Boot EFI candidate as an Android v0 boot image
 # Scope: Package
 # Notes:
-# - Experimental only: RAM-boot it with fastboot before considering boot_b.
+# - Experimental only: validate a backed-up boot_b; fastboot boot and boot_a are not valid on Sheng.
 # - This package does not modify the stable Mobile NixOS boot image.
 # ---
 {
@@ -32,9 +32,20 @@ let
     src = shengUbootSrc;
     defconfig = "qcom_defconfig";
     extraPatches = [
-      ../patches/u-boot/0001-arm64-dts-add-sheng-boot-subset.patch
-      ../patches/u-boot/0002-clk-qcom-program-sm8550-unipro-rate.patch
-      ../patches/u-boot/0003-phy-qcom-add-pm8550b-eusb2-repeater.patch
+      ../patches/u-boot/sheng-baseline/common/0001-acm-stop-cancelled-rx.patch
+      ../patches/u-boot/sheng-baseline/common/0002-acm-nonblocking-console.patch
+      ../patches/u-boot/sheng-baseline/common/0003-button-kbd-events.patch
+      ../patches/u-boot/sheng-baseline/common/0004-spmi-single-byte.patch
+      ../patches/u-boot/sheng-baseline/common/0005-pmic-gpio-input-state.patch
+      ../patches/u-boot/sheng-baseline/common/0006-simplefb-optional-properties.patch
+      ../patches/u-boot/sheng-baseline/sm8550/0001-pm8550b-repeater.patch
+      ../patches/u-boot/sheng-baseline/sm8550/0002-snps-repeater-lifecycle.patch
+      ../patches/u-boot/sheng-baseline/sm8550/0003-sm8550-unipro-clock.patch
+      ../patches/u-boot/sheng-baseline/sm8550/0004-usb-cfg-noc-clock.patch
+      ../patches/u-boot/sheng-baseline/sm8550/0005-unipro-divider.patch
+      ../patches/u-boot/sheng-baseline/sheng/0001-sheng-boot-dts.patch
+      ../patches/u-boot/sheng-baseline/sheng/0002-usb2-pipe-clock.patch
+      ../patches/u-boot/sheng-baseline/sheng/0003-sheng-abl-framebuffer.patch
     ];
     filesToInstall = [
       "u-boot-nodtb.bin"
@@ -46,6 +57,7 @@ let
 
       make qcom_defconfig
       scripts/kconfig/merge_config.sh -m .config board/qualcomm/qcom-phone.config
+      cp ${./sheng-uboot.env} board/qualcomm/sheng.env
       ${lib.optionalString autoFastboot ''
         cat > board/qualcomm/sheng-ram-fastboot.env <<'ENV'
         # Deliberately do not scan storage: this is a no-display RAM-boot probe.
@@ -58,12 +70,24 @@ let
       ''}
       cat >> .config <<'CONFIG'
       CONFIG_DEFAULT_DEVICE_TREE="qcom/sm8550-xiaomi-sheng"
-      # ABL loads Android boot payloads near this address. 0x0 makes the ARM64
-      # text offset wrap when U-Boot relocates itself from the Android envelope.
+      # The ARM64 header subtracts Snapdragon's 0x80000000 RAM base.
       CONFIG_TEXT_BASE=0x80000000
-      CONFIG_PHY_QCOM_EUSB2_REPEATER=y
+      CONFIG_PHY_QCOM_PM8550B_EUSB2=y
+      CONFIG_EFI_LOADER=y
+      CONFIG_CMD_BOOTEFI=y
+      CONFIG_CMD_PART=y
+      CONFIG_CMD_FAT=y
+      CONFIG_FS_FAT=y
+      CONFIG_FS_FAT_HANDLE_SECTOR_SIZE_MISMATCH=y
+      CONFIG_CMD_PMIC=y
+      CONFIG_NO_FB_CLEAR=y
+      # This firmware only reads its EFI payload; Android slot writes stay with ABL.
+      # CONFIG_EFI_RUNTIME_UPDATE_CAPSULE is not set
+      # CONFIG_EFI_CAPSULE_ON_DISK is not set
+      # CONFIG_EFI_CAPSULE_FIRMWARE_RAW is not set
+      # CONFIG_FASTBOOT_FLASH is not set
+      CONFIG_ENV_DEFAULT_ENV_TEXT_FILE="${if autoFastboot then "board/qualcomm/sheng-ram-fastboot.env" else "board/qualcomm/sheng.env"}"
       ${lib.optionalString autoFastboot ''
-      CONFIG_ENV_DEFAULT_ENV_TEXT_FILE="board/qualcomm/sheng-ram-fastboot.env"
       # The USB probe must never expose a partition-writing fastboot command.
       # CONFIG_FASTBOOT_FLASH is not set
       ''}
@@ -86,10 +110,11 @@ let
       test -s dts/upstream/src/arm64/qcom/sm8550-xiaomi-sheng.dts
       tail -n 1 dts/upstream/src/arm64/qcom/sm8550-xiaomi-sheng.dts | grep -Fqx '};'
       grep -Fq 'case GCC_UFS_PHY_UNIPRO_CORE_CLK:' drivers/clk/qcom/clock-sm8550.c
-      grep -Fq 'clk_rcg_set_rate_mnd(priv->base, 0x77098,' drivers/clk/qcom/clock-sm8550.c
-      test -s drivers/phy/qcom/phy-qcom-eusb2-repeater.c
+      grep -Fq 'GCC_CFG_NOC_USB3_PRIM_AXI_CLK' drivers/clk/qcom/clock-sm8550.c
+      grep -Fq 'clk_bcr_update(priv->base + 0x77098)' drivers/clk/qcom/clock-sm8550.c
+      test -s drivers/phy/qcom/phy-pm8550b-eusb2.c
       grep -Fq 'generic_phy_init(&qcom_snps_eusb2->repeater)' drivers/phy/qcom/phy-qcom-snps-eusb2.c
-      grep -Fq 'qcom,pm8550b-eusb2-repeater' drivers/phy/qcom/phy-qcom-eusb2-repeater.c
+      grep -Fq 'qcom,pm8550b-eusb2-repeater' drivers/phy/qcom/phy-pm8550b-eusb2.c
     '';
   });
   payload = runCommand "sheng-uboot-android-bootimg-${if rawPayload then "raw" else "gzip"}-payload" {
@@ -130,10 +155,13 @@ else
   test -s ${firmware}/u-boot.dtb
   grep -Fx 'CONFIG_DEFAULT_DEVICE_TREE="qcom/sm8550-xiaomi-sheng"' ${firmware}/.config
   grep -Fx 'CONFIG_TEXT_BASE=0x80000000' ${firmware}/.config
-  grep -Fx 'CONFIG_PHY_QCOM_EUSB2_REPEATER=y' ${firmware}/.config
-  strings ${firmware}/u-boot-nodtb.bin | grep -Fqx 'qcom-pm8550b-eusb2-repeater'
-  test "$(fdtget -t s ${firmware}/u-boot.dtb /soc@0/rsc@17a00000/regulators-sheng-eusb2/ldo5 regulator-name)" = 'vreg_l5b_3p1'
-  test "$(fdtget -t s ${firmware}/u-boot.dtb /soc@0/rsc@17a00000/regulators-sheng-eusb2/ldo15 regulator-name)" = 'vreg_l15b_1p8'
+  grep -Fx 'CONFIG_PHY_QCOM_PM8550B_EUSB2=y' ${firmware}/.config
+  grep -Fx 'CONFIG_FS_FAT_HANDLE_SECTOR_SIZE_MISMATCH=y' ${firmware}/.config
+  grep -Fx 'CONFIG_NO_FB_CLEAR=y' ${firmware}/.config
+  strings ${firmware}/u-boot-nodtb.bin | grep -Fq 'qcom,pm8550b-eusb2-repeater'
+  test "$(fdtget -t s ${firmware}/u-boot.dtb /soc@0/usb@a600000 dr_mode)" = 'peripheral'
+  fdtget ${firmware}/u-boot.dtb /soc@0/usb@a600000 qcom,select-utmi-as-pipe-clk >/dev/null
+  test "$(fdtget -t s ${firmware}/u-boot.dtb /chosen/framebuffer@b8000000 format)" = 'a8r8g8b8'
   ${lib.optionalString autoFastboot ''
     grep -Fx 'CONFIG_ENV_DEFAULT_ENV_TEXT_FILE="board/qualcomm/sheng-ram-fastboot.env"' ${firmware}/.config
     grep -Fx '# CONFIG_FASTBOOT_FLASH is not set' ${firmware}/.config
@@ -154,11 +182,11 @@ else
     --kernel "$kernel_image" \
     --cmdline "" \
     ${if upstreamAndroidLayout then "--base 0x80000000" else ''
-    --ramdisk ${payload}/ramdisk.gz \\
-    --base 0x00000000 \\
-    --kernel_offset 0x00008000 \\
-    --ramdisk_offset 0x01000000 \\
-    --second_offset 0x00000000 \\
+    --ramdisk ${payload}/ramdisk.gz \
+    --base 0x00000000 \
+    --kernel_offset 0x00008000 \
+    --ramdisk_offset 0x01000000 \
+    --second_offset 0x00000000 \
     --tags_offset 0x01e00000''} \
     --pagesize 4096 \
     -o "$out"

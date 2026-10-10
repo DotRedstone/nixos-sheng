@@ -1,0 +1,42 @@
+From: dianqk <dianqk@dianqk.net>
+Date: Tue, 29 Sep 2026 22:00:00 +0800
+Subject: [PATCH] arm: dts: expose Sheng ABL splash as U-Boot video
+
+Describe the 3048x2032 ARGB8888 panel in the 0xb8000000 splash allocation
+for simplefb and EFI GOP. Retain Sheng's original splash node name while
+testing the ABL display handoff; Asphalt's no-unit-address path is not yet
+known to apply to Sheng.
+The stride and format are initial ABL handoff candidates; validate their
+physical output in a RAM boot before installing this firmware.
+
+The splash address and extent come from the existing Sheng boot DT. The panel
+geometry comes from the Sheng Linux panel modes. This is a local U-Boot-only
+adaptation; it does not alter the imported Linux board patch or Linux DT.
+
+Signed-off-by: dianqk <dianqk@dianqk.net>
+---
+diff --git a/arch/arm/dts/sm8550-xiaomi-sheng-u-boot.dtsi b/arch/arm/dts/sm8550-xiaomi-sheng-u-boot.dtsi
+new file mode 100644
+index 0000000..f1956e7
+--- /dev/null
++++ b/arch/arm/dts/sm8550-xiaomi-sheng-u-boot.dtsi
+@@ -0,0 +1,19 @@
++// SPDX-License-Identifier: GPL-2.0+
++
++/* Candidate ABL framebuffer description; verify physical scanout. */
++/ {
++	chosen {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		framebuffer@b8000000 {
++			compatible = "simple-framebuffer";
++			reg = <0 0xb8000000 0 0x2b00000>;
++			width = <3048>;
++			height = <2032>;
++			stride = <12192>;
++			format = "a8r8g8b8";
++		};
++	};
++};

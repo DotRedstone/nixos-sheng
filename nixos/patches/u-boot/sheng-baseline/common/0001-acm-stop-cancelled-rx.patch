@@ -1,0 +1,25 @@
+From: NixOS Android devices contributors <nixos-android-devices@localhost>
+Date: Mon, 28 Sep 2026 23:02:00 +0800
+Subject: [PATCH] usb: gadget: acm: stop requeueing failed RX requests
+
+Local fix against U-Boot a06e89ab05eaa2b8344d521319399333cd760ae5.
+https://source.denx.de/u-boot/u-boot/-/blob/a06e89ab05eaa2b8344d521319399333cd760ae5/drivers/usb/gadget/f_acm.c
+
+DWC3 disables an endpoint by giving back pending requests with -ESHUTDOWN
+until its request lists are empty. Unconditionally requeueing in the ACM
+completion callback prevents this loop from draining when the console is
+stopped. Return on a failed completion before copying or requeueing.
+---
+--- a/drivers/usb/gadget/f_acm.c
++++ b/drivers/usb/gadget/f_acm.c
+@@ -293,6 +293,10 @@
+ {
+ 	struct f_acm *f_acm = req->context;
+ 
++	/* Endpoint teardown must drain requests, not queue them again. */
++	if (req->status)
++		return;
++
+ 	buf_push(&f_acm->rx_buf, req->buf, req->actual);
+ 
+ 	/* Queue RX req again */
