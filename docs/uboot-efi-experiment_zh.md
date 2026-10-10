@@ -75,20 +75,22 @@ file out/sheng-u-boot-experimental-boot_b.img
 sha256sum out/sheng-u-boot-experimental-boot_b.img
 ```
 
-候选首先只能进行非持久化验证：
+候选不应在主用槽位上直接运行 `fastboot boot`。实机验证发现，此设备的 ABL 会把一次
+失败的 RAM boot 计入**当前活动槽位**的失败次数；多次失败可将该槽位标记为 `unbootable`，
+即使 `fastboot boot` 本身没有刷写 boot 分区。任何实机 RAM boot 前都必须：
 
-```bash
-fastboot boot out/sheng-u-boot-experimental-boot_b.img
-```
+1. 记录 `fastboot getvar current-slot` 和两个槽位的 `slot-unbootable`、`slot-retry-count`；
+2. 只在用户明确指定的测试槽位、且另一个已验证槽位仍可回退时进行；
+3. 每次失败后立即检查槽位状态，必要时用 `fastboot set_active <slot>` 恢复，而不是继续重试；
+4. 未经单独授权，不执行 `fastboot flash boot_b`。
 
-这一步需要观察 U-Boot 是否能稳定显示或通过 USB 恢复，并确认它能枚举 UFS。当前上游
+这类测试需要观察 U-Boot 是否能稳定显示或通过 USB 恢复，并确认它能枚举 UFS。当前上游
 Qualcomm phone environment 会先 `scsi scan`，再执行标准 `bootefi bootmgr`；真正进入
 NixOS 还需要一个独立规划的 GPT FAT ESP，提供 `EFI/BOOT/BOOTAA64.EFI`。现有 `linux`
 rootfs 分区不是这个 ESP，本实验不会创建或修改 GPT。
 
-**禁止在 RAM boot 尚未成功前执行 `fastboot flash boot_b`。** Android header 与字节结构
-正确只说明该文件可交给 fastboot/ABL 测试，不能证明 ABL 接受压缩 U-Boot、UFS 可用、EFI
-可启动，或关机充电与回退链路安全。
+Android header 与字节结构正确只说明该文件可交给 fastboot/ABL 测试，不能证明 ABL 接受
+压缩 U-Boot、UFS 可用、EFI 可启动，或关机充电与回退链路安全。
 
 ### 无显示 USB 探针
 
@@ -101,6 +103,7 @@ rootfs 分区不是这个 ESP，本实验不会创建或修改 GPT。
 ```bash
 nix build ./nixos#packages.x86_64-linux.shengUbootFastbootProbeBootimg \
   -o out/sheng-u-boot-fastboot-probe.img
+# 仅在明确指定的测试槽位上、并记录/检查 A/B 状态后进行：
 fastboot boot out/sheng-u-boot-fastboot-probe.img
 fastboot devices -l
 ```
