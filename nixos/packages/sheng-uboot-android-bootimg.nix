@@ -7,6 +7,7 @@
 # - This package does not modify the stable Mobile NixOS boot image.
 # ---
 {
+  autoFastboot ? false,
   buildPackages,
   buildUBoot,
   dtc,
@@ -16,7 +17,7 @@
 }:
 let
   firmware = (buildUBoot {
-    pname = "sheng-uboot-android-bootimg-firmware";
+    pname = if autoFastboot then "sheng-uboot-fastboot-probe-firmware" else "sheng-uboot-android-bootimg-firmware";
     version = "2026.10-rc5";
     src = shengUbootSrc;
     defconfig = "qcom_defconfig";
@@ -34,18 +35,35 @@ let
 
       make qcom_defconfig
       scripts/kconfig/merge_config.sh -m .config board/qualcomm/qcom-phone.config
+      ${lib.optionalString autoFastboot ''
+        cat > board/qualcomm/sheng-ram-fastboot.env <<'ENV'
+        # Deliberately do not scan storage: this is a no-display RAM-boot probe.
+        bootdelay=0
+        stdout=serial
+        stderr=serial
+        fastboot=fastboot -l $fastboot_addr_r usb 0
+        bootcmd=run fastboot
+        ENV
+      ''}
       cat >> .config <<'CONFIG'
       CONFIG_DEFAULT_DEVICE_TREE="qcom/sm8550-xiaomi-sheng"
       # ABL loads Android boot payloads near this address. 0x0 makes the ARM64
       # text offset wrap when U-Boot relocates itself from the Android envelope.
       CONFIG_TEXT_BASE=0x80000000
+      ${lib.optionalString autoFastboot ''
+      CONFIG_ENV_DEFAULT_ENV_TEXT_FILE="board/qualcomm/sheng-ram-fastboot.env"
+      # The USB probe must never expose a partition-writing fastboot command.
+      # CONFIG_FASTBOOT_FLASH is not set
+      ''}
       CONFIG
       make olddefconfig
 
       runHook postConfigure
     '';
     extraMeta = {
-      description = "Experimental Sheng U-Boot EFI firmware for an Android v0 RAM-boot candidate";
+      description = if autoFastboot then
+        "Experimental Sheng U-Boot USB fastboot RAM-boot probe" else
+        "Experimental Sheng U-Boot EFI firmware for an Android v0 RAM-boot candidate";
       homepage = "https://source.denx.de/u-boot/u-boot";
       license = lib.licenses.gpl2Plus;
       platforms = [ "aarch64-linux" ];
@@ -63,13 +81,14 @@ let
     nativeBuildInputs = [ buildPackages.gzip ];
   } ''
     mkdir -p "$out"
-    cp ${firmware}/u-boot-nodtb.bin "$out/u-boot.bin"
+    gzip -n -c ${firmware}/u-boot-nodtb.bin > "$out/u-boot.gz"
     printf 'unused' | gzip -n > "$out/ramdisk.gz"
   '';
 in
-runCommand "sheng-u-boot-experimental-boot_b.img" {
+runCommand (if autoFastboot then "sheng-u-boot-fastboot-probe.img" else "sheng-u-boot-experimental-boot_b.img") {
   nativeBuildInputs = [
     buildPackages.android-tools
+    buildPackages.binutils
     buildPackages.gzip
     buildPackages.python3
     dtc
@@ -78,12 +97,18 @@ runCommand "sheng-u-boot-experimental-boot_b.img" {
     inherit firmware payload;
     flashPartition = "boot_b";
     maximumBytes = 201326592;
+    mode = if autoFastboot then "fastboot-probe" else "efi";
   };
 } ''
   test -s ${firmware}/u-boot-nodtb.bin
   test -s ${firmware}/u-boot.dtb
   grep -Fx 'CONFIG_DEFAULT_DEVICE_TREE="qcom/sm8550-xiaomi-sheng"' ${firmware}/.config
   grep -Fx 'CONFIG_TEXT_BASE=0x80000000' ${firmware}/.config
+  ${lib.optionalString autoFastboot ''
+    grep -Fx 'CONFIG_ENV_DEFAULT_ENV_TEXT_FILE="board/qualcomm/sheng-ram-fastboot.env"' ${firmware}/.config
+    grep -Fx '# CONFIG_FASTBOOT_FLASH is not set' ${firmware}/.config
+    strings ${firmware}/u-boot-nodtb.bin | grep -Fqx 'bootcmd=run fastboot'
+  ''}
   grep -Fx 'CONFIG_EFI_LOADER=y' ${firmware}/.config
   grep -Fx 'CONFIG_EFI_BOOTMGR=y' ${firmware}/.config
   grep -Fx 'CONFIG_UFS_QCOM=y' ${firmware}/.config
@@ -93,7 +118,7 @@ runCommand "sheng-u-boot-experimental-boot_b.img" {
   fdtget -t s ${firmware}/u-boot.dtb / compatible | grep -Fqx 'xiaomi,sheng qcom,sm8550'
 
   kernel_image="$TMPDIR/kernel-with-dtb"
-  cat ${payload}/u-boot.bin ${firmware}/u-boot.dtb > "$kernel_image"
+  cat ${payload}/u-boot.gz ${firmware}/u-boot.dtb > "$kernel_image"
   mkbootimg \
     --header_version 0 \
     --kernel "$kernel_image" \
@@ -113,12 +138,13 @@ runCommand "sheng-u-boot-experimental-boot_b.img" {
     exit 1
   }
 
-  python3 - "$out" ${firmware}/u-boot-nodtb.bin ${firmware}/u-boot.dtb ${payload}/u-boot.bin ${payload}/ramdisk.gz <<'PY'
+  python3 - "$out" ${firmware}/u-boot-nodtb.bin ${firmware}/u-boot.dtb ${payload}/u-boot.gz ${payload}/ramdisk.gz <<'PY'
 import pathlib
 import struct
 import sys
+import zlib
 
-image, nodtb_path, dtb_path, uboot_path, ramdisk_path = map(pathlib.Path, sys.argv[1:])
+image, nodtb_path, dtb_path, gzip_path, ramdisk_path = map(pathlib.Path, sys.argv[1:])
 data = image.read_bytes()
 assert data[:8] == b"ANDROID!", "missing Android boot magic"
 (
@@ -144,11 +170,13 @@ assert unused == 0, unused
 align = lambda value: (value + page_size - 1) // page_size * page_size
 kernel_start = page_size
 kernel = data[kernel_start : kernel_start + kernel_size]
-expected_uboot = uboot_path.read_bytes()
+expected_gzip = gzip_path.read_bytes()
 expected_dtb = dtb_path.read_bytes()
-assert expected_uboot == nodtb_path.read_bytes()
-assert expected_uboot[0x38:0x3c] == b"ARMd", "U-Boot is missing the ARM64 Image header"
-assert kernel == expected_uboot + expected_dtb, "kernel payload is not raw U-Boot followed by its DTB"
+assert kernel == expected_gzip + expected_dtb, "kernel payload is not gzip U-Boot followed by its DTB"
+decompressor = zlib.decompressobj(wbits=16 + zlib.MAX_WBITS)
+assert decompressor.decompress(kernel) + decompressor.flush() == nodtb_path.read_bytes()
+assert decompressor.eof, "U-Boot gzip stream did not terminate"
+assert decompressor.unused_data == expected_dtb, "U-Boot DTB is not the trailing payload"
 assert expected_dtb[:4] == b"\xd0\x0d\xfe\xed", "invalid flattened DTB magic"
 ramdisk_start = align(kernel_start + kernel_size)
 assert data[ramdisk_start : ramdisk_start + ramdisk_size] == ramdisk_path.read_bytes()

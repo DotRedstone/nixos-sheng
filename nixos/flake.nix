@@ -100,6 +100,10 @@
         sheng-uboot-android-bootimg = final.callPackage ./packages/sheng-uboot-android-bootimg.nix {
           inherit shengUbootSrc;
         };
+        sheng-uboot-fastboot-probe-bootimg = final.callPackage ./packages/sheng-uboot-android-bootimg.nix {
+          autoFastboot = true;
+          inherit shengUbootSrc;
+        };
         xiaomi-sheng-thp = final.callPackage ./packages/xiaomi-sheng-thp.nix {
           libssc = final.sheng-libssc;
         };
@@ -145,6 +149,13 @@
       ubootAndroidBootimgFor = buildSystem:
         let buildPkgs = import nixpkgs { system = buildSystem; };
         in buildPkgs.callPackage ./packages/sheng-uboot-android-bootimg.nix {
+          buildUBoot = buildPkgs.pkgsCross.aarch64-multiplatform.buildUBoot;
+          inherit shengUbootSrc;
+        };
+      ubootFastbootProbeFor = buildSystem:
+        let buildPkgs = import nixpkgs { system = buildSystem; };
+        in buildPkgs.callPackage ./packages/sheng-uboot-android-bootimg.nix {
+          autoFastboot = true;
           buildUBoot = buildPkgs.pkgsCross.aarch64-multiplatform.buildUBoot;
           inherit shengUbootSrc;
         };
@@ -253,6 +264,9 @@
         # Experimental Android v0 envelope for a RAM-boot test. It is separate
         # from mobileAndroidBootimg and must not be flashed before device proof.
         shengUbootAndroidBootimg = pkgs.sheng-uboot-android-bootimg;
+        # USB-only RAM probe: U-Boot must re-enumerate as fastboot before
+        # storage, display, or an EFI payload is brought into the experiment.
+        shengUbootFastbootProbeBootimg = pkgs.sheng-uboot-fastboot-probe-bootimg;
         mobileAndroidBootimg = mobileEval.outputs.android.android-bootimg;
         mobileFastbootImages = mobileEval.outputs.android.android-fastboot-images;
         mobileRootfsImage = mobileEval.outputs.generatedFilesystems.rootfs;
@@ -269,15 +283,20 @@
       packages.x86_64-linux.shengUbootEfiPreflight = ubootPreflightFor "x86_64-linux";
       packages.x86_64-linux.shengUbootEfiShengDtsPreflight = ubootShengDtsPreflightFor "x86_64-linux";
       packages.x86_64-linux.shengUbootAndroidBootimg = ubootAndroidBootimgFor "x86_64-linux";
+      packages.x86_64-linux.shengUbootFastbootProbeBootimg = ubootFastbootProbeFor "x86_64-linux";
 
       checks.x86_64-linux.shengUbootEfiPreflight = ubootPreflightFor "x86_64-linux";
       checks.x86_64-linux.shengUbootEfiShengDtsPreflight = ubootShengDtsPreflightFor "x86_64-linux";
       checks.x86_64-linux.shengUbootAndroidBootimg = ubootAndroidBootimgFor "x86_64-linux";
+      checks.x86_64-linux.shengUbootFastbootProbeBootimg = ubootFastbootProbeFor "x86_64-linux";
 
       checks.${system} = {
         shengUbootEfiPreflight = pkgs.sheng-uboot-efi-preflight;
         shengUbootEfiShengDtsPreflight = pkgs.sheng-uboot-efi-sheng-dts-preflight;
         shengUbootAndroidBootimg = pkgs.sheng-uboot-android-bootimg;
+        # USB-only RAM probe: U-Boot must re-enumerate as fastboot before
+        # storage, display, or an EFI payload is brought into the experiment.
+        shengUbootFastbootProbeBootimg = pkgs.sheng-uboot-fastboot-probe-bootimg;
 
         bootAnimation = pkgs.runCommand "sheng-boot-animation-check" {
           nativeBuildInputs = [
