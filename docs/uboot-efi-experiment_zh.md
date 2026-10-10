@@ -41,6 +41,15 @@ nix build ./nixos#packages.aarch64-linux.shengUbootEfiPreflight --no-link
 结果中只有 `README.md` 和 `NOT_FLASHABLE`。二进制留在内部依赖中，以免被误当成
 fastboot 目标。这个预检只证明工具链和上游 EFI 配置可构建，**不证明 Sheng 能启动**。
 
+第二个预检会在上游树上应用本仓库的最小 Sheng DTS，确认最终 DTB 选择了
+`qcom/sm8550-xiaomi-sheng`、正确声明了设备身份并保留 ABL splash 内存：
+
+```bash
+nix build ./nixos#packages.x86_64-linux.shengUbootEfiShengDtsPreflight --no-link
+```
+
+它同样只输出 `NOT_FLASHABLE`。这一步确认 DTS 能编译，**不确认 UFS、USB 或显示能在设备上工作**。
+
 ## 设备支持必须逐项实现
 
 任何可启动的 Sheng U-Boot 必须在独立提交中实现并审计以下内容：

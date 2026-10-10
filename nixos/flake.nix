@@ -94,6 +94,9 @@
         sheng-uboot-efi-preflight = final.callPackage ./packages/sheng-uboot-efi-preflight.nix {
           inherit shengUbootSrc;
         };
+        sheng-uboot-efi-sheng-dts-preflight = final.callPackage ./packages/sheng-uboot-efi-sheng-dts-preflight.nix {
+          inherit shengUbootSrc;
+        };
         xiaomi-sheng-thp = final.callPackage ./packages/xiaomi-sheng-thp.nix {
           libssc = final.sheng-libssc;
         };
@@ -127,6 +130,12 @@
       ubootPreflightFor = buildSystem:
         let buildPkgs = import nixpkgs { system = buildSystem; };
         in buildPkgs.callPackage ./packages/sheng-uboot-efi-preflight.nix {
+          buildUBoot = buildPkgs.pkgsCross.aarch64-multiplatform.buildUBoot;
+          inherit shengUbootSrc;
+        };
+      ubootShengDtsPreflightFor = buildSystem:
+        let buildPkgs = import nixpkgs { system = buildSystem; };
+        in buildPkgs.callPackage ./packages/sheng-uboot-efi-sheng-dts-preflight.nix {
           buildUBoot = buildPkgs.pkgsCross.aarch64-multiplatform.buildUBoot;
           inherit shengUbootSrc;
         };
@@ -230,6 +239,8 @@
         # This validates the upstream U-Boot/EFI toolchain only. Its result is
         # deliberately not an Android boot image and must never be flashed.
         shengUbootEfiPreflight = pkgs.sheng-uboot-efi-preflight;
+        # Sheng device-tree compilation only; this output is never flashable.
+        shengUbootEfiShengDtsPreflight = pkgs.sheng-uboot-efi-sheng-dts-preflight;
         mobileAndroidBootimg = mobileEval.outputs.android.android-bootimg;
         mobileFastbootImages = mobileEval.outputs.android.android-fastboot-images;
         mobileRootfsImage = mobileEval.outputs.generatedFilesystems.rootfs;
@@ -244,11 +255,14 @@
       };
 
       packages.x86_64-linux.shengUbootEfiPreflight = ubootPreflightFor "x86_64-linux";
+      packages.x86_64-linux.shengUbootEfiShengDtsPreflight = ubootShengDtsPreflightFor "x86_64-linux";
 
       checks.x86_64-linux.shengUbootEfiPreflight = ubootPreflightFor "x86_64-linux";
+      checks.x86_64-linux.shengUbootEfiShengDtsPreflight = ubootShengDtsPreflightFor "x86_64-linux";
 
       checks.${system} = {
         shengUbootEfiPreflight = pkgs.sheng-uboot-efi-preflight;
+        shengUbootEfiShengDtsPreflight = pkgs.sheng-uboot-efi-sheng-dts-preflight;
 
         bootAnimation = pkgs.runCommand "sheng-boot-animation-check" {
           nativeBuildInputs = [
