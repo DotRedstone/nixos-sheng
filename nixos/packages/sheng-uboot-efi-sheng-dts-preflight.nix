@@ -19,6 +19,7 @@ let
     defconfig = "qcom_defconfig";
     extraPatches = [
       ../patches/u-boot/0001-arm64-dts-add-sheng-boot-subset.patch
+      ../patches/u-boot/0002-clk-qcom-program-sm8550-unipro-rate.patch
     ];
     filesToInstall = [
       "u-boot-nodtb.bin"
@@ -49,6 +50,8 @@ let
       test -s dts/upstream/src/arm64/qcom/sm8550-xiaomi-sheng.dts
       grep -Fqx '&usb_1_hsphy {' dts/upstream/src/arm64/qcom/sm8550-xiaomi-sheng.dts
       tail -n 1 dts/upstream/src/arm64/qcom/sm8550-xiaomi-sheng.dts | grep -Fqx '};'
+      grep -Fq 'case GCC_UFS_PHY_UNIPRO_CORE_CLK:' drivers/clk/qcom/clock-sm8550.c
+      grep -Fq 'clk_rcg_set_rate_mnd(priv->base, 0x77098,' drivers/clk/qcom/clock-sm8550.c
     '';
   });
 in
@@ -58,6 +61,7 @@ runCommand "sheng-uboot-efi-sheng-dts-preflight" {
   test -s ${firmware}/u-boot-nodtb.bin
   test -s ${firmware}/u-boot.dtb
   grep -Fx 'CONFIG_DEFAULT_DEVICE_TREE="qcom/sm8550-xiaomi-sheng"' ${firmware}/.config
+  grep -Fx 'CONFIG_UFS_QCOM=y' ${firmware}/.config
   test "$(fdtget -t s ${firmware}/u-boot.dtb / model)" = 'Xiaomi Pad 6S Pro 12.4'
   fdtget -t s ${firmware}/u-boot.dtb / compatible | grep -Fqx 'xiaomi,sheng qcom,sm8550'
   fdtget ${firmware}/u-boot.dtb /reserved-memory/splash@b8000000 no-map >/dev/null
@@ -69,8 +73,8 @@ runCommand "sheng-uboot-efi-sheng-dts-preflight" {
   This result verifies that the minimal Sheng U-Boot device tree compiles and is
   selected as the final U-Boot DTB. It is not a bootable or flashable image.
 
-  DO NOT FLASH THIS RESULT. The candidate is missing the SM8550 UFS clock and
-  divider work, PM8550B eUSB2 repeater driver support, Android boot-image
+  DO NOT FLASH THIS RESULT. The candidate is missing PM8550B eUSB2 repeater
+  driver support, UFS PHY/power and storage validation, Android boot-image
   packaging, ABL framebuffer hand-off, and device runtime validation.
   DOC
   touch "$out/NOT_FLASHABLE"

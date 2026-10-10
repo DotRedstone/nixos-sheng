@@ -1,0 +1,37 @@
+From: DotRedstone <noreply@users.noreply.github.com>
+Subject: [PATCH] clk: qcom: program SM8550 UFS UniPro rates
+
+U-Boot exposes the SM8550 UFS UniPro clock gate but has no set_rate path.
+Add the 75, 150 and 300 MHz table and program its 0x77098 RCG.
+
+Source: DotRedstone/linux-sheng commit c4b27e2cec1371e166f443877812639d4d0d33da,
+drivers/clk/qcom/gcc-sm8550.c (GPL-2.0-only). The register offset and
+frequency/parent/divider tuples are transcribed from the pinned Linux source;
+this patch adapts them to U-Boot's existing clk_rcg_set_rate_mnd API.
+
+This only makes the UFS driver's requested UniPro rates programmable. It does
+not establish UFS power, PHY calibration, storage discovery, or boot safety.
+
+Signed-off-by: DotRedstone <noreply@users.noreply.github.com>
+---
+ drivers/clk/qcom/clock-sm8550.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/drivers/clk/qcom/clock-sm8550.c b/drivers/clk/qcom/clock-sm8550.c
+index 7c06489..cfe8472 100644
+--- a/drivers/clk/qcom/clock-sm8550.c
++++ b/drivers/clk/qcom/clock-sm8550.c
+@@ -69,0 +70,7 @@ static const struct freq_tbl ftbl_gcc_pcie_0_phy_rchng_clk_src[] = {
++static const struct freq_tbl ftbl_gcc_ufs_phy_unipro_core_clk_src[] = {
++	F(75000000, CFG_CLK_SRC_GPLL0_EVEN, 4, 0, 0),
++	F(150000000, CFG_CLK_SRC_GPLL0, 4, 0, 0),
++	F(300000000, CFG_CLK_SRC_GPLL0, 2, 0, 0),
++	{ }
++};
++
+@@ -90,0 +98,5 @@ static ulong sm8550_set_rate(struct clk *clk, ulong rate)
++	case GCC_UFS_PHY_UNIPRO_CORE_CLK:
++		freq = qcom_find_freq(ftbl_gcc_ufs_phy_unipro_core_clk_src, rate);
++		clk_rcg_set_rate_mnd(priv->base, 0x77098,
++				     freq->pre_div, freq->m, freq->n, freq->src, 8);
++		return freq->freq;

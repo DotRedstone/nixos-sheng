@@ -48,7 +48,9 @@ fastboot 目标。这个预检只证明工具链和上游 EFI 配置可构建，
 nix build ./nixos#packages.x86_64-linux.shengUbootEfiShengDtsPreflight --no-link
 ```
 
-它同样只输出 `NOT_FLASHABLE`。这一步确认 DTS 能编译，**不确认 UFS、USB 或显示能在设备上工作**。
+它同样只输出 `NOT_FLASHABLE`。该预检还会编译 SM8550 UFS UniPro 的 75/150/300 MHz
+时钟路径；寄存器、频率和分频值独立来自本项目固定 Linux 内核的 `gcc-sm8550.c`，补丁中
+保留来源。它证明源代码可编译，**不确认 UFS、USB 或显示能在设备上工作**。
 
 ## 设备支持必须逐项实现
 
