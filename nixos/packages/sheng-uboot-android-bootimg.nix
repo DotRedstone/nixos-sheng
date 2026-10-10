@@ -11,6 +11,9 @@
   # Keep the raw form as a separate ABL-entry experiment.  The normal
   # candidate stays gzip, matching the known-good Mobile NixOS boot image.
   rawPayload ? false,
+  # Use the upstream Qualcomm U-Boot legacy Android layout verbatim for a
+  # separate ABL-entry test: high base addresses and no ramdisk.
+  upstreamAndroidLayout ? false,
   buildPackages,
   buildUBoot,
   dtc,
@@ -21,6 +24,7 @@
 let
   firmware = (buildUBoot {
     pname = if autoFastboot then
+      if upstreamAndroidLayout then "sheng-uboot-upstream-fastboot-probe-firmware" else
       if rawPayload then "sheng-uboot-raw-fastboot-probe-firmware" else "sheng-uboot-fastboot-probe-firmware"
     else
       "sheng-uboot-android-bootimg-firmware";
@@ -100,6 +104,7 @@ let
   '';
 in
 runCommand (if autoFastboot then
+  if upstreamAndroidLayout then "sheng-u-boot-upstream-fastboot-probe.img" else
   if rawPayload then "sheng-u-boot-raw-fastboot-probe.img" else "sheng-u-boot-fastboot-probe.img"
 else
   "sheng-u-boot-experimental-boot_b.img") {
@@ -114,7 +119,11 @@ else
     inherit firmware payload;
     flashPartition = "boot_b";
     maximumBytes = 201326592;
-    mode = if autoFastboot then if rawPayload then "raw-fastboot-probe" else "fastboot-probe" else "efi";
+    mode = if autoFastboot then
+      if upstreamAndroidLayout then "upstream-fastboot-probe" else
+      if rawPayload then "raw-fastboot-probe" else "fastboot-probe"
+    else
+      "efi";
   };
 } ''
   test -s ${firmware}/u-boot-nodtb.bin
@@ -143,13 +152,14 @@ else
   mkbootimg \
     --header_version 0 \
     --kernel "$kernel_image" \
-    --ramdisk ${payload}/ramdisk.gz \
     --cmdline "" \
-    --base 0x00000000 \
-    --kernel_offset 0x00008000 \
-    --ramdisk_offset 0x01000000 \
-    --second_offset 0x00000000 \
-    --tags_offset 0x01e00000 \
+    ${if upstreamAndroidLayout then "--base 0x80000000" else ''
+    --ramdisk ${payload}/ramdisk.gz \\
+    --base 0x00000000 \\
+    --kernel_offset 0x00008000 \\
+    --ramdisk_offset 0x01000000 \\
+    --second_offset 0x00000000 \\
+    --tags_offset 0x01e00000''} \
     --pagesize 4096 \
     -o "$out"
 
@@ -159,7 +169,7 @@ else
     exit 1
   }
 
-  python3 - "$out" ${firmware}/u-boot-nodtb.bin ${firmware}/u-boot.dtb ${payload}/u-boot.${if rawPayload then "bin" else "gz"} ${payload}/ramdisk.gz <<'PY'
+  python3 - "$out" ${firmware}/u-boot-nodtb.bin ${firmware}/u-boot.dtb ${payload}/u-boot.${if rawPayload then "bin" else "gz"} ${if upstreamAndroidLayout then "/dev/null" else "${payload}/ramdisk.gz"} <<'PY'
 import pathlib
 import struct
 import sys
@@ -181,11 +191,12 @@ assert data[:8] == b"ANDROID!", "missing Android boot magic"
     unused,
 ) = struct.unpack_from("<10I", data, 8)
 assert page_size == 4096, page_size
-assert kernel_addr == 0x8000, hex(kernel_addr)
-assert ramdisk_addr == 0x01000000, hex(ramdisk_addr)
+upstream_android_layout = ${if upstreamAndroidLayout then "True" else "False"}
+assert kernel_addr == (0x80008000 if upstream_android_layout else 0x8000), hex(kernel_addr)
+assert ramdisk_addr == (0x0 if upstream_android_layout else 0x01000000), hex(ramdisk_addr)
 assert second_size == 0, second_size
 assert second_addr == 0, hex(second_addr)
-assert tags_addr == 0x01E00000, hex(tags_addr)
+assert tags_addr == (0x80000100 if upstream_android_layout else 0x01E00000), hex(tags_addr)
 assert dt_size == 0, dt_size
 assert unused == 0, unused
 align = lambda value: (value + page_size - 1) // page_size * page_size
@@ -206,7 +217,12 @@ else:
     assert decompressor.unused_data == expected_dtb, "U-Boot DTB is not the trailing payload"
 assert expected_dtb[:4] == b"\xd0\x0d\xfe\xed", "invalid flattened DTB magic"
 ramdisk_start = align(kernel_start + kernel_size)
-assert data[ramdisk_start : ramdisk_start + ramdisk_size] == ramdisk_path.read_bytes()
-assert len(data) == align(ramdisk_start + ramdisk_size), "unexpected Android boot image tail"
+expected_ramdisk = ramdisk_path.read_bytes()
+if upstream_android_layout:
+    assert ramdisk_size == 0, ramdisk_size
+    assert len(data) == ramdisk_start, "unexpected Android boot image tail"
+else:
+    assert data[ramdisk_start : ramdisk_start + ramdisk_size] == expected_ramdisk
+    assert len(data) == align(ramdisk_start + ramdisk_size), "unexpected Android boot image tail"
 PY
 ''
