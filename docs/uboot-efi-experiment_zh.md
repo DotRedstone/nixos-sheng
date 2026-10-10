@@ -1,186 +1,101 @@
 # Sheng 的 U-Boot / EFI 实验
 
-> 状态：实验性。当前分支提供一个经过离线结构校验的 Android v0 **RAM-boot 候选**；
-> 它不是稳定刷机包，必须先用 `fastboot boot` 在设备上证明 ABL 能加载它。
+> 状态：实验性。完整 Sheng U-Boot 基线已在 `boot_b` 实机进入 U-Boot USB gadget；本仓库已完成同一基线的独立构建与静态产物校验，等待下一轮 `boot_b` 实机验证。它不是 release 镜像。
 
-## 目标与边界
+## 已确认的启动边界
 
-当前稳定路径保持不变：`ABL -> Android boot_b -> Mobile NixOS stage-1 -> stage-2`。
-长期目标是将普通启动演进为：`ABL -> U-Boot -> systemd-boot -> NixOS`，使系统代际
-可以由标准 EFI 启动项管理。
+稳定系统仍使用：`ABL -> Android boot_b -> Mobile NixOS stage-1 -> stage-2`。
+长期目标为：`ABL -> U-Boot -> systemd-boot -> NixOS`，由标准 EFI 启动项管理系统代际。
 
-离线充电不是这条链路的附带功能。当前的圆润电池界面运行在 Mobile NixOS stage-1；
-若 U-Boot 接管普通启动，必须为关机充电定义独立的状态机、退出条件和恢复路径后，
-才能替换现有路径。
+本次实机诊断得到两条重要结论：
 
-本实验不会自动修改 `boot_a`、`boot_b`、`linux`、`userdata` 或 GPT，也不会改变发布镜像。
-所有持久化刷写都留给设备验证通过后的明确操作；本仓库当前只生成候选文件。
+- `fastboot boot` 不是这台设备的有效验证通道：连已知可启动的 Mobile NixOS `boot_b` 镜像也会回到 ABL fastboot，不能据此判断 U-Boot 是否运行；
+- `boot_a` 原本是 Android header v4，而 NixOS/U-Boot 使用 Android header v0。把 v0 U-Boot 镜像放入 `boot_a` 会回到 ABL fastboot；这不代表 U-Boot 失败。
 
-## 第一阶段：上游编译预检
+有效的验证路径是：备份两个 boot 槽，只临时替换 `boot_b`，设置 B 为活动槽后冷启动，并观察 U-Boot 输出。参考基线已在该路径上枚举为：
 
-`shengUbootEfiPreflight` 固定到官方 U-Boot `v2026.10-rc5` 的带签名标签提交
-`a06e89ab05eaa2b8344d521319399333cd760ae5`。它使用 `qcom_defconfig` 和
-`board/qualcomm/qcom-phone.config`，并确认如下 EFI 能力进入最终配置：
+```text
+USB: 18d1:4ee0
+Manufacturer: U-Boot
+Product: USB download gadget
+Host node: /dev/ttyACM0
+```
 
-- `CONFIG_EFI_LOADER`
-- `CONFIG_CMD_BOOTEFI`
-- `CONFIG_CMD_PART`
-- `CONFIG_CMD_FAT`
-- `CONFIG_FS_FAT`
+试验后已将原始 Mobile NixOS boot 镜像刷回 `boot_b`，设备重新进入内核 `7.1.8`，且 `sheng-mark-boot-successful.service` 将 B 槽标记成功。
+
+## 当前基线
+
+`shengUbootAndroidBootimg` 固定官方 U-Boot `v2026.10-rc5` 的带签名标签提交
+`a06e89ab05eaa2b8344d521319399333cd760ae5`，生成 Android boot header v0：
+
+- `u-boot-nodtb.bin` 用 `gzip -n` 压缩，随后拼接同次构建的 Sheng DTB；
+- 使用已验证的偏移和 4 KiB 页：kernel `0x00008000`、ramdisk `0x01000000`、tags `0x01e00000`；
+- `CONFIG_TEXT_BASE=0x80000000`，避免 ARM64 Image header 的 text offset 溢出；
+- 开启 Sheng UFS、PM8550B eUSB2、USB ACM、EFI、FAT、按键和 ABL framebuffer hand-off；
+- 禁用 UEFI capsule 与 U-Boot fastboot 分区写入，固件只读取 EFI 载荷，不会写 Android 槽位或 GPT；
+- 构建时核对 Android header、gzip 载荷、DTB、ramdisk、页对齐及 192 MiB `boot_b` 上限。
 
 构建命令：
 
 ```bash
-# 在常见 x86_64 开发机上交叉编译 AArch64 固件。
-nix build ./nixos#packages.x86_64-linux.shengUbootEfiPreflight --no-link
-nix build ./nixos#checks.x86_64-linux.shengUbootEfiPreflight --no-link
-
-# 在 AArch64 构建机上可使用项目的原生发布属性。
-nix build ./nixos#packages.aarch64-linux.shengUbootEfiPreflight --no-link
-```
-
-结果中只有 `README.md` 和 `NOT_FLASHABLE`。二进制留在内部依赖中，以免被误当成
-fastboot 目标。这个预检只证明工具链和上游 EFI 配置可构建，**不证明 Sheng 能启动**。
-
-第二个预检会在上游树上应用本仓库的最小 Sheng DTS，确认最终 DTB 选择了
-`qcom/sm8550-xiaomi-sheng`、正确声明了设备身份并保留 ABL splash 内存：
-
-```bash
-nix build ./nixos#packages.x86_64-linux.shengUbootEfiShengDtsPreflight --no-link
-```
-
-它同样只输出 `NOT_FLASHABLE`。该预检还会编译 SM8550 UFS UniPro 的 75/150/300 MHz
-时钟路径；寄存器、频率和分频值独立来自本项目固定 Linux 内核的 `gcc-sm8550.c`，补丁中
-保留来源。它证明源代码可编译，**不确认 UFS、USB 或显示能在设备上工作**。
-
-### PM8550B eUSB2 repeater：当前实现范围
-
-官方 U-Boot 的 SM8550 eUSB2 PHY 原先保留了 `/* TODO Repeater */`，即 SoC PHY 即使完成
-初始化，也不会启动 Pad 的 PM8550B 信号转换器。本分支以独立补丁
-`0003-phy-qcom-add-pm8550b-eusb2-repeater.patch` 补齐这段链路：
-
-- 新的 U-Boot PHY provider 只匹配 `qcom,pm8550b-eusb2-repeater`，取得 Sheng DTS 中的
-  `vdd18`（L15B，1.8 V）与 `vdd3`（L5B，3.1 V）RPMh rail；
-- 初始化会依次投票开启 rail、启用 repeater、写入 IUSB2 / squelch / pre-emphasis 调谐值，
-  并在 5 ms 内轮询 ready 状态；失败会反向关闭已开启 rail；
-- 上游 SoC eUSB2 PHY 在释放 reset 前初始化 repeater 并设为 device mode；后续 PHY 初始化
-  失败或关机时会释放 repeater，避免留下半初始化供电；
-- Nix 检查会确认驱动已实际链接进 `u-boot-nodtb.bin`，并从最终 DTB 读回两条 rail 的名称和
-  电压描述。
-
-寄存器序列、rail 名称和电压来自本项目固定的 `linux-sheng` 设备树与 PM8550B Linux
-repeater 驱动；实现为 U-Boot 的 device-model / generic-PHY 接口，未引入第三方 Android
-设备仓库的补丁。上述只属于**离线编译与结构证据**：尚未证明 RAM boot 后 PMIC 投票被硬件
-接受、USB 在主机端重新枚举，或与 DWC3、UFS、显示、EFI 的后续链路可用。
-
-## 第二阶段：Android boot RAM-boot 候选
-
-`shengUbootAndroidBootimg` 将已审计的 Sheng U-Boot 组合为 Android boot header v0：
-
-- `u-boot-nodtb.bin` 使用可重复的 `gzip -n` 压缩，随后拼接同一构建产出的原始 Sheng DTB；
-- 空 gzip ramdisk 仅用于满足 Android boot 容器；它不含 NixOS rootfs、initrd 或用户数据；
-- 使用当前稳定 Sheng Android boot 的偏移和 4 KiB 页大小：kernel `0x00008000`、ramdisk
-  `0x01000000`、tags `0x01e00000`；
-- 将 U-Boot `CONFIG_TEXT_BASE` 固定为 `0x80000000`，避免从 Android envelope 进入时 ARM64
-  text offset 溢出；
-- 在构建中解析 header，逐字节核对 gzip U-Boot、紧随其后的 DTB、ramdisk、地址、页大小和
-  `boot_b` 的 192 MiB 上限。
-
-在常见 x86_64 构建机上生成候选：
-
-```bash
-nix build ./nixos#packages.x86_64-linux.shengUbootAndroidBootimg \
+nix build ./nixos#shengUbootAndroidBootimg \
   -o out/sheng-u-boot-experimental-boot_b.img
+```
+
+离线验收至少应确认：
+
+```bash
 file out/sheng-u-boot-experimental-boot_b.img
 sha256sum out/sheng-u-boot-experimental-boot_b.img
 ```
 
-候选不应在主用槽位上直接运行 `fastboot boot`。实机验证发现，此设备的 ABL 会把一次
-失败的 RAM boot 计入**当前活动槽位**的失败次数；多次失败可将该槽位标记为 `unbootable`，
-即使 `fastboot boot` 本身没有刷写 boot 分区。任何实机 RAM boot 前都必须：
+最终 DTB 必须包含：
 
-1. 记录 `fastboot getvar current-slot` 和两个槽位的 `slot-unbootable`、`slot-retry-count`；
-2. 只在用户明确指定的测试槽位、且另一个已验证槽位仍可回退时进行；
-3. 每次失败后立即检查槽位状态，必要时用 `fastboot set_active <slot>` 恢复，而不是继续重试；
-4. 未经单独授权，不执行 `fastboot flash boot_b`。
+- SM8550 UFS 与 UniPro 75/150/300 MHz 时钟/分频路径；
+- PM8550B eUSB2 repeater 和其生命周期处理；
+- USB2 peripheral 模式、`qcom,select-utmi-as-pipe-clk` 与 USB configuration NoC clock；
+- 3048x2032、ARGB8888 的 ABL splash framebuffer hand-off；
+- USB ACM 恢复控制台、音量按键和 EFI/FAT 启动环境。
 
-这类测试需要观察 U-Boot 是否能稳定显示或通过 USB 恢复，并确认它能枚举 UFS。当前上游
-Qualcomm phone environment 会先 `scsi scan`，再执行标准 `bootefi bootmgr`；真正进入
-NixOS 还需要一个独立规划的 GPT FAT ESP，提供 `EFI/BOOT/BOOTAA64.EFI`。现有 `linux`
-rootfs 分区不是这个 ESP，本实验不会创建或修改 GPT。
+## 补丁来源与维护方式
 
-Android header 与字节结构正确只说明该文件可交给 fastboot/ABL 测试，不能证明 ABL 接受
-压缩 U-Boot、UFS 可用、EFI 可启动，或关机充电与回退链路安全。
+`nixos/patches/u-boot/sheng-baseline/` 是对公开的
+[`dianqk/nixos-android-devices`](https://github.com/dianqk/nixos-android-devices)
+commit `8f29bfc02bb3a8d03c4545eff1296a9ce6656337` 的可审计基线导入：每个 patch 保留原始作者、
+版权、来源链接与本地说明。它们仍以官方 U-Boot 为构建上游，而不是把第三方二进制纳入本仓库。
 
-### 无显示 USB 探针
+其中 Linux 衍生的改动保留各自的 Linux 来源和许可证信息；本地 U-Boot 适配继续遵循
+GPL-2.0-or-later。后续修改必须保持单一硬件职责，不能把 UFS、USB、显示和 EFI 的新问题混入
+同一 patch。
 
-`shengUbootFastbootProbeBootimg` 使用相同的 Android v0 容器和 Sheng DTB，但替换 U-Boot
-默认环境：不扫描 UFS、不尝试 EFI，而是立即运行 U-Boot USB fastboot。它的唯一验收条件是
-主机先失去 ABL fastboot，随后重新枚举出 U-Boot fastboot；这能把“早期 U-Boot 已运行”与
-“显示、UFS 或 EFI 尚未可用”区分开。探针配置显式关闭 `CONFIG_FASTBOOT_FLASH`，不会提供
-分区写入命令，也不会修改 GPT 或分区。
+## 实机验证流程
+
+只在 B 槽执行，并始终保留 A 槽 Android recovery 与 B 槽 NixOS 备份：
 
 ```bash
-nix build ./nixos#packages.x86_64-linux.shengUbootFastbootProbeBootimg \
-  -o out/sheng-u-boot-fastboot-probe.img
-# 仅在明确指定的测试槽位上、并记录/检查 A/B 状态后进行：
-fastboot boot out/sheng-u-boot-fastboot-probe.img
-fastboot devices -l
+# 先记录状态和备份；不要刷 userdata。
+fastboot getvar current-slot
+fastboot getvar slot-successful:a
+fastboot getvar slot-successful:b
+fastboot flash boot_b out/sheng-u-boot-experimental-boot_b.img
+fastboot set_active b
+fastboot reboot
 ```
 
-若 USB 未重新枚举，下一步只审计 Sheng USB PHY/repeater、电源、时钟和 DWC3 链路；不把
-问题误归因给 EFI 或 NixOS rootfs。
+验证主机端是否出现 U-Boot USB device 和 `/dev/ttyACM*`。若失败，进入 Android fastboot 后立刻回退：
 
-## 设备支持必须逐项实现
+```bash
+fastboot flash boot_b /path/to/known-good-mobile-nixos-boot.img
+fastboot set_active b
+fastboot reboot
+```
 
-任何可启动的 Sheng U-Boot 必须在独立提交中实现并审计以下内容：
+`boot_a`、`linux`、GPT 与 `userdata` 不属于当前实验写入范围。关机充电也继续由现有 Mobile NixOS
+stage-1 路径负责；在 U-Boot 正常启动、EFI 存储、热重启、恢复键、回退和关机充电均分别验证前，
+不得发布或合并此实验分支。
 
-1. Sheng boot DTS：板级身份、按键、UFS reset GPIO 和 PM8550B USB 接线。
-2. SM8550 UFS：UniPro 时钟、分频器和 UFS 依赖链。
-3. USB gadget：PM8550B eUSB2 repeater 与 USB2 pipe clock；先验证串口/网络恢复通道。
-4. ABL framebuffer：只在 RAM boot 证实图像地址、尺寸和显示生命周期后接入。
-5. Android v0 envelope：本分支已生成并离线校验候选；仍须先 `fastboot boot`，不直接写入
-   `boot_b`。
-6. EFI 存储：规划一个标准 GPT FAT ESP（例如 `linux-boot`）并让 EFI 加载
-   `EFI/BOOT/BOOTAA64.EFI`。这一步会改分区表，必须在单独的、获明确授权的操作中执行。
-7. 持久化：保留 `boot_a` 和独立 Android 格式 RAM recovery；确认反复冷启动、普通重启、
-   按键恢复和关机充电后，才考虑写入 `boot_b`。
+## 下一阶段
 
-## 来源与许可证
-
-本分支使用官方 U-Boot 源码（GPL-2.0-or-later）作为基础。它不复制
-`dianqk/nixos-android-devices` 的补丁或打包逻辑。后续若研究该项目公开补丁，只能把它们
-当作线索；每一项都要回溯到上游 Linux/U-Boot 或自行实现，保留作者、来源、许可证和
-本地改动说明。任何来自 U-Boot 或 Linux 的衍生修改都应按其 GPL 要求公开相应源码。
-
-## 验收顺序
-
-| 阶段 | 通过条件 | 禁止事项 |
-| --- | --- | --- |
-| 编译预检 | 上述两个 Nix 构建成功 | 声称设备可启动 |
-| Android 候选 | header、载荷和分区上限在构建中逐项通过 | 直接写入 `boot_b` |
-| RAM boot | USB 恢复通道、串口、UFS 探测和按键可重复验证 | 写入 `boot_b` |
-| EFI 原型 | 标准 ESP 上能加载一个已知 EFI 程序并回到 recovery | 改动现有 `linux` 数据 |
-| 持久化候选 | 多次冷启动、普通重启、恢复键和关机充电均可回退 | 覆盖 `boot_a` 或刷写 `userdata` |
-
-## Sheng 启动 DTS 的来源映射
-
-预检确认上游 U-Boot 有 SM8550 的通用参考板，却没有 Sheng。下一阶段的 DTS 必须从
-本项目锁定的内核树逐项裁剪，而不是复制完整 Linux 板级 DTS：
-
-- 内核来源：`DotRedstone/linux-sheng` 的
-  `c4b27e2cec1371e166f443877812639d4d0d33da`，文件
-  `arch/arm64/boot/dts/qcom/sm8550-xiaomi-sheng.dts`。
-- 板级身份：`model = "Xiaomi Pad 6S Pro 12.4"` 和
-  `compatible = "xiaomi,sheng", "qcom,sm8550"`。
-- 恢复按键：PM8550 GPIO 6 的音量上键。U-Boot 只需要这个明确的恢复输入；不携带
-  Hall、触摸、相机、音频或桌面硬件节点。
-- UFS：`ufs_mem_hc` 的 reset GPIO 210，以及 `vcc`、`vccq`、`vdd-hba` 供电引用；
-  相应 UniPro 时钟和分频器仍须在 U-Boot 驱动中单独实现。
-- USB gadget：`pm8550b_eusb2_repeater` 的 L15B 1.8 V / L5B 3.1 V 供电，以及
-  `usb_1_hsphy` 到 repeater 的连接。完整 USB-C、DP、PMIC GLINK 策略不在首个
-  RAM boot 范围内。
-
-该 Linux DTS 文件标注为 `BSD-3-Clause`。后续若移植其中的节点，补丁头会记录此来源、
-原作者和被保留的最小节点；U-Boot 驱动侧的新增或改写仍遵循 U-Boot 的 GPL-2.0-or-later
-要求。每个驱动链路（UFS、USB、framebuffer）各自独立提交与测试。
+U-Boot 已能获得 USB gadget，但尚未证明能从存储启动 EFI。下一步是规划独立 FAT ESP（例如
+`linux-boot`）并由 U-Boot 加载 `EFI/BOOT/BOOTAA64.EFI`。这会涉及存储布局，必须在独立分支、
+备份和明确授权后进行；不得复用现有 `linux` rootfs 分区或 Android `userdata`。
