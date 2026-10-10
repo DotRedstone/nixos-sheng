@@ -63,7 +63,7 @@ let
     nativeBuildInputs = [ buildPackages.gzip ];
   } ''
     mkdir -p "$out"
-    gzip -n -c ${firmware}/u-boot-nodtb.bin > "$out/u-boot.gz"
+    cp ${firmware}/u-boot-nodtb.bin "$out/u-boot.bin"
     printf 'unused' | gzip -n > "$out/ramdisk.gz"
   '';
 in
@@ -93,7 +93,7 @@ runCommand "sheng-u-boot-experimental-boot_b.img" {
   fdtget -t s ${firmware}/u-boot.dtb / compatible | grep -Fqx 'xiaomi,sheng qcom,sm8550'
 
   kernel_image="$TMPDIR/kernel-with-dtb"
-  cat ${payload}/u-boot.gz ${firmware}/u-boot.dtb > "$kernel_image"
+  cat ${payload}/u-boot.bin ${firmware}/u-boot.dtb > "$kernel_image"
   mkbootimg \
     --header_version 0 \
     --kernel "$kernel_image" \
@@ -113,13 +113,12 @@ runCommand "sheng-u-boot-experimental-boot_b.img" {
     exit 1
   }
 
-  python3 - "$out" ${firmware}/u-boot-nodtb.bin ${firmware}/u-boot.dtb ${payload}/u-boot.gz ${payload}/ramdisk.gz <<'PY'
+  python3 - "$out" ${firmware}/u-boot-nodtb.bin ${firmware}/u-boot.dtb ${payload}/u-boot.bin ${payload}/ramdisk.gz <<'PY'
 import pathlib
 import struct
 import sys
-import zlib
 
-image, nodtb_path, dtb_path, gzip_path, ramdisk_path = map(pathlib.Path, sys.argv[1:])
+image, nodtb_path, dtb_path, uboot_path, ramdisk_path = map(pathlib.Path, sys.argv[1:])
 data = image.read_bytes()
 assert data[:8] == b"ANDROID!", "missing Android boot magic"
 (
@@ -145,13 +144,11 @@ assert unused == 0, unused
 align = lambda value: (value + page_size - 1) // page_size * page_size
 kernel_start = page_size
 kernel = data[kernel_start : kernel_start + kernel_size]
-expected_gzip = gzip_path.read_bytes()
+expected_uboot = uboot_path.read_bytes()
 expected_dtb = dtb_path.read_bytes()
-assert kernel == expected_gzip + expected_dtb, "kernel payload is not gzip U-Boot followed by its DTB"
-decompressor = zlib.decompressobj(wbits=16 + zlib.MAX_WBITS)
-assert decompressor.decompress(kernel) + decompressor.flush() == nodtb_path.read_bytes()
-assert decompressor.eof, "U-Boot gzip stream did not terminate"
-assert decompressor.unused_data == expected_dtb, "U-Boot DTB is not the trailing payload"
+assert expected_uboot == nodtb_path.read_bytes()
+assert expected_uboot[0x38:0x3c] == b"ARMd", "U-Boot is missing the ARM64 Image header"
+assert kernel == expected_uboot + expected_dtb, "kernel payload is not raw U-Boot followed by its DTB"
 assert expected_dtb[:4] == b"\xd0\x0d\xfe\xed", "invalid flattened DTB magic"
 ramdisk_start = align(kernel_start + kernel_size)
 assert data[ramdisk_start : ramdisk_start + ramdisk_size] == ramdisk_path.read_bytes()
