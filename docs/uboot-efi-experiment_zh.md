@@ -57,13 +57,13 @@ nix build ./nixos#packages.x86_64-linux.shengUbootEfiShengDtsPreflight --no-link
 
 `shengUbootAndroidBootimg` 将已审计的 Sheng U-Boot 组合为 Android boot header v0：
 
-- 原始 `u-boot-nodtb.bin` 保留 ARM64 `Image` 头，随后拼接同一构建产出的原始 Sheng DTB；
+- `u-boot-nodtb.bin` 使用可重复的 `gzip -n` 压缩，随后拼接同一构建产出的原始 Sheng DTB；
 - 空 gzip ramdisk 仅用于满足 Android boot 容器；它不含 NixOS rootfs、initrd 或用户数据；
 - 使用当前稳定 Sheng Android boot 的偏移和 4 KiB 页大小：kernel `0x00008000`、ramdisk
   `0x01000000`、tags `0x01e00000`；
 - 将 U-Boot `CONFIG_TEXT_BASE` 固定为 `0x80000000`，避免从 Android envelope 进入时 ARM64
   text offset 溢出；
-- 在构建中解析 header，逐字节核对原始 ARM64 U-Boot、紧随其后的 DTB、ramdisk、地址、页大小和
+- 在构建中解析 header，逐字节核对 gzip U-Boot、紧随其后的 DTB、ramdisk、地址、页大小和
   `boot_b` 的 192 MiB 上限。
 
 在常见 x86_64 构建机上生成候选：
@@ -87,8 +87,26 @@ NixOS 还需要一个独立规划的 GPT FAT ESP，提供 `EFI/BOOT/BOOTAA64.EFI
 rootfs 分区不是这个 ESP，本实验不会创建或修改 GPT。
 
 **禁止在 RAM boot 尚未成功前执行 `fastboot flash boot_b`。** Android header 与字节结构
-正确只说明该文件可交给 fastboot/ABL 测试，不能证明 ABL 接受 U-Boot、UFS 可用、EFI
+正确只说明该文件可交给 fastboot/ABL 测试，不能证明 ABL 接受压缩 U-Boot、UFS 可用、EFI
 可启动，或关机充电与回退链路安全。
+
+### 无显示 USB 探针
+
+`shengUbootFastbootProbeBootimg` 使用相同的 Android v0 容器和 Sheng DTB，但替换 U-Boot
+默认环境：不扫描 UFS、不尝试 EFI，而是立即运行 U-Boot USB fastboot。它的唯一验收条件是
+主机先失去 ABL fastboot，随后重新枚举出 U-Boot fastboot；这能把“早期 U-Boot 已运行”与
+“显示、UFS 或 EFI 尚未可用”区分开。探针配置显式关闭 `CONFIG_FASTBOOT_FLASH`，不会提供
+分区写入命令，也不会修改 GPT 或分区。
+
+```bash
+nix build ./nixos#packages.x86_64-linux.shengUbootFastbootProbeBootimg \
+  -o out/sheng-u-boot-fastboot-probe.img
+fastboot boot out/sheng-u-boot-fastboot-probe.img
+fastboot devices -l
+```
+
+若 USB 未重新枚举，下一步只审计 Sheng USB PHY/repeater、电源、时钟和 DWC3 链路；不把
+问题误归因给 EFI 或 NixOS rootfs。
 
 ## 设备支持必须逐项实现
 
