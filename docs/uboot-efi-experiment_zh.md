@@ -53,6 +53,26 @@ nix build ./nixos#packages.x86_64-linux.shengUbootEfiShengDtsPreflight --no-link
 时钟路径；寄存器、频率和分频值独立来自本项目固定 Linux 内核的 `gcc-sm8550.c`，补丁中
 保留来源。它证明源代码可编译，**不确认 UFS、USB 或显示能在设备上工作**。
 
+### PM8550B eUSB2 repeater：当前实现范围
+
+官方 U-Boot 的 SM8550 eUSB2 PHY 原先保留了 `/* TODO Repeater */`，即 SoC PHY 即使完成
+初始化，也不会启动 Pad 的 PM8550B 信号转换器。本分支以独立补丁
+`0003-phy-qcom-add-pm8550b-eusb2-repeater.patch` 补齐这段链路：
+
+- 新的 U-Boot PHY provider 只匹配 `qcom,pm8550b-eusb2-repeater`，取得 Sheng DTS 中的
+  `vdd18`（L15B，1.8 V）与 `vdd3`（L5B，3.1 V）RPMh rail；
+- 初始化会依次投票开启 rail、启用 repeater、写入 IUSB2 / squelch / pre-emphasis 调谐值，
+  并在 5 ms 内轮询 ready 状态；失败会反向关闭已开启 rail；
+- 上游 SoC eUSB2 PHY 在释放 reset 前初始化 repeater 并设为 device mode；后续 PHY 初始化
+  失败或关机时会释放 repeater，避免留下半初始化供电；
+- Nix 检查会确认驱动已实际链接进 `u-boot-nodtb.bin`，并从最终 DTB 读回两条 rail 的名称和
+  电压描述。
+
+寄存器序列、rail 名称和电压来自本项目固定的 `linux-sheng` 设备树与 PM8550B Linux
+repeater 驱动；实现为 U-Boot 的 device-model / generic-PHY 接口，未引入第三方 Android
+设备仓库的补丁。上述只属于**离线编译与结构证据**：尚未证明 RAM boot 后 PMIC 投票被硬件
+接受、USB 在主机端重新枚举，或与 DWC3、UFS、显示、EFI 的后续链路可用。
+
 ## 第二阶段：Android boot RAM-boot 候选
 
 `shengUbootAndroidBootimg` 将已审计的 Sheng U-Boot 组合为 Android boot header v0：
