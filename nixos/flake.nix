@@ -25,9 +25,15 @@
       url = "github:DotRedstone/sheng-firmware-full/719086ce25222dcc54920ae12409eb5d4401bbff";
       # Note: This is now a true flake, so we remove `flake = false;`
     };
+    shengUbootSrc = {
+      # Official U-Boot v2026.10-rc5 signed tag commit. This experiment never
+      # imports device patches from third-party repositories.
+      url = "github:u-boot/u-boot/a06e89ab05eaa2b8344d521319399333cd760ae5";
+      flake = false;
+    };
   };
 
-  outputs = { self, mobile-nixos, nixpkgs, home-manager, shengKernelSrc, shengFirmware }:
+  outputs = { self, mobile-nixos, nixpkgs, home-manager, shengKernelSrc, shengFirmware, shengUbootSrc }:
     let
       system = "aarch64-linux";
       shengOverlay = final: prev: {
@@ -85,6 +91,9 @@
         sheng-fb-painter = final.callPackage ./packages/sheng-fb-painter.nix { };
         sheng-libssc = final.callPackage ./hardware/xiaomi-sheng/sensors/libssc.nix { };
         sheng-touch-firmware = final.callPackage ./packages/xiaomi-sheng-touch-firmware.nix { };
+        sheng-uboot-efi-preflight = final.callPackage ./packages/sheng-uboot-efi-preflight.nix {
+          inherit shengUbootSrc;
+        };
         xiaomi-sheng-thp = final.callPackage ./packages/xiaomi-sheng-thp.nix {
           libssc = final.sheng-libssc;
         };
@@ -112,6 +121,15 @@
         inherit system;
         overlays = [ shengOverlay ];
       };
+      # The release outputs target aarch64-linux. Keep this host-side cross
+      # entry separate so maintainers can prove the firmware build on x86_64
+      # without changing device packages or image outputs.
+      ubootPreflightFor = buildSystem:
+        let buildPkgs = import nixpkgs { system = buildSystem; };
+        in buildPkgs.callPackage ./packages/sheng-uboot-efi-preflight.nix {
+          buildUBoot = buildPkgs.pkgsCross.aarch64-multiplatform.buildUBoot;
+          inherit shengUbootSrc;
+        };
       homeManagerModule = {
         environment.systemPackages = [
           home-manager.packages.${system}.default
@@ -209,6 +227,9 @@
       packages.${system} = {
         xiaomiShengThp = pkgs.xiaomi-sheng-thp;
         xiaomiPenStatus = pkgs.xiaomi-pen-status;
+        # This validates the upstream U-Boot/EFI toolchain only. Its result is
+        # deliberately not an Android boot image and must never be flashed.
+        shengUbootEfiPreflight = pkgs.sheng-uboot-efi-preflight;
         mobileAndroidBootimg = mobileEval.outputs.android.android-bootimg;
         mobileFastbootImages = mobileEval.outputs.android.android-fastboot-images;
         mobileRootfsImage = mobileEval.outputs.generatedFilesystems.rootfs;
@@ -222,7 +243,13 @@
         '';
       };
 
+      packages.x86_64-linux.shengUbootEfiPreflight = ubootPreflightFor "x86_64-linux";
+
+      checks.x86_64-linux.shengUbootEfiPreflight = ubootPreflightFor "x86_64-linux";
+
       checks.${system} = {
+        shengUbootEfiPreflight = pkgs.sheng-uboot-efi-preflight;
+
         bootAnimation = pkgs.runCommand "sheng-boot-animation-check" {
           nativeBuildInputs = [
             pkgs.ruby pkgs.mruby pkgs.sheng-fb-painter
