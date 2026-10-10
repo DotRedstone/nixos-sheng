@@ -71,3 +71,25 @@ fastboot 目标。这个预检只证明工具链和上游 EFI 配置可构建，
 | RAM boot | USB 恢复通道、串口、UFS 探测和按键可重复验证 | 写入 `boot_b` |
 | EFI 原型 | 标准 ESP 上能加载一个已知 EFI 程序并回到 recovery | 改动现有 `linux` 数据 |
 | 持久化候选 | 多次冷启动、普通重启、恢复键和关机充电均可回退 | 覆盖 `boot_a` 或刷写 `userdata` |
+
+## Sheng 启动 DTS 的来源映射
+
+预检确认上游 U-Boot 有 SM8550 的通用参考板，却没有 Sheng。下一阶段的 DTS 必须从
+本项目锁定的内核树逐项裁剪，而不是复制完整 Linux 板级 DTS：
+
+- 内核来源：`DotRedstone/linux-sheng` 的
+  `c4b27e2cec1371e166f443877812639d4d0d33da`，文件
+  `arch/arm64/boot/dts/qcom/sm8550-xiaomi-sheng.dts`。
+- 板级身份：`model = "Xiaomi Pad 6S Pro 12.4"` 和
+  `compatible = "xiaomi,sheng", "qcom,sm8550"`。
+- 恢复按键：PM8550 GPIO 6 的音量上键。U-Boot 只需要这个明确的恢复输入；不携带
+  Hall、触摸、相机、音频或桌面硬件节点。
+- UFS：`ufs_mem_hc` 的 reset GPIO 210，以及 `vcc`、`vccq`、`vdd-hba` 供电引用；
+  相应 UniPro 时钟和分频器仍须在 U-Boot 驱动中单独实现。
+- USB gadget：`pm8550b_eusb2_repeater` 的 L15B 1.8 V / L5B 3.1 V 供电，以及
+  `usb_1_hsphy` 到 repeater 的连接。完整 USB-C、DP、PMIC GLINK 策略不在首个
+  RAM boot 范围内。
+
+该 Linux DTS 文件标注为 `BSD-3-Clause`。后续若移植其中的节点，补丁头会记录此来源、
+原作者和被保留的最小节点；U-Boot 驱动侧的新增或改写仍遵循 U-Boot 的 GPL-2.0-or-later
+要求。每个驱动链路（UFS、USB、framebuffer）各自独立提交与测试。
