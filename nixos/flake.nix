@@ -195,6 +195,7 @@
           {
             _module.args = {
               inherit vars stage2Only;
+              mobileNixosSource = mobile-nixos;
             };
           }
           ({ lib, ... }: {

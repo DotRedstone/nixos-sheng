@@ -6,7 +6,7 @@
 # - This module must remain separate from the installed Mobile NixOS configuration.
 # - It deliberately mounts no persistent filesystem and never performs storage writes itself.
 # ---
-{ lib, pkgs, ... }:
+{ lib, mobileNixosSource, pkgs, ... }:
 
 {
   fileSystems = lib.mkForce { };
@@ -16,6 +16,13 @@
     # repairs it through stage-1 ADB.
     shell.enable = lib.mkForce true;
     fail.reboot = lib.mkForce false;
+
+    # Do not inherit the normal Sheng tasks: its root fsck task can repair the
+    # installed ext4 filesystem.  Recovery only needs the ADB FunctionFS
+    # gadget, whose task mounts pseudo-filesystems but no persistent storage.
+    tasks = lib.mkForce [
+      "${mobileNixosSource}/modules/stage-1/tasks/usb-gadget-task.rb"
+    ];
 
     # All commands are interactive only.  The image contains no startup task
     # that alters GPT, ext4, FAT, Android slots, or firmware partitions.
