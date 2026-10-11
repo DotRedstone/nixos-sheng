@@ -51,10 +51,11 @@ flowchart TB
 
 该 ESP 使用标准 EFI GPT 类型 GUID `c12a7328-f81f-11d2-ba4b-00a0c93ec93b`，FAT 标签为 `linux-boot`，FAT UUID
 为 `B9D7-707A`，分区 UUID 为 `a9ecf033-04ea-40c3-b9ef-79df0a758f35`。正常系统的
-`systemd-gpt-auto-generator` 已将它以 `nodev,nosuid,noexec,nosymfollow` 挂载到 `/boot`；首次验证时该文件系统为空。
+`systemd-gpt-auto-generator` 已将它以 `nodev,nosuid,noexec,nosymfollow` 挂载到 `/boot`；首次验证时该文件系统为空，
+现已部署经 SHA-256 校验的 EFI 载荷。
 
-U-Boot 按 GPT 名 `linux-boot` 查找该分区，并只读取 `EFI/BOOT/BOOTAA64.EFI`。systemd-boot 及每个 NixOS generation
-的内核、initrd、DTB 将放在该 FAT 分区；它不应包含 rootfs、Android 镜像或固件分区内容。
+U-Boot 按 GPT 名 `linux-boot` 查找该分区，并读取 `EFI/BOOT/BOOTAA64.EFI`。systemd-boot 的 Type #1 条目包含
+内核、initrd、DTB；它不包含 rootfs、Android 镜像或固件分区内容。
 
 ## 实机验收记录
 
@@ -65,7 +66,8 @@ U-Boot 按 GPT 名 `linux-boot` 查找该分区，并只读取 `EFI/BOOT/BOOTAA6
 
 恢复已知可启动的 `boot_b` 后，设备运行内核 `7.1.8` 并进入 NixOS stage-2，根目录仍由
 `/dev/disk/by-partlabel/linux` 以 ext4 挂载，`systemctl --failed` 为空。该验收证明根分区缩容和 ESP 的 GPT/FAT
-创建没有破坏现有 Mobile NixOS 启动链；它不证明 U-Boot 或 EFI 载荷已经可启动。
+创建没有破坏现有 Mobile NixOS 启动链。后续 EFI 实机验证已确认 U-Boot 能加载此 ESP 中的 systemd-boot，EFI 内核
+进入 stage-1 与 stage-2，且一次普通重启再次通过同一启动链。
 
 ## Android 保护边界
 
@@ -89,13 +91,13 @@ U-Boot 按 GPT 名 `linux-boot` 查找该分区，并只读取 `EFI/BOOT/BOOTAA6
 2. 在 recovery 中创建完整的 `sfdisk --dump` 备份和 `linux` 文件系统检查记录；先执行只读布局计划。
 3. 获得用户对 1 GiB 根分区缩容的明确确认，并先验证新 GPT、ext4 与稳定系统启动，再格式化 ESP。
 
-下一道门槛是构建并离线验证 EFI 载荷：`BOOTAA64.EFI`、内核、initrd、Sheng DTB 和 Boot Loader
-Specification 菜单文件必须先在临时 FAT32 镜像中逐一读回校验，之后才允许把它们复制到已挂载的 `/boot`。
+EFI 载荷已构建、离线写入临时 FAT32 并逐项读回校验，随后复制到 `/boot` 并在设备上逐文件 SHA-256 复核。
+下一道门槛是让每个 NixOS generation 受控更新对应的 Type #1 条目。
 
 ## 验收与回退
 
-首次 EFI 启动只替换 `boot_b`，并保留稳定的 Android/NixOS boot 镜像。验收顺序为：GPT 可读、FAT
-文件可读、U-Boot 加载 systemd-boot、EFI 内核进入 stage-1、根分区挂载、stage-2 与 B 槽成功标记。
+首次 EFI 启动只替换 `boot_b`，并保留稳定的 Android/NixOS boot 镜像。已完成的验收顺序为：GPT 可读、FAT
+文件可读、U-Boot 加载 systemd-boot、EFI 内核进入 stage-1、根分区挂载、stage-2、B 槽成功标记与普通重启。
 
 任何阶段失败均先回到 Android ABL fastboot，刷回已知可启动的 `boot_b`；在恢复环境中保留的原始 GPT
 备份和 ext4 检查记录用于继续诊断。未完成所有验收前，不合并该实验分支，也不发布镜像。
