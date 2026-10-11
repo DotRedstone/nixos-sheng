@@ -8,13 +8,30 @@
 # ---
 { lib, mobileNixosSource, pkgs, ... }:
 
+let
+  recoveryHoldTask = pkgs.writeText "sheng-recovery-hold.rb" ''
+    # USB must be active before the recovery loop prevents SwitchRoot.
+    class Tasks::ShengRecoveryHold < SingletonTask
+      def initialize()
+        add_dependency(:Task, Tasks::SetupGadgetMode.instance)
+        Targets[:SwitchRoot].add_dependency(:Task, self)
+      end
+
+      def run()
+        $logger.info("Sheng RAM recovery is ready over ADB; SwitchRoot is intentionally blocked.")
+        loop { sleep(3600) }
+      end
+    end
+  '';
+in
 {
   fileSystems = lib.mkForce { };
 
   mobile.boot.stage-1 = {
-    # Prevent SwitchRoot so linux stays unmounted while the operator audits or
-    # repairs it through stage-1 ADB.
-    shell.enable = lib.mkForce true;
+    # A dedicated task blocks SwitchRoot only after the USB gadget is ready,
+    # leaving linux unmounted while the operator audits it over stage-1 ADB.
+    shell.enable = lib.mkForce false;
+    shell.shellOnFail = lib.mkForce false;
     fail.reboot = lib.mkForce false;
 
     # A recovery image must not run normal-boot presentation or power-policy
@@ -31,6 +48,7 @@
     # gadget, whose task mounts pseudo-filesystems but no persistent storage.
     tasks = lib.mkForce [
       "${mobileNixosSource}/modules/stage-1/tasks/usb-gadget-task.rb"
+      recoveryHoldTask
     ];
 
     # The normal Sheng stage-1 includes the animation assets solely for its
