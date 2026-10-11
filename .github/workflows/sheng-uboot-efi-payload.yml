@@ -22,10 +22,16 @@ on:
       - nixos/hardware/xiaomi-sheng/**
       - .github/workflows/sheng-uboot-efi-payload.yml
   workflow_dispatch:
+    inputs:
+      build_full_stage2:
+        description: Build the complete minimal stage-2 closure (release preflight)
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   validate-stage2-integration:
-    name: Validate EFI update tool in minimal rootfs
+    name: Evaluate EFI update tool in minimal rootfs
     runs-on: ubuntu-24.04-arm
     permissions:
       contents: read
@@ -35,7 +41,24 @@ jobs:
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
       - uses: DeterminateSystems/magic-nix-cache-action@v13
-      - name: Build the installed stage-2 closure
+      - name: Evaluate the installed stage-2 closure
+        run: |
+          nix eval --raw \
+            ./nixos#nixosConfigurations.sheng-minimal.config.system.build.toplevel.drvPath
+
+  build-full-minimal-stage2:
+    name: Build complete minimal stage-2 closure
+    if: github.event_name == 'workflow_dispatch' && inputs.build_full_stage2
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: DeterminateSystems/magic-nix-cache-action@v13
+      - name: Build the complete stage-2 closure
         run: |
           nix build ./nixos#nixosConfigurations.sheng-minimal.config.system.build.toplevel \
             --no-link \
