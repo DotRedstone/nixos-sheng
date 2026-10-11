@@ -303,6 +303,13 @@
         # This probe instead uses the upstream Qualcomm U-Boot Android v0
         # layout to test ABL's container-address contract.
         shengUbootUpstreamFastbootProbeBootimg = pkgs.sheng-uboot-upstream-fastboot-probe-bootimg;
+        # Immutable BLS payload for the dedicated linux-boot ESP. Building it
+        # validates the files U-Boot reads but cannot write a device partition.
+        shengUbootEfiEsp = pkgs.callPackage ./packages/sheng-uboot-efi-esp.nix {
+          kernel = mobileEval.config.system.build.kernel;
+          initrd = mobileEval.outputs.initrd;
+          kernelParams = mobileEval.config.boot.kernelParams;
+        };
         mobileAndroidBootimg = mobileEval.outputs.android.android-bootimg;
         mobileFastbootImages = mobileEval.outputs.android.android-fastboot-images;
         mobileRootfsImage = mobileEval.outputs.generatedFilesystems.rootfs;
