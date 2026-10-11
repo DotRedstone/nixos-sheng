@@ -140,6 +140,13 @@
       sync
       systemctl reboot
     '';
+    sheng-reboot-bootloader = pkgs.writeShellApplication {
+      name = "sheng-reboot-bootloader";
+      runtimeInputs = [ pkgs.perl ];
+      text = ''
+        exec perl ${./scripts/sheng-reboot-bootloader.pl}
+      '';
+    };
     sheng-nixos-rebuild = pkgs.writeShellScriptBin "sheng-nixos-rebuild" ''
       set -eu
 
@@ -201,6 +208,7 @@
     sheng-check
     sheng-nixos-rebuild
     sheng-reboot-generation-menu
+    sheng-reboot-bootloader
     sheng-alsa-ucm
     alsa-ucm-conf
     alsa-utils
