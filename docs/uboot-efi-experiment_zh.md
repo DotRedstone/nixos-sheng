@@ -1,6 +1,6 @@
 # Sheng 的 U-Boot / EFI 实验
 
-> 状态：实验性。完整 Sheng U-Boot 基线已在 `boot_b` 实机进入 U-Boot USB gadget；本仓库已完成同一基线的独立构建与静态产物校验，等待下一轮 `boot_b` 实机验证。它不是 release 镜像。
+> 状态：实验性。本仓库构建的完整 Sheng U-Boot 基线已在 `boot_b` 实机进入 U-Boot USB gadget；它不是 release 镜像。
 
 ## 已确认的启动边界
 
@@ -12,7 +12,7 @@
 - `fastboot boot` 不是这台设备的有效验证通道：连已知可启动的 Mobile NixOS `boot_b` 镜像也会回到 ABL fastboot，不能据此判断 U-Boot 是否运行；
 - `boot_a` 原本是 Android header v4，而 NixOS/U-Boot 使用 Android header v0。把 v0 U-Boot 镜像放入 `boot_a` 会回到 ABL fastboot；这不代表 U-Boot 失败。
 
-有效的验证路径是：备份两个 boot 槽，只临时替换 `boot_b`，设置 B 为活动槽后冷启动，并观察 U-Boot 输出。参考基线已在该路径上枚举为：
+有效的验证路径是：备份两个 boot 槽，只临时替换 `boot_b`，设置 B 为活动槽后冷启动，并观察 U-Boot 输出。本仓库的镜像已在该路径上枚举为：
 
 ```text
 USB: 18d1:4ee0
@@ -21,7 +21,11 @@ Product: USB download gadget
 Host node: /dev/ttyACM0
 ```
 
-试验后已将原始 Mobile NixOS boot 镜像刷回 `boot_b`，设备重新进入内核 `7.1.8`，且 `sheng-mark-boot-successful.service` 将 B 槽标记成功。
+本次实测的本仓库镜像 SHA-256 为
+`ace4caa74df60600ce9f799ac260743030999a24eca3b8e0bc4d077580167231`；试验后已将已知可启动的
+Mobile NixOS boot 镜像（SHA-256
+`def3f8d2d3219d64e660f1c848d59e13371ab6102596dd8832ac5b65c7370160`）刷回 `boot_b`。设备重新进入内核
+`7.1.8`，且 `sheng-mark-boot-successful.service` 将 B 槽标记成功。
 
 ## 当前基线
 
@@ -96,6 +100,7 @@ stage-1 路径负责；在 U-Boot 正常启动、EFI 存储、热重启、恢复
 
 ## 下一阶段
 
-U-Boot 已能获得 USB gadget，但尚未证明能从存储启动 EFI。下一步是规划独立 FAT ESP（例如
-`linux-boot`）并由 U-Boot 加载 `EFI/BOOT/BOOTAA64.EFI`。这会涉及存储布局，必须在独立分支、
-备份和明确授权后进行；不得复用现有 `linux` rootfs 分区或 Android `userdata`。
+U-Boot 已能获得 USB gadget，但尚未证明能从存储启动 EFI。当前设备没有可直接使用的 FAT ESP：`uefi_a` 和
+`uefi_b` 是设备固件分区，`rescue` 是正在使用的 Android 恢复日志 ext4 分区，均不可复用。下一步是规划独立
+FAT ESP（例如 `linux-boot`）并由 U-Boot 加载 `EFI/BOOT/BOOTAA64.EFI`。这会涉及存储布局，必须在独立分支、
+完整备份和明确授权后进行；不得复用现有 `linux` rootfs 分区或 Android `userdata`。
