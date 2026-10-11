@@ -104,6 +104,16 @@
           autoFastboot = true;
           inherit shengUbootSrc;
         };
+        sheng-uboot-raw-fastboot-probe-bootimg = final.callPackage ./packages/sheng-uboot-android-bootimg.nix {
+          autoFastboot = true;
+          rawPayload = true;
+          inherit shengUbootSrc;
+        };
+        sheng-uboot-upstream-fastboot-probe-bootimg = final.callPackage ./packages/sheng-uboot-android-bootimg.nix {
+          autoFastboot = true;
+          upstreamAndroidLayout = true;
+          inherit shengUbootSrc;
+        };
         xiaomi-sheng-thp = final.callPackage ./packages/xiaomi-sheng-thp.nix {
           libssc = final.sheng-libssc;
         };
