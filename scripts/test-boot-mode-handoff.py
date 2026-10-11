@@ -103,6 +103,7 @@ module ShengBootAnimation
   def self.start(*args); $animation = true; end
 end
 module ShengHeadlessGenerationMenu
+  def self.efi_boot?; false; end
   def self.consume_pending_selection(root); ARGV[4] == "yes" ? :chosen : nil; end
   def self.choose(*args); abort "unexpected menu"; end
 end
