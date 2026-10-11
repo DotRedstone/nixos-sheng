@@ -1,15 +1,20 @@
 # ---
 # Module: Sheng U-Boot EFI Update
-# Description: Installs validated EFI payloads onto the dedicated linux-boot ESP without coupling them to stage-2 generations.
+# Description: Installs validated EFI payloads and mirrors NixOS generations onto the dedicated linux-boot ESP.
 # Scope: System
 # Notes:
-# - Ordinary nixos-rebuild updates stage-2 only and must not overwrite the fixed EFI kernel or stage-1 payload.
-# - A new payload is copied and verified before loader.conf changes its default entry; previous payload files remain on the ESP.
+# - 普通 nixos-rebuild 只更新世代条目，不覆盖 EFI 内核或 stage-1。
+# - 新载荷通过校验后才切换默认项；旧载荷仍留在 ESP 供回退。
 # ---
 { config, lib, pkgs, ... }:
 
 let
   cfg = config.services.sheng-uboot-efi;
+  shengEfiGenerations = pkgs.writeShellApplication {
+    name = "sheng-efi-generations";
+    runtimeInputs = with pkgs; [ coreutils findutils gawk gnugrep gnused util-linux ];
+    text = builtins.readFile ../scripts/sheng-efi-generations.sh;
+  };
   shengEfi = pkgs.writeShellApplication {
     name = "sheng-efi";
     runtimeInputs = with pkgs; [
@@ -27,10 +32,13 @@ let
         sheng-efi status
         sheng-efi install /path/to/sheng-uboot-efi-esp/esp
         sheng-efi rollback
+        sheng-efi sync-generations
 
       install accepts only a validated shengUbootEfiEsp/esp tree. It first
       writes and verifies the new versioned payload, then switches the
-      systemd-boot default. It never touches Android partitions.
+      systemd-boot default. sync-generations mirrors available NixOS system
+      profiles into EFI menu entries without replacing the kernel payload.
+      Neither command touches Android partitions.
       USAGE
         exit 2
       }
@@ -77,7 +85,7 @@ let
       rebuild_manifest() {
         (
           cd "$esp"
-          find EFI loader -type f -print0 | sort -z | xargs -0 sha256sum > manifest.sha256.new
+          find EFI loader -type f ! -path 'loader/random-seed' -print0 | sort -z | xargs -0 sha256sum > manifest.sha256.new
           mv manifest.sha256.new manifest.sha256
           sync
         )
@@ -108,7 +116,7 @@ let
 
       install_payload() {
         local supplied=$1 source entry entries version payload linux_path initrd_path dtb_path
-        local staging backup_loader
+        local staging backup_loader previous_default previous_linux previous_base candidate
 
         source="$(readlink -f -- "$supplied")"
         if [ "$source" = "$esp" ] || [ ! -d "$source" ]; then
@@ -207,6 +215,22 @@ let
         if [ -f "$esp/loader/loader.conf" ]; then
           install -m 0600 "$esp/loader/loader.conf" "$backup_loader"
           install -m 0644 "$esp/loader/loader.conf" "$esp/loader/loader.conf.previous"
+          previous_default="$(awk '$1 == "default" { print $2; exit }' "$backup_loader")"
+          previous_linux="$(awk '$1 == "linux" { print $2; exit }' "$esp/loader/entries/$previous_default")"
+          previous_base=
+          for candidate in "$esp"/loader/entries/nixos-sheng-*.conf; do
+            [ -f "$candidate" ] || continue
+            case "$(basename "$candidate")" in nixos-sheng-generation-*.conf) continue ;; esac
+            if [ "$(awk '$1 == "linux" { print $2; exit }' "$candidate")" = "$previous_linux" ]; then
+              previous_base="$(basename "$candidate")"
+              break
+            fi
+          done
+          if [ -z "$previous_base" ]; then
+            echo "Cannot identify the previous immutable EFI payload." >&2
+            exit 1
+          fi
+          printf '%s\n' "$previous_base" > "$state/previous-payload-entry"
         fi
         if [ -f "$esp/EFI/BOOT/BOOTAA64.EFI" ]; then
           install -m 0644 "$esp/EFI/BOOT/BOOTAA64.EFI" "$esp/EFI/BOOT/BOOTAA64.EFI.previous"
@@ -216,6 +240,7 @@ let
         mv "$staging/loader/loader.conf" "$esp/loader/loader.conf.new"
         mv "$esp/loader/loader.conf.new" "$esp/loader/loader.conf"
         rebuild_manifest
+        ${shengEfiGenerations}/bin/sheng-efi-generations "$esp"
         printf '%s\n' "$version" > "$state/pending-version"
         sync
         trap - EXIT
@@ -233,9 +258,26 @@ let
         install -d -m 0700 "$state"
         exec 9>"$state/install.lock"
         flock -x 9
-        install -m 0644 "$state/previous-loader.conf" "$esp/loader/loader.conf.new"
+        if [ -s "$state/previous-payload-entry" ]; then
+          previous_base="$(cat "$state/previous-payload-entry")"
+          case "$previous_base" in
+            nixos-sheng-*.conf) ;;
+            *) echo "Invalid previous EFI payload entry." >&2; exit 1 ;;
+          esac
+          test -f "$esp/loader/entries/$previous_base" || {
+            echo "Previous EFI payload entry is missing." >&2
+            exit 1
+          }
+          awk -v selected="$previous_base" '
+            $1 == "default" { print "default " selected; next }
+            { print }
+          ' "$state/previous-loader.conf" > "$esp/loader/loader.conf.new"
+        else
+          install -m 0644 "$state/previous-loader.conf" "$esp/loader/loader.conf.new"
+        fi
         mv "$esp/loader/loader.conf.new" "$esp/loader/loader.conf"
         rebuild_manifest
+        ${shengEfiGenerations}/bin/sheng-efi-generations "$esp"
         rm -f "$state/pending-version"
         echo "Restored the previous EFI default entry."
       }
@@ -264,6 +306,11 @@ let
           [ "$#" -eq 1 ] || usage
           rollback
           ;;
+        sync-generations)
+          [ "$#" -eq 1 ] || usage
+          check_esp
+          ${shengEfiGenerations}/bin/sheng-efi-generations "$esp"
+          ;;
         mark-successful)
           [ "$#" -eq 1 ] || usage
           mark_successful
@@ -289,11 +336,26 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    environment.systemPackages = [ shengEfi ];
+    environment.systemPackages = [ shengEfi shengEfiGenerations ];
 
     systemd.tmpfiles.rules = [
       "d ${cfg.statePath} 0700 root root -"
     ];
+
+    systemd.services.sheng-efi-sync-generations = {
+      description = "Mirror Sheng NixOS generations into the EFI boot menu";
+      after = [ "local-fs.target" ];
+      wantedBy = [ "multi-user.target" ];
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = "${shengEfi}/bin/sheng-efi sync-generations";
+      };
+    };
+
+    systemd.paths.sheng-efi-sync-generations = {
+      wantedBy = [ "multi-user.target" ];
+      pathConfig.PathChanged = "/nix/var/nix/profiles";
+    };
 
     systemd.services.sheng-efi-mark-successful = {
       description = "Record a successful Sheng U-Boot EFI boot";
@@ -301,6 +363,7 @@ in
       wants = [ "local-fs.target" ];
       wantedBy = [ "multi-user.target" ];
       unitConfig.ConditionPathIsMountPoint = cfg.espPath;
+      unitConfig.ConditionPathExists = "/sys/firmware/efi";
       serviceConfig = {
         Type = "oneshot";
         ExecStart = "${shengEfi}/bin/sheng-efi mark-successful";
