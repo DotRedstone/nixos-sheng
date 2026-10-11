@@ -50,6 +50,7 @@ runCommand "sheng-uboot-efi-esp-${version}" {
   ];
 } ''
   set -euo pipefail
+  set -x
 
   test -s ${efiBootManager}
   test -s ${kernelImage}
