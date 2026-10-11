@@ -41,6 +41,16 @@ Android ABL fastboot，再刷回已知可启动的 `boot_b` 镜像。
 sudo sheng-reboot-bootloader
 ```
 
+尚未更新 rootfs 时，可在主机直接运行仓库脚本。它会通过 ADB 传送同一段受控代码，随后等待
+ABL fastboot 枚举，因此无需手动按住音量键：
+
+```bash
+scripts/sheng-adb-reboot-bootloader.sh
+```
+
+`adb reboot bootloader` 是 ADB daemon 的普通重启请求，不能稳定映射为 Linux 的
+`RESTART2("bootloader")`；主机包装脚本和 rootfs 命令专门补足这个原因传递。
+
 该命令立即重启到 ABL fastboot，不会写入 `boot_a`、`boot_b`、`linux`、GPT、`userdata`、基带或其他
 Android 固件分区。实机已确认执行后主机直接枚举 fastboot 设备。
 
