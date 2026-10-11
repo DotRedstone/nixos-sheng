@@ -19,7 +19,7 @@ let
   version = kernel.modDirVersion;
   commandLine = lib.concatStringsSep " " kernelParams;
   efiBootManager = "${systemd}/lib/systemd/boot/efi/systemd-bootaa64.efi";
-  kernelImage = "${kernel}/Image";
+  kernelCompressedImage = "${kernel}/Image.gz";
   deviceTree = "${kernel}/dtbs/qcom/sm8550-xiaomi-sheng.dtb";
   payloadDirectory = "EFI/NixOS/sheng-${version}";
   efiPeCheck = buildPackages.writeText "sheng-check-aa64-pe.py" (
@@ -45,15 +45,15 @@ runCommand "sheng-uboot-efi-esp-${version}" {
     buildPackages.coreutils
     buildPackages.dosfstools
     buildPackages.findutils
+    buildPackages.gzip
     buildPackages.mtools
     buildPackages.python3
   ];
 } ''
   set -euo pipefail
-  set -x
 
   test -s ${efiBootManager}
-  test -s ${kernelImage}
+  test -s ${kernelCompressedImage}
   test -s ${initrd}
   test -s ${deviceTree}
 
@@ -63,7 +63,10 @@ runCommand "sheng-uboot-efi-esp-${version}" {
   # U-Boot finds this fallback path directly, then systemd-boot enumerates the
   # standard Boot Loader Specification entry below.
   install -m 0644 ${efiBootManager} "$out/esp/EFI/BOOT/BOOTAA64.EFI"
-  install -m 0644 ${kernelImage} "$out/esp/${payloadDirectory}/linux"
+  # The Mobile NixOS kernel builder exports Image.gz. EFI must receive the
+  # uncompressed Image so U-Boot/systemd-boot can invoke its PE/COFF stub.
+  gzip -dc ${kernelCompressedImage} > "$out/esp/${payloadDirectory}/linux"
+  chmod 0644 "$out/esp/${payloadDirectory}/linux"
   install -m 0644 ${initrd} "$out/esp/${payloadDirectory}/initrd"
   install -m 0644 ${deviceTree} "$out/esp/${payloadDirectory}/sm8550-xiaomi-sheng.dtb"
 
