@@ -27,6 +27,11 @@ Mobile NixOS boot 镜像（SHA-256
 `def3f8d2d3219d64e660f1c848d59e13371ab6102596dd8832ac5b65c7370160`）刷回 `boot_b`。设备重新进入内核
 `7.1.8`，且 `sheng-mark-boot-successful.service` 将 B 槽标记成功。
 
+同一基线的只读 fastboot 探针也已完成实机验证。它启动后由主机返回
+`version: 0.4` 与 `product: xiaomi-sheng`，证明 U-Boot 的 fastboot 协议可用。探针禁用
+`CONFIG_FASTBOOT_FLASH`，不能写任何分区；同时它拒绝 `fastboot reboot bootloader`，因此恢复时必须手动进入
+Android ABL fastboot，再刷回已知可启动的 `boot_b` 镜像。
+
 ## 当前基线
 
 `shengUbootAndroidBootimg` 固定官方 U-Boot `v2026.10-rc5` 的带签名标签提交
