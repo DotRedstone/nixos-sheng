@@ -30,7 +30,7 @@
       pkgs.coreutils
       pkgs.dosfstools
       pkgs.e2fsprogs
-      pkgs.util-linux
+      pkgs.util-linuxMinimal
     ];
   };
 
