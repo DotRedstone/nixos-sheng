@@ -1,6 +1,6 @@
 # Sheng 的 U-Boot / EFI 实验
 
-> 状态：实验性。本仓库构建的完整 Sheng U-Boot 基线已在 `boot_b` 实机进入 U-Boot USB gadget；它不是 release 镜像。
+> 状态：实验性。本仓库构建的完整 Sheng U-Boot 基线已从独立 EFI ESP 实机引导 NixOS；它不是 release 镜像。
 
 ## 已确认的启动边界
 
@@ -31,6 +31,29 @@ Mobile NixOS boot 镜像（SHA-256
 `version: 0.4` 与 `product: xiaomi-sheng`，证明 U-Boot 的 fastboot 协议可用。探针禁用
 `CONFIG_FASTBOOT_FLASH`，不能写任何分区；同时它拒绝 `fastboot reboot bootloader`，因此恢复时必须手动进入
 Android ABL fastboot，再刷回已知可启动的 `boot_b` 镜像。
+
+## EFI 存储启动实测
+
+2026-10-11 已完成第一次存储启动验证。`linux-boot` ESP 中的载荷包含标准
+`EFI/BOOT/BOOTAA64.EFI`、systemd-boot Type #1 菜单、未压缩的 EFI-stub `Image`、initrd 与 Sheng DTB。
+载荷构造在原生 ARM CI 中通过 AA64 PE/COFF、FAT32 文件布局和读回验证；随后又从当前已验证的稳定
+`boot_b` 提取同一内核、initrd 与 DTB，在主机独立完成 FAT32 读回，并在设备 ESP 上逐文件 SHA-256 复核。
+
+使用 SHA-256 为 `ace4caa74df60600ce9f799ac260743030999a24eca3b8e0bc4d077580167231` 的实验 U-Boot
+`boot_b` 后，设备进入 NixOS stage-2。内核日志确认：
+
+```text
+efi: EFI v2.11 by Das U-Boot
+Kernel command line: initrd=\EFI\NixOS\sheng-7.1.8\initrd ...
+fb0: EFI VGA frame buffer device
+```
+
+根目录继续由 `/dev/disk/by-partlabel/linux` 挂载为 ext4，`/sys/firmware/efi` 存在，ESP GPT 与文件
+清单均通过校验，`systemctl --failed` 为空，`sheng-mark-boot-successful.service` 为 active。随后普通
+`systemctl reboot` 也重新回到 EFI runtime 和 stage-2；重新启动后的正常重启标记已被消费。
+
+这证明目标链 `ABL → U-Boot → systemd-boot → EFI Image → stage-1 → stage-2` 可用。`boot_a`、
+Android `userdata`、`super`、基带与其他固件分区没有写入。
 
 ## 当前基线
 
@@ -105,12 +128,9 @@ stage-1 路径负责；在 U-Boot 正常启动、EFI 存储、热重启、恢复
 
 ## 下一阶段
 
-U-Boot 已能获得 USB gadget，但尚未证明能从存储启动 EFI。独立的 `linux-boot` FAT32 ESP 已在 RAM recovery
-中创建并验收：它只从 NixOS `linux` 根分区末尾释放 1 GiB，稳定系统已正常进入 stage-2，且 ESP 自动挂载到
-`/boot`。`uefi_a`、`uefi_b`、`rescue`、`userdata` 与 Android 固件分区仍不可复用，也没有被写入。
+独立的 `linux-boot` FAT32 ESP 已在 RAM recovery 中创建并验收，U-Boot 也已从其引导 EFI 载荷。
+`uefi_a`、`uefi_b`、`rescue`、`userdata` 与 Android 固件分区仍不可复用，也没有被写入。
 
-下一步是先构造并离线校验一个标准 EFI 载荷，再由 U-Boot 读取
-`EFI/BOOT/BOOTAA64.EFI`。载荷必须使用 systemd-boot 的 Boot Loader Specification 菜单，菜单项明确包含
-Sheng 的 EFI-stub 内核、initrd 和 DTB；首次实机测试仍只临时替换 `boot_b`。在 EFI 内核进入 stage-1、根分区
-挂载、stage-2、热重启、恢复键和关机充电分别验证前，实验分支不得合并或发布。实际分区边界和验收记录见
-[存储迁移预案](uboot-efi-storage-plan_zh.md)。
+下一步是让 NixOS generation 更新以受控方式更新 ESP 中的 Type #1 条目，并单独验证 systemd-boot 菜单交互、
+恢复键、关机充电和从 ABL fastboot 回退稳定 `boot_b`。在这些路径分别验证前，实验分支不得合并或发布。
+实际分区边界和验收记录见 [存储迁移预案](uboot-efi-storage-plan_zh.md)。
