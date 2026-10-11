@@ -1,6 +1,26 @@
 # Sheng U-Boot / EFI 存储迁移预案
 
-> 状态：只读审计完成，尚未获准执行。本文不是刷机教程，也不能直接用于修改 GPT。
+> 状态：用户已授权该实验；GPT 写入仍被独立 RAM recovery、备份和离线验收门槛阻止。本文不是刷机教程，也不能直接用于修改 GPT。
+
+## 目标启动架构
+
+```mermaid
+flowchart TB
+  abl[Android ABL] --> bootb[boot_b: 实验性 U-Boot]
+  bootb --> scan[只读扫描外层 UFS GPT]
+  scan --> esp[linux-boot: 新建 1 GiB FAT ESP]
+  esp --> sdboot[EFI/BOOT/BOOTAA64.EFI<br/>systemd-boot]
+  sdboot --> efiKernel[EFI Linux Image + initrd + Sheng DTB]
+  efiKernel --> root[linux: ext4 NixOS root]
+  root --> stage2[NixOS stage-2 与代际更新]
+
+  abl -. 保持原样 .-> boota[boot_a: Android 回退路径]
+  android[Android userdata / super / 基带与射频固件 / rescue] -. 受保护，不读写 .-> abl
+  recovery[临时 RAM recovery] -. 仅离线维护 linux 与 linux-boot .-> root
+```
+
+`boot_b` 只在 U-Boot 实验阶段临时替换；失败时恢复已知可启动的 Mobile NixOS `boot_b` 即可回到现有启动链。
+`boot_a` 和所有 Android 固件分区始终不在实验写入集内。
 
 ## 已测得的现有布局
 
@@ -31,6 +51,19 @@
 U-Boot 按 GPT 名 `linux-boot` 查找该分区，并只读取
 `EFI/BOOT/BOOTAA64.EFI`。systemd-boot 及每个 NixOS generation 的内核、initrd、DTB
 将放在该 FAT 分区；它不应包含 rootfs、Android 镜像或固件分区内容。
+
+## Android 保护边界
+
+实际 recovery 脚本在任何写入前必须同时断言：
+
+- 目标磁盘是 262,173,360,128 字节、4 KiB 扇区的 UFS `sda`；
+- `linux` 的 GPT 名、起始 LBA `43,628,032`、原始大小 `20,379,131`、UUID
+  `22c64e07-7a6d-4614-bbd3-a01fc1dcd4ec` 与 ext4 UUID 都精确匹配；
+- `userdata`、`super`、`rescue`、`uefi_a`/`uefi_b`、modem、Bluetooth、`persist` 及所有 A/B
+  固件分区不在命令参数中；
+- `linux` 和新 ESP 均未被挂载，且 GPT 校验、ext4 只读检查、主机备份均成功。
+
+任一条件不匹配即退出，不尝试“猜测”分区名、UFS 磁盘字母或扇区位置。
 
 ## 执行前置条件
 
