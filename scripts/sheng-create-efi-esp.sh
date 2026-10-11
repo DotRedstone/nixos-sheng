@@ -23,7 +23,9 @@ expected_linux_size=20379131
 new_linux_size=20116987
 esp_start=63745019
 esp_size=262144
-esp_type=C12A7328-F81F-11D2-BA4B-00A0C93EC93
+# util-linux sfdisk on Sheng accepts its GPT EFI System alias, "U", when
+# appending a partition.  It writes the standard C12A7328-… EFI GUID.
+esp_type=U
 
 die() {
   printf '%s\n' "error: $*" >&2
