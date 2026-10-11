@@ -105,8 +105,12 @@ stage-1 路径负责；在 U-Boot 正常启动、EFI 存储、热重启、恢复
 
 ## 下一阶段
 
-U-Boot 已能获得 USB gadget，但尚未证明能从存储启动 EFI。当前设备没有可直接使用的 FAT ESP：`uefi_a` 和
-`uefi_b` 是设备固件分区，`rescue` 是正在使用的 Android 恢复日志 ext4 分区，均不可复用。下一步是规划独立
-FAT ESP（例如 `linux-boot`）并由 U-Boot 加载 `EFI/BOOT/BOOTAA64.EFI`。这会涉及存储布局，必须在独立分支、
-完整备份和明确授权后进行；不得把现有 `linux` 根分区或 Android `userdata` 直接复用为 ESP。当前的只读迁移预案见
+U-Boot 已能获得 USB gadget，但尚未证明能从存储启动 EFI。独立的 `linux-boot` FAT32 ESP 已在 RAM recovery
+中创建并验收：它只从 NixOS `linux` 根分区末尾释放 1 GiB，稳定系统已正常进入 stage-2，且 ESP 自动挂载到
+`/boot`。`uefi_a`、`uefi_b`、`rescue`、`userdata` 与 Android 固件分区仍不可复用，也没有被写入。
+
+下一步是先构造并离线校验一个标准 EFI 载荷，再由 U-Boot 读取
+`EFI/BOOT/BOOTAA64.EFI`。载荷必须使用 systemd-boot 的 Boot Loader Specification 菜单，菜单项明确包含
+Sheng 的 EFI-stub 内核、initrd 和 DTB；首次实机测试仍只临时替换 `boot_b`。在 EFI 内核进入 stage-1、根分区
+挂载、stage-2、热重启、恢复键和关机充电分别验证前，实验分支不得合并或发布。实际分区边界和验收记录见
 [存储迁移预案](uboot-efi-storage-plan_zh.md)。
