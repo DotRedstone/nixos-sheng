@@ -234,6 +234,9 @@
         includeHomeManager = true;
         stage2Only = true;
       };
+      mobileUbootRecoveryEval = mobileEvalFor {
+        extraModules = [ ./modules/sheng-uboot-recovery.nix ];
+      };
     in
     {
       # Reuse the exact Mobile NixOS evaluations used by the flashable images.
@@ -293,6 +296,10 @@
         mobileFastbootImages = mobileEval.outputs.android.android-fastboot-images;
         mobileRootfsImage = mobileEval.outputs.generatedFilesystems.rootfs;
         mobileRootfsImageGnome = mobileGnomeEval.outputs.generatedFilesystems.rootfs;
+        # RAM-only storage recovery. It is an Android boot image for boot_b
+        # testing, not a rootfs or a release artifact.
+        shengUbootStorageRecoveryBootimg =
+          mobileUbootRecoveryEval.outputs.recovery.mobile.outputs.android.android-bootimg;
         # Compatibility alias for older workflow names. This is the Mobile NixOS
         # generated rootfs, not a separate hand-built filesystem.
         fullRootfsImage = mobileEval.outputs.generatedFilesystems.rootfs;
