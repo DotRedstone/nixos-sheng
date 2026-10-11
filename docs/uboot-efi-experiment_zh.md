@@ -4,8 +4,8 @@
 
 ## 已确认的启动边界
 
-稳定系统仍使用：`ABL -> Android boot_b -> Mobile NixOS stage-1 -> stage-2`。
-长期目标为：`ABL -> U-Boot -> systemd-boot -> NixOS`，由标准 EFI 启动项管理系统代际。
+当前验证中的 B 槽使用：`ABL -> U-Boot -> systemd-boot -> EFI Image -> Mobile NixOS stage-1 -> stage-2`。
+稳定回退路径仍是：`ABL -> Android boot_b -> Mobile NixOS stage-1 -> stage-2`。EFI 的 Type #1 条目管理固定的内核、DTB 与 stage-1；普通 NixOS stage-2 代际继续由现有 generation 菜单管理。
 
 本次实机诊断得到两条重要结论：
 
@@ -24,8 +24,8 @@ Host node: /dev/ttyACM0
 本次实测的本仓库镜像 SHA-256 为
 `ace4caa74df60600ce9f799ac260743030999a24eca3b8e0bc4d077580167231`；试验后已将已知可启动的
 Mobile NixOS boot 镜像（SHA-256
-`def3f8d2d3219d64e660f1c848d59e13371ab6102596dd8832ac5b65c7370160`）刷回 `boot_b`。设备重新进入内核
-`7.1.8`，且 `sheng-mark-boot-successful.service` 将 B 槽标记成功。
+`def3f8d2d3219d64e660f1c848d59e13371ab6102596dd8832ac5b65c7370160`）保留为 ABL fastboot 回退物。当前 B 槽仍为
+已验证的 U-Boot；设备运行内核 `7.1.8`，且 `sheng-mark-boot-successful.service` 已将 B 槽标记成功。
 
 同一基线的只读 fastboot 探针也已完成实机验证。它启动后由主机返回
 `version: 0.4` 与 `product: xiaomi-sheng`，证明 U-Boot 的 fastboot 协议可用。探针禁用
@@ -126,11 +126,36 @@ fastboot reboot
 stage-1 路径负责；在 U-Boot 正常启动、EFI 存储、热重启、恢复键、回退和关机充电均分别验证前，
 不得发布或合并此实验分支。
 
-## 下一阶段
+## 已接入的 EFI 载荷更新路径
 
-独立的 `linux-boot` FAT32 ESP 已在 RAM recovery 中创建并验收，U-Boot 也已从其引导 EFI 载荷。
-`uefi_a`、`uefi_b`、`rescue`、`userdata` 与 Android 固件分区仍不可复用，也没有被写入。
+`services.sheng-uboot-efi` 现在向 rootfs 安装 `sheng-efi` 工具和
+`sheng-efi-mark-successful.service`。它与普通 `nixos-rebuild` 明确隔离：
+后者只切换 stage-2 generation，绝不改变 ESP 上的内核、DTB、stage-1 initrd 或默认 EFI 条目。
 
-下一步是让 NixOS generation 更新以受控方式更新 ESP 中的 Type #1 条目，并单独验证 systemd-boot 菜单交互、
-恢复键、关机充电和从 ABL fastboot 回退稳定 `boot_b`。在这些路径分别验证前，实验分支不得合并或发布。
+构建新的、不可变的 ESP 文件树后，使用 root 身份显式安装：
+
+```bash
+nix build ./nixos#shengUbootEfiEsp -o result/sheng-efi-esp
+sudo sheng-efi install "$PWD/result/sheng-efi-esp/esp"
+sudo sheng-efi status
+```
+
+安装器只接受含完整 `manifest.sha256` 的 `shengUbootEfiEsp/esp` 树，并确认 `/boot` 是
+PARTLABEL 为 `linux-boot` 的 FAT ESP。它先把新的版本化目录
+`EFI/NixOS/sheng-<kernel-version>-<payload-hash>/`、BLS 条目和 systemd-boot 写入临时目录，再逐文件校验；
+新载荷全部存在后才用重命名切换 `loader.conf` 的默认项。旧 BLS 条目和旧内核/initrd/DTB 不会被删除，
+旧 `loader.conf` 会保存在 `/var/lib/sheng-efi/previous-loader.conf`。
+
+如果还没有重启，或者在仍可进入 stage-2 时决定撤销默认项：
+
+```bash
+sudo sheng-efi rollback
+sudo sheng-efi status
+```
+
+成功到达 `multi-user.target` 后，`sheng-efi-mark-successful.service` 会记录当时配置的 EFI 默认项和时间。
+它是运行时健康记录，不能单独证明用户没有从 systemd-boot 菜单手动选择旧条目；它不会自动清理旧载荷，也不会修改 Android 分区。
+
+`uefi_a`、`uefi_b`、`rescue`、`userdata` 与 Android 固件分区仍不可复用，也没有被写入。接下来仍需单独验证
+systemd-boot 菜单交互、恢复键、关机充电和从 ABL fastboot 回退稳定 `boot_b`；在这些路径分别验证前，实验分支不得合并或发布。
 实际分区边界和验收记录见 [存储迁移预案](uboot-efi-storage-plan_zh.md)。

@@ -21,7 +21,12 @@ let
   efiBootManager = "${systemd}/lib/systemd/boot/efi/systemd-bootaa64.efi";
   kernelCompressedImage = "${kernel}/Image.gz";
   deviceTree = "${kernel}/dtbs/qcom/sm8550-xiaomi-sheng.dtb";
-  payloadDirectory = "EFI/NixOS/sheng-${version}";
+  # A kernel release alone is not a unique EFI payload: a stage-1 or command
+  # line change can keep the same kernel.modDirVersion.  Retain a short,
+  # reproducible input identity so an ESP installer can keep the old payload
+  # and safely add a new one instead of overwriting it.
+  payloadId = "${version}-${builtins.substring 0 16 (builtins.hashString "sha256" "${kernelCompressedImage}:${initrd}:${commandLine}")}";
+  payloadDirectory = "EFI/NixOS/sheng-${payloadId}";
   efiPeCheck = buildPackages.writeText "sheng-check-aa64-pe.py" (
     builtins.concatStringsSep "\n" [
       "import pathlib"
@@ -71,15 +76,15 @@ runCommand "sheng-uboot-efi-esp-${version}" {
   install -m 0644 ${deviceTree} "$out/esp/${payloadDirectory}/sm8550-xiaomi-sheng.dtb"
 
   cat > "$out/esp/loader/loader.conf" <<'EOF'
-  default nixos-sheng-${version}.conf
+  default nixos-sheng-${payloadId}.conf
   timeout 3
   console-mode keep
   editor no
   EOF
 
-  cat > "$out/esp/loader/entries/nixos-sheng-${version}.conf" <<'EOF'
-  title NixOS Sheng (${version})
-  version ${version}
+  cat > "$out/esp/loader/entries/nixos-sheng-${payloadId}.conf" <<'EOF'
+  title NixOS Sheng (${payloadId})
+  version ${payloadId}
   sort-key nixos-sheng
   architecture aa64
   options ${commandLine}
@@ -114,12 +119,12 @@ runCommand "sheng-uboot-efi-esp-${version}" {
   mcopy -i "$fat_image" "$out/esp/${payloadDirectory}/sm8550-xiaomi-sheng.dtb" \
     ::/${payloadDirectory}/sm8550-xiaomi-sheng.dtb
   mcopy -i "$fat_image" "$out/esp/loader/loader.conf" ::/loader/loader.conf
-  mcopy -i "$fat_image" "$out/esp/loader/entries/nixos-sheng-${version}.conf" \
-    ::/loader/entries/nixos-sheng-${version}.conf
+  mcopy -i "$fat_image" "$out/esp/loader/entries/nixos-sheng-${payloadId}.conf" \
+    ::/loader/entries/nixos-sheng-${payloadId}.conf
   mcopy -i "$fat_image" "$out/esp/loader/entries.srel" ::/loader/entries.srel
   mcopy -i "$fat_image" "$out/esp/manifest.sha256" ::/manifest.sha256
   mdir -i "$fat_image" ::/EFI/BOOT/BOOTAA64.EFI
-  mdir -i "$fat_image" ::/loader/entries/nixos-sheng-${version}.conf
-  mtype -i "$fat_image" ::/loader/entries/nixos-sheng-${version}.conf \
-    | cmp - "$out/esp/loader/entries/nixos-sheng-${version}.conf"
+  mdir -i "$fat_image" ::/loader/entries/nixos-sheng-${payloadId}.conf
+  mtype -i "$fat_image" ::/loader/entries/nixos-sheng-${payloadId}.conf \
+    | cmp - "$out/esp/loader/entries/nixos-sheng-${payloadId}.conf"
 ''
