@@ -8,6 +8,13 @@ name: Build Sheng U-Boot Storage Recovery
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - exp/uboot-efi
+    paths:
+      - .github/workflows/sheng-uboot-storage-recovery.yml
+      - nixos/flake.nix
+      - nixos/modules/sheng-uboot-recovery.nix
 
 permissions:
   contents: read
