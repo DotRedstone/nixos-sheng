@@ -1,0 +1,47 @@
+name: Build Sheng U-Boot EFI payload
+
+on:
+  push:
+    branches:
+      - exp/uboot-efi
+    paths:
+      - nixos/flake.nix
+      - nixos/packages/sheng-uboot-efi-esp.nix
+      - nixos/hardware/mobile.nix
+      - nixos/hardware/xiaomi-sheng/**
+      - .github/workflows/sheng-uboot-efi-payload.yml
+  pull_request:
+    paths:
+      - nixos/flake.nix
+      - nixos/packages/sheng-uboot-efi-esp.nix
+      - nixos/hardware/mobile.nix
+      - nixos/hardware/xiaomi-sheng/**
+      - .github/workflows/sheng-uboot-efi-payload.yml
+  workflow_dispatch:
+
+jobs:
+  build-efi-payload:
+    name: Build and validate EFI payload
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: DeterminateSystems/magic-nix-cache-action@v13
+      - name: Build and validate immutable ESP tree
+        run: |
+          nix build ./nixos#shengUbootEfiEsp \
+            --print-build-logs \
+            --out-link out/sheng-uboot-efi-esp
+          test -s out/sheng-uboot-efi-esp/esp/EFI/BOOT/BOOTAA64.EFI
+          test -s out/sheng-uboot-efi-esp/esp/loader/entries/nixos-sheng-7.1.8.conf
+          sha256sum out/sheng-uboot-efi-esp/esp/manifest.sha256 > out/sheng-uboot-efi-esp/manifest.sha256
+      - name: Upload validated EFI payload
+        uses: actions/upload-artifact@v4
+        with:
+          name: sheng-uboot-efi-esp
+          path: out/sheng-uboot-efi-esp
+          if-no-files-found: error
