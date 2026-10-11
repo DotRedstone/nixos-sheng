@@ -47,6 +47,10 @@ let
 
       check_esp() {
         local source fstype partlabel
+        # /boot is intentionally a systemd automount on the Mobile NixOS
+        # rootfs.  Resolve the directory first; otherwise findmnt sees only
+        # the autofs placeholder and rejects the healthy FAT filesystem.
+        ( cd "$esp"; : )
         source="$(findmnt -n -o SOURCE --target "$esp" 2>/dev/null || true)"
         fstype="$(findmnt -n -o FSTYPE --target "$esp" 2>/dev/null || true)"
         if [ -z "$source" ] || [ "$fstype" != vfat ]; then
