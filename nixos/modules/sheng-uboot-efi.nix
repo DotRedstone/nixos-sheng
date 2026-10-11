@@ -46,14 +46,16 @@ let
       state=${lib.escapeShellArg cfg.statePath}
 
       check_esp() {
-        local source fstype partlabel
+        local source partlabel
         # /boot is intentionally a systemd automount on the Mobile NixOS
         # rootfs.  Read its directory before findmnt; merely resolving its
         # path leaves the autofs placeholder in place.
         ls -1 "$esp" >/dev/null
-        source="$(findmnt -n -o SOURCE --target "$esp" 2>/dev/null || true)"
-        fstype="$(findmnt -n -o FSTYPE --target "$esp" 2>/dev/null || true)"
-        if [ -z "$source" ] || [ "$fstype" != vfat ]; then
+        # The automount itself remains visible too, so select the backing
+        # vfat mount rather than treating findmnt's two rows as one value.
+        source="$(findmnt -rn -o SOURCE,FSTYPE --target "$esp" 2>/dev/null \
+          | awk '$2 == "vfat" { print $1; exit }')"
+        if [ -z "$source" ]; then
           echo "$esp is not a mounted FAT ESP." >&2
           exit 1
         fi
