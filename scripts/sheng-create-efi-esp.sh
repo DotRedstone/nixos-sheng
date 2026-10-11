@@ -38,6 +38,12 @@ assert_eq() {
   [ "$1" = "$2" ] || die "$3 (expected $2, got $1)"
 }
 
+blkid_field() {
+  field=$1
+  device=$2
+  blkid "$device" | sed -n "s/.* ${field}=\"\\([^\"]*\\)\".*/\\1/p"
+}
+
 [ "${1:-}" = --apply ] && [ "$#" -eq 1 ] || die "usage: $0 --apply"
 
 for command in awk blkid blockdev cmp e2fsck grep id mkfs.fat partx resize2fs sed seq sfdisk sha256sum sleep sync tr; do
@@ -55,7 +61,7 @@ fi
 
 assert_eq "$(blockdev --getsize64 "$disk")" "$expected_disk_bytes" "unexpected disk size"
 assert_eq "$(blockdev --getss "$disk")" "$expected_sector_size" "unexpected logical sector size"
-assert_eq "$(blkid -o value -s UUID "$linux_partition")" "$expected_linux_fs_uuid" "unexpected Linux filesystem UUID"
+assert_eq "$(blkid_field UUID "$linux_partition")" "$expected_linux_fs_uuid" "unexpected Linux filesystem UUID"
 
 sfdisk --verify "$disk"
 sfdisk --dump "$disk" > "$backup"
@@ -107,8 +113,8 @@ done
 [ -b "$esp_partition" ] || die "kernel did not expose $esp_partition"
 
 mkfs.fat -F 32 -n linux-boot "$esp_partition"
-assert_eq "$(blkid -o value -s TYPE "$esp_partition")" vfat "EFI partition format failed"
-assert_eq "$(blkid -o value -s LABEL "$esp_partition")" linux-boot "EFI partition label failed"
+assert_eq "$(blkid_field TYPE "$esp_partition")" vfat "EFI partition format failed"
+assert_eq "$(blkid_field LABEL "$esp_partition")" linux-boot "EFI partition label failed"
 
 sfdisk --verify "$disk"
 sync
