@@ -22,15 +22,31 @@ let
   kernelImage = "${kernel}/Image";
   deviceTree = "${kernel}/dtbs/qcom/sm8550-xiaomi-sheng.dtb";
   payloadDirectory = "EFI/NixOS/sheng-${version}";
+  efiPeCheck = buildPackages.writeText "sheng-check-aa64-pe.py" (
+    builtins.concatStringsSep "\n" [
+      "import pathlib"
+      "import struct"
+      "import sys"
+      ""
+      "for path_string in sys.argv[1:]:"
+      "    path = pathlib.Path(path_string)"
+      "    data = path.read_bytes()"
+      "    assert data[:2] == b\"MZ\", f\"{path}: missing DOS/PE signature\""
+      "    pe_offset, = struct.unpack_from(\"<I\", data, 0x3C)"
+      "    assert data[pe_offset : pe_offset + 4] == b\"PE\\\\0\\\\0\", f\"{path}: missing PE header\""
+      "    machine, = struct.unpack_from(\"<H\", data, pe_offset + 4)"
+      "    assert machine == 0xAA64, f\"{path}: expected AA64 PE machine, got {machine:#x}\""
+      ""
+    ]
+  );
 in
 runCommand "sheng-uboot-efi-esp-${version}" {
   nativeBuildInputs = [
     buildPackages.coreutils
     buildPackages.dosfstools
-    buildPackages.file
     buildPackages.findutils
-    buildPackages.gnugrep
     buildPackages.mtools
+    buildPackages.python3
   ];
 } ''
   set -euo pipefail
@@ -74,12 +90,11 @@ runCommand "sheng-uboot-efi-esp-${version}" {
     find EFI loader -type f -print0 | sort -z | xargs -0 sha256sum > manifest.sha256
   )
 
-  # Both executables must be AA64 PE/COFF files: systemd-boot loads the kernel
-  # through its EFI stub, while U-Boot invokes only the fallback boot manager.
-  ${buildPackages.file}/bin/file "$out/esp/EFI/BOOT/BOOTAA64.EFI" \
-    | ${buildPackages.gnugrep}/bin/grep -F 'Aarch64'
-  ${buildPackages.file}/bin/file "$out/esp/${payloadDirectory}/linux" \
-    | ${buildPackages.gnugrep}/bin/grep -F 'Aarch64'
+  # Both executables must be AA64 PE/COFF files. Do not parse `file(1)` text:
+  # it describes an EFI-stub Linux Image differently across file versions.
+  ${buildPackages.python3}/bin/python3 ${efiPeCheck} \
+    "$out/esp/EFI/BOOT/BOOTAA64.EFI" \
+    "$out/esp/${payloadDirectory}/linux"
 
   # Exercise the exact FAT directory and long-name layout without producing a
   # 1 GiB store object. The target partition is already a separately verified
