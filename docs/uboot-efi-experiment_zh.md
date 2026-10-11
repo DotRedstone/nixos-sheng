@@ -7,12 +7,12 @@
 当前验证中的 B 槽使用：`ABL -> U-Boot -> systemd-boot -> EFI Image -> Mobile NixOS stage-1 -> stage-2`。
 稳定回退路径仍是：`ABL -> Android boot_b -> Mobile NixOS stage-1 -> stage-2`。EFI 的 Type #1 条目管理固定的内核、DTB 与 stage-1；普通 NixOS stage-2 代际继续由现有 generation 菜单管理。
 
-本次实机诊断得到两条重要结论：
+2026-10-11 的实机复验确认，`fastboot boot` 可以作为 RAM-only 验证通道：当前候选在不写入
+`boot_b` 的情况下进入 U-Boot、EFI runtime、stage-1 与 stage-2，且 ADB/USB gadget 正常枚举。持久
+启动验收仍须在备份后刷入 `boot_b` 并进行冷启动、回退和关机充电测试。`boot_a` 原本是 Android header v4，
+而 NixOS/U-Boot 使用 Android header v0；不要将该 v0 镜像刷入 `boot_a`。
 
-- `fastboot boot` 不是这台设备的有效验证通道：连已知可启动的 Mobile NixOS `boot_b` 镜像也会回到 ABL fastboot，不能据此判断 U-Boot 是否运行；
-- `boot_a` 原本是 Android header v4，而 NixOS/U-Boot 使用 Android header v0。把 v0 U-Boot 镜像放入 `boot_a` 会回到 ABL fastboot；这不代表 U-Boot 失败。
-
-有效的验证路径是：备份两个 boot 槽，只临时替换 `boot_b`，设置 B 为活动槽后冷启动，并观察 U-Boot 输出。本仓库的镜像已在该路径上枚举为：
+本仓库的镜像在 U-Boot 阶段枚举为：
 
 ```text
 USB: 18d1:4ee0
@@ -24,13 +24,25 @@ Host node: /dev/ttyACM0
 本次实测的本仓库镜像 SHA-256 为
 `ace4caa74df60600ce9f799ac260743030999a24eca3b8e0bc4d077580167231`；试验后已将已知可启动的
 Mobile NixOS boot 镜像（SHA-256
-`def3f8d2d3219d64e660f1c848d59e13371ab6102596dd8832ac5b65c7370160`）保留为 ABL fastboot 回退物。当前 B 槽仍为
-已验证的 U-Boot；设备运行内核 `7.1.8`，且 `sheng-mark-boot-successful.service` 已将 B 槽标记成功。
+`def3f8d2d3219d64e660f1c848d59e13371ab6102596dd8832ac5b65c7370160`）保留为 ABL fastboot 回退物。
 
 同一基线的只读 fastboot 探针也已完成实机验证。它启动后由主机返回
 `version: 0.4` 与 `product: xiaomi-sheng`，证明 U-Boot 的 fastboot 协议可用。探针禁用
 `CONFIG_FASTBOOT_FLASH`，不能写任何分区；同时它拒绝 `fastboot reboot bootloader`，因此恢复时必须手动进入
 Android ABL fastboot，再刷回已知可启动的 `boot_b` 镜像。
+
+## 从 Linux 进入 ABL fastboot
+
+内核的 `nvmem-reboot-mode` 已声明 `bootloader` 重启原因，但普通 `reboot`、`systemctl reboot` 和
+`adb reboot bootloader` 不会可靠传递该原因。rootfs 提供下列命令，它通过 Linux
+`RESTART2("bootloader")` 直接触发 Qualcomm reboot-mode 驱动：
+
+```bash
+sudo sheng-reboot-bootloader
+```
+
+该命令立即重启到 ABL fastboot，不会写入 `boot_a`、`boot_b`、`linux`、GPT、`userdata`、基带或其他
+Android 固件分区。实机已确认执行后主机直接枚举 fastboot 设备。
 
 ## EFI 存储启动实测
 
