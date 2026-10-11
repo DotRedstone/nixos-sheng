@@ -33,7 +33,7 @@ let
       "    data = path.read_bytes()"
       "    assert data[:2] == b\"MZ\", f\"{path}: missing DOS/PE signature\""
       "    pe_offset, = struct.unpack_from(\"<I\", data, 0x3C)"
-      "    assert data[pe_offset : pe_offset + 4] == b\"PE\\\\0\\\\0\", f\"{path}: missing PE header\""
+      "    assert data[pe_offset : pe_offset + 4] == b\"PE\\0\\0\", f\"{path}: missing PE header\""
       "    machine, = struct.unpack_from(\"<H\", data, pe_offset + 4)"
       "    assert machine == 0xAA64, f\"{path}: expected AA64 PE machine, got {machine:#x}\""
       ""
