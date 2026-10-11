@@ -38,10 +38,12 @@ jobs:
             --out-link out/sheng-uboot-efi-esp
           test -s out/sheng-uboot-efi-esp/esp/EFI/BOOT/BOOTAA64.EFI
           test -s out/sheng-uboot-efi-esp/esp/loader/entries/nixos-sheng-7.1.8.conf
-          sha256sum out/sheng-uboot-efi-esp/esp/manifest.sha256 > out/sheng-uboot-efi-esp/manifest.sha256
+          sha256sum out/sheng-uboot-efi-esp/esp/manifest.sha256 > out/sheng-uboot-efi-esp.manifest.sha256
       - name: Upload validated EFI payload
         uses: actions/upload-artifact@v4
         with:
           name: sheng-uboot-efi-esp
-          path: out/sheng-uboot-efi-esp
+          path: |
+            out/sheng-uboot-efi-esp
+            out/sheng-uboot-efi-esp.manifest.sha256
           if-no-files-found: error
