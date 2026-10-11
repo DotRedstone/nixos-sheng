@@ -114,6 +114,14 @@ for attempt in $(seq 1 10); do
 done
 [ -b "$esp_partition" ] || die "kernel did not expose $esp_partition"
 
+after_append=/run/sheng-sda-gpt-after-append.sfdisk
+sfdisk --dump "$disk" > "$after_append"
+esp_line=$(grep '^/dev/sda31 :' "$after_append" | tr -d ' ')
+case "$esp_line" in
+  *"start=$esp_start"*"size=$esp_size"*'type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B'*'name="linux-boot"'*) ;;
+  *) die "EFI partition was not created as expected" ;;
+esac
+
 mkfs.fat -F 32 -n linux-boot "$esp_partition"
 assert_eq "$(blkid_field TYPE "$esp_partition")" vfat "EFI partition format failed"
 assert_eq "$(blkid_field LABEL "$esp_partition")" linux-boot "EFI partition label failed"
