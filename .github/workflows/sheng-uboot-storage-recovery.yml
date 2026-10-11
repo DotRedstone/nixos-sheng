@@ -44,7 +44,10 @@ jobs:
             build ./nixos#shengUbootStorageRecoveryBootimg \
             --out-link out/sheng-u-boot-storage-recovery
           test -f out/sheng-u-boot-storage-recovery
-          sha256sum out/sheng-u-boot-storage-recovery > out/sha256sums.txt
+          (
+            cd out
+            sha256sum sheng-u-boot-storage-recovery > sha256sums.txt
+          )
 
       - name: Upload recovery image
         uses: actions/upload-artifact@v7
