@@ -108,4 +108,5 @@ stage-1 路径负责；在 U-Boot 正常启动、EFI 存储、热重启、恢复
 U-Boot 已能获得 USB gadget，但尚未证明能从存储启动 EFI。当前设备没有可直接使用的 FAT ESP：`uefi_a` 和
 `uefi_b` 是设备固件分区，`rescue` 是正在使用的 Android 恢复日志 ext4 分区，均不可复用。下一步是规划独立
 FAT ESP（例如 `linux-boot`）并由 U-Boot 加载 `EFI/BOOT/BOOTAA64.EFI`。这会涉及存储布局，必须在独立分支、
-完整备份和明确授权后进行；不得复用现有 `linux` rootfs 分区或 Android `userdata`。
+完整备份和明确授权后进行；不得把现有 `linux` 根分区或 Android `userdata` 直接复用为 ESP。当前的只读迁移预案见
+[存储迁移预案](uboot-efi-storage-plan_zh.md)。
