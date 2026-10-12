@@ -30,7 +30,7 @@ Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的 Mobile NixOS 移植项目�
 - 可刷入 Android `boot_b` 的 boot 镜像，以及专用 `linux` 分区 rootfs 镜像
 - 面向私人 dotfiles 仓库的桌面无关公开 flake 构造器
 - 可选 GNOME 镜像，集成触屏键盘、自动旋转和盖板开合处理
-- 可通过音量键和电源键操作的 stage-1 NixOS 世代菜单
+- 稳定启动路径提供 stage-1 世代菜单；实验性 U-Boot/EFI 路径在引导器中选择世代
 - Wi-Fi、USB-C role/OTG、SSC 传感器、RAW 相机抓取与 MiPPS 快充认证已可用
 - NT36532E THP 触控/触控笔与 FPC1553 指纹已完成实机接入
 
@@ -98,9 +98,9 @@ linux 分区
 
 这里的 rootfs 镜像故意没有采用标准的 PC 风格根目录。对于 Mobile NixOS 生成的 rootfs 而言，顶层只有 `nix/store` 和 `nix-path-registration` 是正常的现象：stage-1 会使用这些注册数据来寻找 NixOS 系统闭包并运行其 `init`。
 
-### Stage-1 世代回滚菜单
+### 世代回滚菜单
 
-由于 Android 设备的 Bootloader 无法直接引导标准的 GRUB/systemd-boot 菜单，本项目在 `stage-1` initramfs 中专门开发了一套**纯文本 framebuffer 启动菜单**。
+已发布的 Android `boot_b` 路径无法直接显示标准引导器菜单，因此在 `stage-1` initramfs 中提供 framebuffer 世代菜单。
 
 每次启动都会短暂显示菜单，3 秒无操作后自动进入最新世代。也可以在系统中执行
 `sudo sheng-reboot-generation-menu` 主动重启到菜单：
@@ -113,6 +113,12 @@ linux 分区
 
 这使移动设备也能使用 NixOS 的原子升级与回滚。详细文档见
 [`docs/boot-generation-menu_zh.md`](docs/boot-generation-menu_zh.md)。
+
+实验性 U-Boot 路径使用独立的 `linux-boot` ESP，在 systemd-boot 中列出 NixOS 世代；
+stage-1 根据选中的 EFI 条目进入对应系统，不再显示上述 stage-1 菜单。第 97 与第 98 世代
+已经通过临时 U-Boot 引导完成实机切换，第 99 世代也通过持久 B 槽启动和热重启；
+关机充电与实体按键仍需单独验收。架构、验证与回退步骤见
+[`docs/uboot-efi-experiment_zh.md`](docs/uboot-efi-experiment_zh.md)。
 
 ## 仓库结构
 

@@ -36,7 +36,7 @@ stage-1 to stage-2 handoff; the charging loop is the actual rounded battery UI.
 - Flashable Android `boot_b` image plus dedicated `linux` rootfs image
 - Desktop-neutral public flake constructor for private dotfiles repositories
 - Optional GNOME image with touch keyboard, rotation, and cover handling
-- Stage-1 NixOS generation menu controlled by volume and power keys
+- Stage-1 generation menu on the stable boot path; experimental U-Boot/EFI generation selection
 - Android-style offline charging with a framebuffer battery UI and power-key controls
 - Working Wi-Fi, USB-C role/OTG, SSC sensors, RAW camera capture, and MiPPS
   fast-charging authentication
@@ -111,9 +111,9 @@ only `nix/store` and `nix-path-registration` at the top level is expected for
 the Mobile NixOS generated rootfs: stage-1 uses that registration data to find
 the NixOS system closure and then runs its `init`.
 
-### Stage-1 Boot Generation Menu
+### Boot Generation Menus
 
-Because standard Android bootloaders cannot render GRUB or systemd-boot menus, this project implements a **custom framebuffer text menu** directly inside the `stage-1` initramfs.
+The released Android `boot_b` path cannot render a standard bootloader menu, so its `stage-1` initramfs provides a framebuffer generation menu.
 
 The menu appears briefly on every boot and automatically enters the newest
 generation after three seconds without input. Run
@@ -128,6 +128,14 @@ generation after three seconds without input. Run
   spends a long time choosing a generation.
 
 See [`docs/boot-generation-menu.md`](docs/boot-generation-menu.md) for details.
+
+The experimental U-Boot path uses a dedicated `linux-boot` ESP and lists NixOS
+generations in systemd-boot. Stage-1 enters the selected EFI generation without
+showing the stage-1 menu. Temporary U-Boot boots have selected generations 97
+and 98 on the tablet; generation 99 has also passed persistent B-slot boot and
+warm reboot. Offline charging and physical menu keys need separate validation.
+See [`docs/uboot-efi-experiment_zh.md`](docs/uboot-efi-experiment_zh.md)
+for the architecture, checks, and rollback procedure.
 
 ## Repository Layout
 
