@@ -10,7 +10,15 @@ on:
       - nixos/modules/sheng-uboot-efi.nix
       - nixos/configuration.nix
       - nixos/hardware/mobile.nix
+      - nixos/modules/sheng-boot-animation.nix
+      - nixos/patches/stage-1-boot-animation.rb
+      - nixos/patches/stage-1-early-charge-guard.rb
       - nixos/patches/stage-1-headless-generation-menu.rb
+      - nixos/packages/sheng-boot-animation.nix
+      - nixos/packages/sheng-boot-animation.h
+      - nixos/packages/build-boot-animation.py
+      - nixos/packages/sheng-fb-painter.c
+      - nixos/packages/sheng-fb-painter.nix
       - nixos/scripts/sheng-efi-generations.sh
       - nixos/hardware/xiaomi-sheng/**
       - .github/workflows/sheng-uboot-efi-payload.yml
@@ -21,7 +29,15 @@ on:
       - nixos/modules/sheng-uboot-efi.nix
       - nixos/configuration.nix
       - nixos/hardware/mobile.nix
+      - nixos/modules/sheng-boot-animation.nix
+      - nixos/patches/stage-1-boot-animation.rb
+      - nixos/patches/stage-1-early-charge-guard.rb
       - nixos/patches/stage-1-headless-generation-menu.rb
+      - nixos/packages/sheng-boot-animation.nix
+      - nixos/packages/sheng-boot-animation.h
+      - nixos/packages/build-boot-animation.py
+      - nixos/packages/sheng-fb-painter.c
+      - nixos/packages/sheng-fb-painter.nix
       - nixos/scripts/sheng-efi-generations.sh
       - nixos/hardware/xiaomi-sheng/**
       - .github/workflows/sheng-uboot-efi-payload.yml
