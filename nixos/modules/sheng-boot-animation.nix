@@ -11,9 +11,11 @@ let
 in
 {
   # VT1 belongs to the display manager, VT2 to the boot UI. The kernel can
-  # append loglevel=6, so quiet alone is insufficient: fbcon only maps VT3-6.
+  # append loglevel=6, so quiet alone is insufficient: kernel logs use VT3.
+  # VT2 must also be mapped so fbcon activates DRM scanout before the native
+  # painter writes fb0; otherwise U-Boot EFI boots leave the panel black.
   mobile.boot.defaultConsole = "tty3";
-  boot.kernelParams = [ "quiet" "fbcon=vc:3-6" ];
+  boot.kernelParams = [ "quiet" "fbcon=vc:2-6" ];
 
   # Keep the full stage-1 bootlog and journal; this only changes presentation.
   systemd.settings.Manager.ShowStatus = false;
