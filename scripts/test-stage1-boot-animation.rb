@@ -47,6 +47,7 @@ Dir.mktmpdir("sheng-stage1-animation-") do |directory|
   splash = Tasks::Splash.new
   raise "Early splash lacks proc dependency" unless splash.dependencies.include?([:Mount, "/proc"])
   raise "Early splash lacks dev dependency" unless splash.dependencies.include?([:Mount, "/dev"])
+  raise "Early splash lacks sys dependency for EFI reason" unless splash.dependencies.include?([:Mount, "/sys"])
 
   splash.run
   raise "Charger boot animated before the charging target" unless System.spawns.empty?

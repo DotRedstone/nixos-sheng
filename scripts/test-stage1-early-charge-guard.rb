@@ -31,6 +31,25 @@ def assert(condition, message)
   raise message unless condition
 end
 
+Dir.mktmpdir do |directory|
+  variable = File.join(directory, "ShengBootReason")
+  ShengEarlyChargeGuard.define_singleton_method(:efi_boot_reason_path) { variable }
+  File.binwrite(variable, "\x06\x00\x00\x00bootinfo.pureason=0x800011\0")
+  assert(
+    ShengEarlyChargeGuard.boot_value("bootinfo.pureason") == "0x800011",
+    "EFI boot reason was not decoded after its efivarfs attributes"
+  )
+  assert(
+    ShengEarlyChargeGuard.charger_mode?(),
+    "EFI charger reason was not used by stage-1"
+  )
+  File.binwrite(variable, "\x06\x00\x00\x00bootinfo.pureason=0x800091\0")
+  assert(
+    !ShengEarlyChargeGuard.charger_mode?(),
+    "EFI power-key reason did not override USB charging"
+  )
+end
+
 assert(
   ShengEarlyChargeGuard.charger_power_on_reason?("0x800011"),
   "USB charger PON reason was not detected"

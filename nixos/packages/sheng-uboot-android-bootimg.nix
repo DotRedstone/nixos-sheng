@@ -46,6 +46,7 @@ let
       ../patches/u-boot/sheng-baseline/sheng/0001-sheng-boot-dts.patch
       ../patches/u-boot/sheng-baseline/sheng/0002-usb2-pipe-clock.patch
       ../patches/u-boot/sheng-baseline/sheng/0003-sheng-abl-framebuffer.patch
+      ../patches/u-boot/sheng-baseline/sheng/0004-efi-abl-boot-reason.patch
     ];
     filesToInstall = [
       "u-boot-nodtb.bin"
