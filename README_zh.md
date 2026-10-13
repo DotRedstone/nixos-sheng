@@ -117,7 +117,7 @@ linux 分区
 实验性 U-Boot 路径使用独立的 `linux-boot` ESP，在 systemd-boot 中列出 NixOS 世代；
 stage-1 根据选中的 EFI 条目进入对应系统，不再显示上述 stage-1 菜单。第 97 与第 98 世代
 已经通过临时 U-Boot 引导完成实机切换，第 99 世代也通过持久 B 槽启动和热重启；
-关机充电与实体按键仍需单独验收。架构、验证与回退步骤见
+关机充电的电池画面已在实验 EFI 路径现场确认；实体按键、冷启动和回退仍需单独验收。架构、验证与回退步骤见
 [`docs/uboot-efi-experiment_zh.md`](docs/uboot-efi-experiment_zh.md)。
 
 ## 仓库结构

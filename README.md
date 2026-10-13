@@ -64,7 +64,7 @@ issues before flashing.
 | Sensors | User-space working | accelerometer, proximity, ambient light, and compass work through SSC + iio-sensor-proxy D-Bus |
 | Touch and stylus | Working | NT36532E THP multitouch plus Xiaomi Focus Pen pressure, tilt, hover, and button events are verified; wider application compatibility still needs testing |
 | Fingerprint | Working | Graphical enrollment and verification work through the FPC1553 QTEE-backed private libfprint driver; screen-off wake-unlock needs long-term testing |
-| Charging | Working | Standard PD and Xiaomi MiPPS authentication work; Android-style offline charging is implemented and awaiting a complete power-off hardware cycle; actual power depends on charge state, temperature, charger, and cable and is not a guaranteed 120 W |
+| Charging | Working | Standard PD and Xiaomi MiPPS authentication work; the offline-charging battery UI was visually confirmed on the experimental EFI path; actual power depends on charge state, temperature, charger, and cable and is not a guaranteed 120 W |
 
 ## Upstream Projects
 
@@ -133,7 +133,8 @@ The experimental U-Boot path uses a dedicated `linux-boot` ESP and lists NixOS
 generations in systemd-boot. Stage-1 enters the selected EFI generation without
 showing the stage-1 menu. Temporary U-Boot boots have selected generations 97
 and 98 on the tablet; generation 99 has also passed persistent B-slot boot and
-warm reboot. Offline charging and physical menu keys need separate validation.
+warm reboot. The offline-charging battery UI was visually confirmed; physical
+menu keys, cold boot, and rollback still need separate validation.
 See [`docs/uboot-efi-experiment_zh.md`](docs/uboot-efi-experiment_zh.md)
 for the architecture, checks, and rollback procedure.
 

@@ -16,7 +16,7 @@ ABL fastboot / B 槽
     └── 刷回备份的 Android boot_b → Mobile NixOS stage-1 菜单 → stage-2
 ```
 
-实验 EFI 路径不再显示旧的 stage-1 世代菜单；旧 Android boot 镜像保存在主机，供 ABL fastboot 回退。持久启动已在 B 槽实测；菜单按键、断电冷启动、关机充电与实际回退操作尚未全部验收，因此仍保持实验分支状态。
+实验 EFI 路径不再显示旧的 stage-1 世代菜单；旧 Android boot 镜像保存在主机，供 ABL fastboot 回退。持久启动已在 B 槽实测；菜单按键、断电冷启动与实际回退操作尚未全部验收，因此仍保持实验分支状态。
 
 2026-10-11 的实机复验确认，`fastboot boot` 可以作为 RAM-only 验证通道：候选镜像在不写入
 `boot_b` 的情况下进入 U-Boot、EFI runtime、stage-1 与 stage-2，且 ADB/USB gadget 正常枚举。此后已备份并刷入 `boot_b`，完成持久启动及从 Linux 热重启复验。`boot_a` 原本是 Android header v4，
@@ -100,8 +100,12 @@ EFI 载荷将动画 VT2 纳入 `fbcon` 映射。实机日志显示动画服务�
 新 U-Boot 从 ABL 的 `/chosen/bootargs` 读取 `bootinfo.pureason`，只把启动原因写入临时
 `ShengBootReason` EFI 变量。stage-1 在需要时挂载 `efivarfs` 并读取它，继续遵守电源键优先和
 正常重启标记。实机 RAM 启动已读取该变量；USB 连接下关机后自动重新上电时，stage-1 读到
-`bootinfo.pureason=0x80010`，包含 USB 充电触发位，随后 ADB 断开。充电目标及屏幕电池动画
-的实际运行结果仍需现场确认，不能由 ADB 断开单独推断。
+`bootinfo.pureason=0x80010`，包含 USB 充电触发位，随后 ADB 断开。使用者随后确认关机充电
+的圆角电池画面正常显示；充电功率、长时间稳定性与电源键转正常启动仍需分别验证。
+
+2026-10-13 将 EFI 动画首帧改为先 blank、绘制后 unblank，并安装
+`sheng-7.1.8-2ac6f6483bf104d1` 载荷。它已进入第 99 世代，stage-2 动画服务运行约 7 秒，
+GNOME、DSI 和背光状态正常，失败服务为 0。屏幕上的开机动画是否可见仍待现场确认。
 
 这证明目标链 `ABL → U-Boot → systemd-boot → EFI Image → stage-1 → stage-2` 可用。`boot_a`、
 Android `userdata`、`super`、基带与其他固件分区没有写入。
@@ -173,8 +177,8 @@ fastboot set_active b
 fastboot reboot
 ```
 
-`boot_a`、`linux`、GPT 与 `userdata` 不属于当前实验写入范围。关机充电继续由 Mobile NixOS
-stage-1 路径负责；在 EFI 菜单按键、冷启动、恢复键、回退和关机充电均分别验证前，
+`boot_a`、`linux`、GPT 与 `userdata` 不属于当前实验写入范围。关机充电由 Mobile NixOS
+stage-1 判定，再交给 stage-2 充电目标；在 EFI 菜单按键、冷启动、恢复键和回退均分别验证前，
 不得发布或合并此实验分支。
 
 ## 已接入的 EFI 载荷更新路径
@@ -220,5 +224,5 @@ sudo sheng-efi status
 它是运行时健康记录，不能单独证明用户没有从 systemd-boot 菜单手动选择旧条目；它不会自动清理旧载荷，也不会修改 Android 分区。
 
 `uefi_a`、`uefi_b`、`rescue`、`userdata` 与 Android 固件分区仍不可复用，也没有被写入。接下来仍需单独验证
-systemd-boot 菜单按键、恢复键、关机充电和从 ABL fastboot 回退稳定 `boot_b`；在这些路径分别验证前，实验分支不得合并或发布。
+systemd-boot 菜单按键、恢复键和从 ABL fastboot 回退稳定 `boot_b`；在这些路径分别验证前，实验分支不得合并或发布。
 实际分区边界和验收记录见 [存储迁移预案](uboot-efi-storage-plan_zh.md)。
