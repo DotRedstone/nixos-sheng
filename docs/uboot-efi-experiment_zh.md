@@ -16,7 +16,7 @@ ABL fastboot / B 槽
     └── 刷回备份的 Android boot_b → Mobile NixOS stage-1 菜单 → stage-2
 ```
 
-实验 EFI 路径不再显示旧的 stage-1 世代菜单；旧 Android boot 镜像保存在主机，供 ABL fastboot 回退。持久启动已在 B 槽实测；菜单按键、断电冷启动与实际回退操作尚未全部验收，因此仍保持实验分支状态。
+实验 EFI 路径不再显示旧的 stage-1 世代菜单；旧 Android boot 镜像保存在主机，供 ABL fastboot 回退。持久启动已在 B 槽实测，音量键短按可移动菜单。长按连续移动已加入 U-Boot 按钮键盘补丁，需在更新 `boot_b` 后实机验证；断电冷启动与实际回退操作也尚未验收，因此仍保持实验分支状态。
 
 2026-10-11 的实机复验确认，`fastboot boot` 可以作为 RAM-only 验证通道：候选镜像在不写入
 `boot_b` 的情况下进入 U-Boot、EFI runtime、stage-1 与 stage-2，且 ADB/USB gadget 正常枚举。此后已备份并刷入 `boot_b`，完成持久启动及从 Linux 热重启复验。`boot_a` 原本是 Android header v4，
