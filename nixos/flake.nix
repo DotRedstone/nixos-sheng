@@ -373,6 +373,7 @@
             (pkgs.python3.withPackages (ps: [ ps.pillow ]))
             pkgs.ruby
             pkgs.mruby
+            pkgs.perl
             pkgs.sheng-fb-painter
           ];
         } ''
@@ -387,6 +388,9 @@
           ruby \
             ${../scripts/test-stage1-early-charge-guard.rb} \
             ${./patches/stage-1-early-charge-guard.rb}
+          perl \
+            ${../scripts/test-sheng-reboot-bootloader-marker.pl} \
+            ${./scripts/sheng-reboot-bootloader.pl}
           mruby \
             ${../scripts/test-stage1-udev-tolerant.rb} \
             ${./patches/stage-1-udev-trigger-tolerant.rb}
