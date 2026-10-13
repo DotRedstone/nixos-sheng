@@ -136,7 +136,9 @@ and 98 on the tablet; generation 99 has also passed persistent B-slot boot and
 warm reboot. The boot animation and offline-charging battery UI were visually
 confirmed on the experimental EFI path. Short and held volume-key presses now
 move through the EFI menu on-device. The updated U-Boot image has booted from
-`boot_b`; cold boot, recovery-key behavior, and rollback still need validation.
+`boot_b`; flashing the known-good backup and restoring the experimental image
+have been tested. Cold boot, recovery-key behavior, and manually initiated
+fastboot reboot still need validation.
 See [`docs/uboot-efi-experiment_zh.md`](docs/uboot-efi-experiment_zh.md)
 for the architecture, checks, and rollback procedure.
 
