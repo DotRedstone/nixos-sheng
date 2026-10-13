@@ -90,6 +90,19 @@ fb0: EFI VGA frame buffer device
 `sheng-efi-mark-successful.service` 与清单校验均通过，失败服务为空。将同一 U-Boot 镜像写入
 `boot_b` 后，`fastboot reboot` 和 Linux `systemctl reboot` 均重新进入 EFI 与第 99 世代。
 
+2026-10-13 的后续实验将 EFI 载荷更新为 `sheng-7.1.8-117aacafd58af6e7`，并在
+`boot_b` 写入 SHA-256 为
+`904130c581c7c72b1ba08ccf838f645b65bf0481c837312be9e382ca527020dc` 的 U-Boot 镜像。
+该镜像先通过 RAM 引导进入第 99 世代，再通过持久 B 槽重启；两次的失败服务均为 0。
+EFI 载荷将动画 VT2 纳入 `fbcon` 映射。实机日志显示动画服务运行约 7 秒，DSI 连接为
+`enabled`；画面是否完整可见仍需现场确认。
+
+新 U-Boot 从 ABL 的 `/chosen/bootargs` 读取 `bootinfo.pureason`，只把启动原因写入临时
+`ShengBootReason` EFI 变量。stage-1 在需要时挂载 `efivarfs` 并读取它，继续遵守电源键优先和
+正常重启标记。实机 RAM 启动已读取该变量；USB 连接下关机后自动重新上电时，stage-1 读到
+`bootinfo.pureason=0x80010`，包含 USB 充电触发位，随后 ADB 断开。充电目标及屏幕电池动画
+的实际运行结果仍需现场确认，不能由 ADB 断开单独推断。
+
 这证明目标链 `ABL → U-Boot → systemd-boot → EFI Image → stage-1 → stage-2` 可用。`boot_a`、
 Android `userdata`、`super`、基带与其他固件分区没有写入。
 
