@@ -24,6 +24,7 @@ let
       ../patches/u-boot/sheng-baseline/common/0004-spmi-single-byte.patch
       ../patches/u-boot/sheng-baseline/common/0005-pmic-gpio-input-state.patch
       ../patches/u-boot/sheng-baseline/common/0006-simplefb-optional-properties.patch
+      ../patches/u-boot/sheng-baseline/common/0007-button-kbd-navigation-repeat.patch
       ../patches/u-boot/sheng-baseline/sm8550/0001-pm8550b-repeater.patch
       ../patches/u-boot/sheng-baseline/sm8550/0002-snps-repeater-lifecycle.patch
       ../patches/u-boot/sheng-baseline/sm8550/0003-sm8550-unipro-clock.patch
