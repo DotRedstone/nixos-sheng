@@ -95,7 +95,7 @@ fb0: EFI VGA frame buffer device
 `904130c581c7c72b1ba08ccf838f645b65bf0481c837312be9e382ca527020dc` 的 U-Boot 镜像。
 该镜像先通过 RAM 引导进入第 99 世代，再通过持久 B 槽重启；两次的失败服务均为 0。
 EFI 载荷将动画 VT2 纳入 `fbcon` 映射。实机日志显示动画服务运行约 7 秒，DSI 连接为
-`enabled`；画面是否完整可见仍需现场确认。
+`enabled`；该旧载荷的可见画面未单独验收。
 
 新 U-Boot 从 ABL 的 `/chosen/bootargs` 读取 `bootinfo.pureason`，只把启动原因写入临时
 `ShengBootReason` EFI 变量。stage-1 在需要时挂载 `efivarfs` 并读取它，继续遵守电源键优先和
@@ -105,7 +105,7 @@ EFI 载荷将动画 VT2 纳入 `fbcon` 映射。实机日志显示动画服务�
 
 2026-10-13 将 EFI 动画首帧改为先 blank、绘制后 unblank，并安装
 `sheng-7.1.8-2ac6f6483bf104d1` 载荷。它已进入第 99 世代，stage-2 动画服务运行约 7 秒，
-GNOME、DSI 和背光状态正常，失败服务为 0。屏幕上的开机动画是否可见仍待现场确认。
+GNOME、DSI 和背光状态正常，失败服务为 0。使用者现场确认这次开机动画正常显示。
 
 这证明目标链 `ABL → U-Boot → systemd-boot → EFI Image → stage-1 → stage-2` 可用。`boot_a`、
 Android `userdata`、`super`、基带与其他固件分区没有写入。
