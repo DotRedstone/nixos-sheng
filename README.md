@@ -134,9 +134,9 @@ generations in systemd-boot. Stage-1 enters the selected EFI generation without
 showing the stage-1 menu. Temporary U-Boot boots have selected generations 97
 and 98 on the tablet; generation 99 has also passed persistent B-slot boot and
 warm reboot. The boot animation and offline-charging battery UI were visually
-confirmed on the experimental EFI path. Short volume-key presses move the EFI
-menu; the U-Boot hold-to-repeat fix still needs on-device validation. Cold boot
-and rollback also need separate validation.
+confirmed on the experimental EFI path. Short and held volume-key presses now
+move through the EFI menu on-device. The updated U-Boot image has booted from
+`boot_b`; cold boot, recovery-key behavior, and rollback still need validation.
 See [`docs/uboot-efi-experiment_zh.md`](docs/uboot-efi-experiment_zh.md)
 for the architecture, checks, and rollback procedure.
 
