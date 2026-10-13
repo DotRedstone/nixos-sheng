@@ -60,6 +60,9 @@ scripts/sheng-adb-reboot-bootloader.sh
 
 `adb reboot bootloader` 是 ADB daemon 的普通重启请求，不能稳定映射为 Linux 的
 `RESTART2("bootloader")`；主机包装脚本和 rootfs 命令专门补足这个原因传递。
+直接调用 `RESTART2` 不经过 systemd 的 `reboot.target`，因此这两个命令会先持久化一次性
+`force-normal-once` 标记。设备从 ABL fastboot 执行 `fastboot reboot` 后，stage-1 用该标记
+优先选择正常启动，stage-2 随后清除标记。更新 rootfs 前应使用仓库中的主机包装脚本。
 
 该命令立即重启到 ABL fastboot，不会写入 `boot_a`、`boot_b`、`linux`、GPT、`userdata`、基带或其他
 Android 固件分区。实机已确认执行后主机直接枚举 fastboot 设备。
@@ -101,7 +104,15 @@ EFI 载荷将动画 VT2 纳入 `fbcon` 映射。实机日志显示动画服务�
 `ShengBootReason` EFI 变量。stage-1 在需要时挂载 `efivarfs` 并读取它，继续遵守电源键优先和
 正常重启标记。实机 RAM 启动已读取该变量；USB 连接下关机后自动重新上电时，stage-1 读到
 `bootinfo.pureason=0x80010`，包含 USB 充电触发位，随后 ADB 断开。使用者随后确认关机充电
-的圆角电池画面正常显示；充电功率、长时间稳定性与电源键转正常启动仍需分别验证。
+的圆角电池画面正常显示；充电功率和长时间稳定性仍需分别验证。电源键长按转入正常系统
+已在后续测试中确认。
+
+2026-10-14 的回退测试确认：从 ABL fastboot 将备份 Mobile NixOS 镜像刷回 `boot_b` 后，
+设备进入第 99 世代，系统状态为 `running`，失败服务为空；再将实验 U-Boot 刷回 `boot_b`。
+这次从旧版主机包装脚本进入 fastboot 后直接 `fastboot reboot`，设备误入关机充电目标，
+直到长按电源键才正常启动。原因是包装脚本的直接 `RESTART2` 绕过了 systemd 正常重启标记。
+预先写入标记以及使用修订后的包装脚本，两次 `fastboot reboot` 均进入正常系统，标记随之
+消费，系统状态为 `running`。手动进入 fastboot 后直接重启的情形尚未单独验收。
 
 2026-10-13 将 EFI 动画首帧改为先 blank、绘制后 unblank，并安装
 `sheng-7.1.8-2ac6f6483bf104d1` 载荷。它已进入第 99 世代，stage-2 动画服务运行约 7 秒，
@@ -185,8 +196,8 @@ fastboot reboot
 ```
 
 `boot_a`、`linux`、GPT 与 `userdata` 不属于当前实验写入范围。关机充电由 Mobile NixOS
-stage-1 判定，再交给 stage-2 充电目标；在冷启动、恢复键和回退均分别验证前，
-不得发布或合并此实验分支。
+stage-1 判定，再交给 stage-2 充电目标。备份 `boot_b` 的刷回与恢复已实测；冷启动、恢复键和
+手动 fastboot 重启仍需分别验收。在这些路径验证前，不得发布或合并此实验分支。
 
 ## 已接入的 EFI 载荷更新路径
 
