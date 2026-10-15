@@ -137,8 +137,9 @@ warm reboot. The boot animation and offline-charging battery UI were visually
 confirmed on the experimental EFI path. Short and held volume-key presses now
 move through the EFI menu on-device. The updated U-Boot image has booted from
 `boot_b`; flashing the known-good backup and restoring the experimental image
-have been tested. Cold boot, recovery-key behavior, and manually initiated
-fastboot reboot still need validation.
+have been tested. Fastboot reboot without a prewritten normal-boot marker
+returned to the normal system. Cold boot and recovery-key behavior still need
+validation.
 See [`docs/uboot-efi-experiment_zh.md`](docs/uboot-efi-experiment_zh.md)
 for the architecture, checks, and rollback procedure.
 

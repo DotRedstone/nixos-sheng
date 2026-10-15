@@ -16,7 +16,7 @@ ABL fastboot / B 槽
     └── 刷回备份的 Android boot_b → Mobile NixOS stage-1 菜单 → stage-2
 ```
 
-实验 EFI 路径不再显示旧的 stage-1 世代菜单；旧 Android boot 镜像保存在主机，供 ABL fastboot 回退。持久启动已在 B 槽实测，音量键短按和长按连续移动均已实机确认。断电冷启动、恢复键与实际回退操作尚未验收，因此仍保持实验分支状态。
+实验 EFI 路径不再显示旧的 stage-1 世代菜单；旧 Android boot 镜像保存在主机，供 ABL fastboot 回退。持久启动、音量键短按和长按连续移动、备份镜像刷回及无预写标记的 fastboot 回程均已实机确认。断电冷启动与恢复键仍待验收，因此保持实验分支状态。
 
 2026-10-11 的实机复验确认，`fastboot boot` 可以作为 RAM-only 验证通道：候选镜像在不写入
 `boot_b` 的情况下进入 U-Boot、EFI runtime、stage-1 与 stage-2，且 ADB/USB gadget 正常枚举。此后已备份并刷入 `boot_b`，完成持久启动及从 Linux 热重启复验。`boot_a` 原本是 Android header v4，
@@ -112,7 +112,12 @@ EFI 载荷将动画 VT2 纳入 `fbcon` 映射。实机日志显示动画服务�
 这次从旧版主机包装脚本进入 fastboot 后直接 `fastboot reboot`，设备误入关机充电目标，
 直到长按电源键才正常启动。原因是包装脚本的直接 `RESTART2` 绕过了 systemd 正常重启标记。
 预先写入标记以及使用修订后的包装脚本，两次 `fastboot reboot` 均进入正常系统，标记随之
-消费，系统状态为 `running`。手动进入 fastboot 后直接重启的情形尚未单独验收。
+消费，系统状态为 `running`。
+
+2026-10-15 又从已处于 ABL fastboot 的设备（`current-slot: b`）执行 `fastboot reboot`，
+本轮未通过 Linux 重启脚本预写标记。设备进入正常 NixOS stage-2，`/run/sheng-boot-ui.mode` 为 `normal`，
+`systemctl is-system-running` 为 `running`，失败服务为空；EFI 变量记录
+`bootinfo.pureason=0x800001`。这条无预写标记的 fastboot 回程与上述 Linux `RESTART2` 回程已分别验收。
 
 2026-10-13 将 EFI 动画首帧改为先 blank、绘制后 unblank，并安装
 `sheng-7.1.8-2ac6f6483bf104d1` 载荷。它已进入第 99 世代，stage-2 动画服务运行约 7 秒，
@@ -196,8 +201,8 @@ fastboot reboot
 ```
 
 `boot_a`、`linux`、GPT 与 `userdata` 不属于当前实验写入范围。关机充电由 Mobile NixOS
-stage-1 判定，再交给 stage-2 充电目标。备份 `boot_b` 的刷回与恢复已实测；冷启动、恢复键和
-手动 fastboot 重启仍需分别验收。在这些路径验证前，不得发布或合并此实验分支。
+stage-1 判定，再交给 stage-2 充电目标。备份 `boot_b` 的刷回与恢复、手动 fastboot 回程均已实测；
+断电冷启动和恢复键仍需分别验收。在这些路径验证前，不得发布或合并此实验分支。
 
 ## 已接入的 EFI 载荷更新路径
 
@@ -242,5 +247,6 @@ sudo sheng-efi status
 它是运行时健康记录，不能单独证明用户没有从 systemd-boot 菜单手动选择旧条目；它不会自动清理旧载荷，也不会修改 Android 分区。
 
 `uefi_a`、`uefi_b`、`rescue`、`userdata` 与 Android 固件分区仍不可复用，也没有被写入。接下来仍需单独验证
-断电冷启动、恢复键和从 ABL fastboot 回退稳定 `boot_b`；在这些路径分别验证前，实验分支不得合并或发布。
+断电冷启动与恢复键；在这些路径分别验证前，实验分支不得合并或发布。稳定 `boot_b` 的刷回
+与重新进入实验 U-Boot 已实测。
 实际分区边界和验收记录见 [存储迁移预案](uboot-efi-storage-plan_zh.md)。
