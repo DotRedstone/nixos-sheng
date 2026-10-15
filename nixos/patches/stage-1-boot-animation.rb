@@ -82,6 +82,7 @@ class Tasks::Splash
     sheng_initialize_without_animation
     add_dependency(:Mount, "/proc")
     add_dependency(:Mount, "/dev")
+    add_dependency(:Mount, "/sys")
   end
 
   def run()

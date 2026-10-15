@@ -1,0 +1,152 @@
+From 4edcd3031b04f4c7e398c8b8409c0d4a45d5ce79 Mon Sep 17 00:00:00 2001
+From: map220v <map220v300@gmail.com>
+Date: Sat, 24 Aug 2024 10:19:16 +0000
+Subject: [PATCH] SM8550: Add device tree for Xiaomi Pad 6S Pro 12.4
+
+---
+
+Source: https://github.com/ianchb/sm8550-mainline/commit/4edcd3031b04f4c7e398c8b8409c0d4a45d5ce79
+Local U-Boot port (not the original Linux diff): retain board identity, keys,
+UFS and USB wiring; relocate into dts/upstream; omit Linux peripherals and
+RPMh supply programming (ABL supplies rails); force USB2 device mode.
+Memory corrections follow Linux pin ad75da348a020f0b7cb541ca2f06ab38cf77004d.
+Keep the original splash reservation but do not create a framebuffer without
+measured ABL stride/format. No kernel DT is changed.
+
+diff --git a/dts/upstream/src/arm64/qcom/sm8550-xiaomi-sheng.dts b/dts/upstream/src/arm64/qcom/sm8550-xiaomi-sheng.dts
+--- /dev/null
++++ b/dts/upstream/src/arm64/qcom/sm8550-xiaomi-sheng.dts
+@@ -0,0 +1,133 @@
++// SPDX-License-Identifier: BSD-3-Clause
++/*
++ * Copyright (c) 2024, map220v <map220v300@gmail.com>
++ * Boot-only subset of sm8550-xiaomi-sheng.dts. ABL owns power/display setup.
++ */
++/dts-v1/;
++#include "sm8550.dtsi"
++#include "pm8550.dtsi"
++#include "pm8550b.dtsi"
++#include "pmk8550.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/linux-event-codes.h>
++
++/delete-node/ &rmtfs_mem;
++/delete-node/ &adspslpi_mem;
++/delete-node/ &xbl_dt_log_merged_mem;
++/delete-node/ &hwfence_shbuf;
++/delete-node/ &hyp_tags_reserved_mem;
++/delete-node/ &cdsp_secure_heap_mem;
++/delete-node/ &trust_ui_vm_mem;
++/delete-node/ &trust_ui_vm_dump;
++/delete-node/ &trust_ui_vm_qrtr;
++/delete-node/ &trust_ui_vm_vblk0_ring;
++/delete-node/ &trust_ui_vm_vblk1_ring;
++/delete-node/ &trust_ui_vm_swiotlb;
++/delete-node/ &oem_vm_vblk0_ring;
++/delete-node/ &oem_vm_swiotlb;
++/delete-node/ &oem_vm_mem;
++/delete-node/ &hyp_ext_tags_mem;
++/delete-node/ &hyp_ext_reserved_mem;
++/delete-node/ &mpss_dsm_mem;
++/delete-node/ &mpss_mem;
++/delete-node/ &q6_mpss_dtb_mem;
++/delete-node/ &remoteproc_mpss;
++
++/ {
++	model = "Xiaomi Pad 6S Pro 12.4";
++	compatible = "xiaomi,sheng", "qcom,sm8550";
++	qcom,msm-id = <536 0x20000>;
++	qcom,board-id = <0x10008 0>;
++
++	/* No fixed framebuffer: ABL stride/format have not been measured. */
++	gpio-keys {
++		compatible = "gpio-keys";
++		pinctrl-names = "default";
++		pinctrl-0 = <&volume_up_n>;
++		key-volume-up {
++			label = "Volume Up";
++			linux,code = <KEY_VOLUMEUP>;
++			gpios = <&pm8550_gpios 6 GPIO_ACTIVE_LOW>;
++		};
++	};
++
++	reserved-memory {
++		splash_region@b8000000 {
++			reg = <0 0xb8000000 0 0x2b00000>;
++			no-map;
++		};
++		xbl_ramdump_mem: xbl-ramdump-region@81200000 {
++			reg = <0 0x81200000 0 0x280000>;
++			no-map;
++		};
++
++		xbl_dt_log_mem: xbl-dt-log-region@81a00000 {
++			reg = <0 0x81a00000 0 0x40000>;
++			no-map;
++		};
++
++		aop_image_mem: aop-image-region@81c00000 {
++			reg = <0 0x81c00000 0 0x60000>;
++			no-map;
++		};
++
++		adspslpi_mem: adspslpi-region@9ea00000 {
++			reg = <0 0x9ea00000 0 0x4680000>;
++			no-map;
++		};
++
++		rmtfs_mem: rmtfs-region@ccd00000 {
++			compatible = "qcom,rmtfs-mem";
++			reg = <0x0 0xccd00000 0x0 0x280000>;
++			no-map;
++
++			qcom,client-id = <1>;
++			qcom,vmid = <QCOM_SCM_VMID_MSS_MSA>;
++		};
++
++		hwfence_shbuf: hwfence-shbuf-region@e6440000 {
++			reg = <0 0xe6440000 0 0x2dd000>;
++			no-map;
++		};
++
++		llcc_lpi_mem: llcc-lpi-region@ff800000 {
++			reg = <0 0xff800000 0 0x600000>;
++			no-map;
++		};
++
++	};
++};
++
++&pm8550_gpios {
++	volume_up_n: volume-up-n-state {
++		pins = "gpio6";
++		function = "normal";
++		power-source = <1>;
++		bias-pull-up;
++		input-enable;
++	};
++};
++
++&pon_pwrkey { status = "okay"; };
++&pon_resin {
++	linux,code = <KEY_VOLUMEDOWN>;
++	status = "okay";
++};
++
++&ufs_mem_hc {
++	reset-gpios = <&tlmm 210 GPIO_ACTIVE_LOW>;
++	status = "okay";
++};
++&ufs_mem_phy { status = "okay"; };
++
++&usb_1_hsphy {
++	phys = <&pm8550b_eusb2_repeater>;
++	status = "okay";
++};
++&usb_1 {
++	phys = <&usb_1_hsphy>;
++	phy-names = "usb2-phy";
++	dr_mode = "peripheral";
++	maximum-speed = "high-speed";
++	status = "okay";
++};

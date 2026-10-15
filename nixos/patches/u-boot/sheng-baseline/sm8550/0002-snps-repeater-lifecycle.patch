@@ -1,0 +1,103 @@
+From: NixOS Android devices contributors <nixos-android-devices@localhost>
+Date: Mon, 28 Sep 2026 21:00:00 +0800
+Subject: [PATCH] phy: qcom: initialize and unwind the required eUSB2 repeater
+
+Local follow-up: connect the imported PM8550B port to the SNPS PHY.
+Propagate errors, unwind clocks/resets and release repeater state on failure.
+This stack is selected only for Sheng; a missing repeater is an error.
+---
+diff --git a/drivers/phy/qcom/phy-qcom-snps-eusb2.c b/drivers/phy/qcom/phy-qcom-snps-eusb2.c
+--- a/drivers/phy/qcom/phy-qcom-snps-eusb2.c
++++ b/drivers/phy/qcom/phy-qcom-snps-eusb2.c
+@@ -126,6 +126,7 @@
+ 	void __iomem *base;
+ 	struct clk *ref_clk;
+ 	struct reset_ctl_bulk resets;
++	struct phy repeater;
+ };
+ 
+ static void qcom_snps_eusb2_hsphy_write_mask(void __iomem *base, u32 offset,
+@@ -295,19 +296,31 @@
+ 	struct qcom_snps_eusb2_phy_priv *qcom_snps_eusb2 = dev_get_priv(phy->dev);
+ 	int ret;
+ 
+-	/* TODO Repeater */
+-
+-	clk_prepare_enable(qcom_snps_eusb2->ref_clk);
++	ret = generic_phy_init(&qcom_snps_eusb2->repeater);
++	if (ret)
++		goto exit_repeater;
++
++	ret = clk_prepare_enable(qcom_snps_eusb2->ref_clk);
++	if (ret)
++		goto exit_repeater;
+ 
+ 	ret = reset_deassert_bulk(&qcom_snps_eusb2->resets);
+ 	if (ret)
+-		return ret;
++		goto disable_clock;
+ 
+ 	ret = qcom_snps_eusb2_usb_init(phy);
+ 	if (ret)
+-		return ret;
++		goto assert_reset;
+ 
+ 	return 0;
++
++assert_reset:
++	reset_assert_bulk(&qcom_snps_eusb2->resets);
++disable_clock:
++	clk_disable_unprepare(qcom_snps_eusb2->ref_clk);
++exit_repeater:
++	generic_phy_exit(&qcom_snps_eusb2->repeater);
++	return ret;
+ }
+ 
+ static int qcom_snps_eusb2_phy_power_off(struct phy *phy)
+@@ -317,7 +330,7 @@
+ 	reset_assert_bulk(&qcom_snps_eusb2->resets);
+ 	clk_disable_unprepare(qcom_snps_eusb2->ref_clk);
+ 
+-	return 0;
++	return generic_phy_exit(&qcom_snps_eusb2->repeater);
+ }
+ 
+ static int qcom_snps_eusb2_phy_probe(struct udevice *dev)
+@@ -342,7 +355,7 @@
+ 		return ret;
+ 	}
+ 
+-	return 0;
++	return generic_phy_get_by_index(dev, 0, &qcom_snps_eusb2->repeater);
+ }
+ 
+ static struct phy_ops qcom_snps_eusb2_phy_ops = {
+diff --git a/drivers/phy/qcom/phy-pm8550b-eusb2.c b/drivers/phy/qcom/phy-pm8550b-eusb2.c
+--- a/drivers/phy/qcom/phy-pm8550b-eusb2.c
++++ b/drivers/phy/qcom/phy-pm8550b-eusb2.c
+@@ -44,18 +44,22 @@
+ 		ret = pmic_reg_write(pmic, priv->base + sequence[i].reg,
+ 				     sequence[i].val);
+ 		if (ret)
+-			return ret;
++			goto disable;
+ 	}
+ 	/* Bound the wait to 5 ms, and distinguish SPMI failure from timeout. */
+ 	for (i = 0; i < 100; i++) {
+ 		ret = pmic_reg_read(pmic, priv->base + EUSB2_RPTR_STATUS);
+ 		if (ret < 0)
+-			return ret;
++			goto disable;
+ 		if (ret & RPTR_OK)
+ 			return 0;
+ 		udelay(50);
+ 	}
+-	return -ETIMEDOUT;
++	ret = -ETIMEDOUT;
++disable:
++	/* generic_phy_init() does not retain a failed init for later exit. */
++	pmic_reg_write(pmic, priv->base + EUSB2_EN_CTL1, 0);
++	return ret;
+ }
+ 
+ static int pm8550b_eusb2_exit(struct phy *phy)

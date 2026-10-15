@@ -36,7 +36,7 @@ stage-1 to stage-2 handoff; the charging loop is the actual rounded battery UI.
 - Flashable Android `boot_b` image plus dedicated `linux` rootfs image
 - Desktop-neutral public flake constructor for private dotfiles repositories
 - Optional GNOME image with touch keyboard, rotation, and cover handling
-- Stage-1 NixOS generation menu controlled by volume and power keys
+- Stage-1 generation menu on the stable boot path; experimental U-Boot/EFI generation selection
 - Android-style offline charging with a framebuffer battery UI and power-key controls
 - Working Wi-Fi, USB-C role/OTG, SSC sensors, RAW camera capture, and MiPPS
   fast-charging authentication
@@ -64,7 +64,7 @@ issues before flashing.
 | Sensors | User-space working | accelerometer, proximity, ambient light, and compass work through SSC + iio-sensor-proxy D-Bus |
 | Touch and stylus | Working | NT36532E THP multitouch plus Xiaomi Focus Pen pressure, tilt, hover, and button events are verified; wider application compatibility still needs testing |
 | Fingerprint | Working | Graphical enrollment and verification work through the FPC1553 QTEE-backed private libfprint driver; screen-off wake-unlock needs long-term testing |
-| Charging | Working | Standard PD and Xiaomi MiPPS authentication work; Android-style offline charging is implemented and awaiting a complete power-off hardware cycle; actual power depends on charge state, temperature, charger, and cable and is not a guaranteed 120 W |
+| Charging | Working | Standard PD and Xiaomi MiPPS authentication work; the offline-charging battery UI was visually confirmed on the experimental EFI path; actual power depends on charge state, temperature, charger, and cable and is not a guaranteed 120 W |
 
 ## Upstream Projects
 
@@ -111,9 +111,9 @@ only `nix/store` and `nix-path-registration` at the top level is expected for
 the Mobile NixOS generated rootfs: stage-1 uses that registration data to find
 the NixOS system closure and then runs its `init`.
 
-### Stage-1 Boot Generation Menu
+### Boot Generation Menus
 
-Because standard Android bootloaders cannot render GRUB or systemd-boot menus, this project implements a **custom framebuffer text menu** directly inside the `stage-1` initramfs.
+The released Android `boot_b` path cannot render a standard bootloader menu, so its `stage-1` initramfs provides a framebuffer generation menu.
 
 The menu appears briefly on every boot and automatically enters the newest
 generation after three seconds without input. Run
@@ -128,6 +128,20 @@ generation after three seconds without input. Run
   spends a long time choosing a generation.
 
 See [`docs/boot-generation-menu.md`](docs/boot-generation-menu.md) for details.
+
+The experimental U-Boot path uses a dedicated `linux-boot` ESP and lists NixOS
+generations in systemd-boot. Stage-1 enters the selected EFI generation without
+showing the stage-1 menu. Temporary U-Boot boots have selected generations 97
+and 98 on the tablet; generation 99 has also passed persistent B-slot boot and
+warm reboot. The boot animation and offline-charging battery UI were visually
+confirmed on the experimental EFI path. Short and held volume-key presses now
+move through the EFI menu on-device. The updated U-Boot image has booted from
+`boot_b`; flashing the known-good backup and restoring the experimental image
+have been tested. Fastboot reboot without a prewritten normal-boot marker
+returned to the normal system. Cold boot and recovery-key behavior still need
+validation.
+See [`docs/uboot-efi-experiment_zh.md`](docs/uboot-efi-experiment_zh.md)
+for the architecture, checks, and rollback procedure.
 
 ## Repository Layout
 

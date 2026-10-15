@@ -1,0 +1,59 @@
+# ---
+# Module: Sheng U-Boot Storage Recovery Build
+# Description: Builds the RAM-only storage recovery image on native AArch64 CI.
+# Scope: CI
+# ---
+
+name: Build Sheng U-Boot Storage Recovery
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - exp/uboot-efi
+    paths:
+      - .github/workflows/sheng-uboot-storage-recovery.yml
+      - nixos/flake.nix
+      - nixos/modules/sheng-uboot-recovery.nix
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build RAM-only recovery image
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Enable Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v13
+
+      - name: Build RAM-only recovery image
+        run: |
+          set -euo pipefail
+          nix --extra-experimental-features "nix-command flakes" \
+            build ./nixos#shengUbootStorageRecoveryBootimg \
+            --out-link out/sheng-u-boot-storage-recovery
+          test -f out/sheng-u-boot-storage-recovery
+          (
+            cd out
+            sha256sum sheng-u-boot-storage-recovery > sha256sums.txt
+          )
+
+      - name: Upload recovery image
+        uses: actions/upload-artifact@v7
+        with:
+          name: sheng-u-boot-storage-recovery
+          path: |
+            out/sheng-u-boot-storage-recovery
+            out/sha256sums.txt
+          retention-days: 14
