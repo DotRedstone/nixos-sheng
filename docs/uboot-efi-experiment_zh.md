@@ -107,6 +107,15 @@ EFI 载荷将动画 VT2 纳入 `fbcon` 映射。实机日志显示动画服务�
 的圆角电池画面正常显示；充电功率和长时间稳定性仍需分别验证。电源键长按转入正常系统
 已在后续测试中确认。
 
+关机插线时，旧版 EFI 路径会先显示 systemd-boot 世代菜单，等待 `loader.conf` 的 3 秒倒计时，
+然后才进入充电目标。新的 U-Boot 候选补丁在 ABL 启动原因明确为 USB 充电、且没有电源键启动位时，
+向 systemd-boot 提供仅本次启动有效的 `LoaderConfigTimeout=menu-hidden`。这样充电启动可跳过
+世代菜单；普通电源键开机仍按现有配置显示菜单。该变量不写入非易失存储，也不修改 ESP、
+`linux` 或 Android 槽位。源码评估、本地交叉构建和 RAM 启动进入第 99 世代 stage-1 已通过；
+关机插线的画面顺序和完整 stage-2 启动仍待实机确认。
+正常重启的一次性标记位于 Linux 根分区；若 ABL 将插线重启也报告成 USB 充电启动，
+EFI 菜单可能在那一次重启中隐藏，但 stage-1 仍会按标记选择正常系统目标。
+
 2026-10-14 的回退测试确认：从 ABL fastboot 将备份 Mobile NixOS 镜像刷回 `boot_b` 后，
 设备进入第 99 世代，系统状态为 `running`，失败服务为空；再将实验 U-Boot 刷回 `boot_b`。
 这次从旧版主机包装脚本进入 fastboot 后直接 `fastboot reboot`，设备误入关机充电目标，
