@@ -1,14 +1,15 @@
 From: DotRedstone <noreply@github.com>
 Subject: [PATCH] sheng: hide the EFI generation menu for offline charging
 
-ABL reports charger insertion before EFI starts. Set systemd-boot's
-LoaderConfigTimeout to menu-hidden only for that boot, so offline charging
-reaches stage-1 without showing the generation selector. Keep the EFI
-variable volatile so ordinary power-key boots retain the selector.
+ABL reports charger insertion before EFI starts. Require an unambiguous USB
+PON trigger before setting systemd-boot's LoaderConfigTimeout to menu-hidden.
+Offline charging then reaches stage-1 without showing the generation
+selector. Keep the EFI variable volatile so ordinary power-key boots
+retain the selector.
 
 --- a/arch/arm/mach-snapdragon/board.c
 +++ b/arch/arm/mach-snapdragon/board.c
-@@ -380,6 +380,62 @@ void qcom_set_serialno(void)
+@@ -380,6 +380,63 @@ void qcom_set_serialno(void)
  		env_set("serial#", serial);
  }
  
@@ -41,7 +42,8 @@ variable volatile so ordinary power-key boots retain the selector.
 +	if (end == value || *end)
 +		return false;
 +
-+	return (reason & BIT(4)) && !(reason & BIT(7));
++	/* Other PON sources may represent a normal reboot while USB is present. */
++	return (reason & 0xff) == BIT(4);
 +}
 +
 +static void sheng_hide_charger_menu(void)
@@ -71,7 +73,7 @@ variable volatile so ordinary power-key boots retain the selector.
  /*
   * ABL supplies bootinfo.pureason in its /chosen bootargs, but a systemd-boot
   * Type #1 entry replaces the Linux command line. Publish only this one boot
-@@ -427,8 +483,13 @@ void efi_platform_set_boot_reason(void)
+@@ -427,8 +484,13 @@ void efi_platform_set_boot_reason(void)
  		if (efi_set_variable_int(u"ShengBootReason", &guid,
  					 EFI_VARIABLE_BOOTSERVICE_ACCESS |
  					 EFI_VARIABLE_RUNTIME_ACCESS,
