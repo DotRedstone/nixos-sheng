@@ -108,13 +108,17 @@ EFI 载荷将动画 VT2 纳入 `fbcon` 映射。实机日志显示动画服务�
 已在后续测试中确认。
 
 关机插线时，旧版 EFI 路径会先显示 systemd-boot 世代菜单，等待 `loader.conf` 的 3 秒倒计时，
-然后才进入充电目标。新的 U-Boot 候选补丁在 ABL 启动原因明确为 USB 充电、且没有电源键启动位时，
+然后才进入充电目标。新的 U-Boot 候选补丁在 ABL 启动原因的低字节只有 USB 触发位时，
 向 systemd-boot 提供仅本次启动有效的 `LoaderConfigTimeout=menu-hidden`。这样充电启动可跳过
 世代菜单；普通电源键开机仍按现有配置显示菜单。该变量不写入非易失存储，也不修改 ESP、
-`linux` 或 Android 槽位。源码评估、本地交叉构建和 RAM 启动进入第 99 世代 stage-1 已通过；
-关机插线的画面顺序和完整 stage-2 启动仍待实机确认。
-正常重启的一次性标记位于 Linux 根分区；若 ABL 将插线重启也报告成 USB 充电启动，
-EFI 菜单可能在那一次重启中隐藏，但 stage-1 仍会按标记选择正常系统目标。
+`linux` 或 Android 槽位。源码评估、本地交叉构建和 RAM 正常启动进入第 99 世代均已通过；
+关机插线的画面顺序仍待实机确认。设备当前第 99 世代仍运行旧版
+`sheng-reboot-bootloader`，它不会写入正常重启标记；直接用它进入 fastboot 后临时启动，
+stage-1 会把混合 USB 原因判为充电启动。手动预写标记后，新候选镜像读取到
+`bootinfo.pureason=0x40011`，没有设置隐藏菜单变量，最终进入第 99 世代正常目标；
+`systemctl is-system-running` 为 `running`，失败服务为空，标记已消费。此前真实关机插线
+读到的原因是 `0x80010`；它的低字节只有 USB 触发位。设备系统下次更新时需同步安装
+带标记写入的新版重启脚本。
 
 2026-10-14 的回退测试确认：从 ABL fastboot 将备份 Mobile NixOS 镜像刷回 `boot_b` 后，
 设备进入第 99 世代，系统状态为 `running`，失败服务为空；再将实验 U-Boot 刷回 `boot_b`。
