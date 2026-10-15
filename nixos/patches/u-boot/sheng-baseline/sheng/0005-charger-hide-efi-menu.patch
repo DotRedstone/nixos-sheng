@@ -1,0 +1,88 @@
+From: DotRedstone <noreply@github.com>
+Subject: [PATCH] sheng: hide the EFI generation menu for offline charging
+
+ABL reports charger insertion before EFI starts. Set systemd-boot's
+LoaderConfigTimeout to menu-hidden only for that boot, so offline charging
+reaches stage-1 without showing the generation selector. Keep the EFI
+variable volatile so ordinary power-key boots retain the selector.
+
+--- a/arch/arm/mach-snapdragon/board.c
++++ b/arch/arm/mach-snapdragon/board.c
+@@ -380,6 +380,62 @@ void qcom_set_serialno(void)
+ 		env_set("serial#", serial);
+ }
+ 
++static bool sheng_cmdline_has(const char *cmdline, const char *option)
++{
++	const char *match = cmdline;
++	size_t len = strlen(option);
++
++	while ((match = strstr(match, option))) {
++		if ((match == cmdline || match[-1] == ' ') &&
++		    (match[len] == ' ' || match[len] == '\0'))
++			return true;
++		match++;
++	}
++
++	return false;
++}
++
++static bool sheng_charger_reason(const char *key, const char *value)
++{
++	char *end;
++	unsigned long long reason;
++
++	if (!strcmp(key, "androidboot.mode="))
++		return !strcmp(value, "charger");
++	if (strcmp(key, "bootinfo.pureason="))
++		return false;
++
++	reason = simple_strtoull(value, &end, 0);
++	if (end == value || *end)
++		return false;
++
++	return (reason & BIT(4)) && !(reason & BIT(7));
++}
++
++static void sheng_hide_charger_menu(void)
++{
++	static const efi_guid_t loader_guid =
++		EFI_GUID(0x4a67b082, 0x0a4c, 0x41cf, 0xb6, 0xc7,
++			 0x44, 0x0b, 0x29, 0xbb, 0x8c, 0x4f);
++	static const u16 hidden[] = u"menu-hidden";
++	efi_uintn_t size = 0;
++	efi_status_t ret;
++
++	/* Preserve user overrides; a one-shot timeout would force the menu. */
++	ret = efi_get_variable_int(u"LoaderConfigTimeout", &loader_guid,
++				   NULL, &size, NULL, NULL);
++	if (ret != EFI_NOT_FOUND)
++		return;
++
++	/* Volatile: the regular generation menu returns on the next boot. */
++	ret = efi_set_variable_int(u"LoaderConfigTimeout", &loader_guid,
++				   EFI_VARIABLE_BOOTSERVICE_ACCESS |
++				   EFI_VARIABLE_RUNTIME_ACCESS,
++				   sizeof(hidden), hidden, false);
++	if (ret != EFI_SUCCESS)
++		log_warning("Could not hide Sheng charger boot menu\n");
++}
++
+ /*
+  * ABL supplies bootinfo.pureason in its /chosen bootargs, but a systemd-boot
+  * Type #1 entry replaces the Linux command line. Publish only this one boot
+@@ -427,8 +483,13 @@ void efi_platform_set_boot_reason(void)
+ 		if (efi_set_variable_int(u"ShengBootReason", &guid,
+ 					 EFI_VARIABLE_BOOTSERVICE_ACCESS |
+ 					 EFI_VARIABLE_RUNTIME_ACCESS,
+-					 strlen(data) + 1, data, false) != EFI_SUCCESS)
++					 strlen(data) + 1, data, false) != EFI_SUCCESS) {
+ 			log_warning("Could not publish Sheng EFI boot reason\n");
++			return;
++		}
++		if (sheng_charger_reason(keys[i], value) &&
++		    !sheng_cmdline_has(cmdline, "androidboot.force_normal_boot=1"))
++			sheng_hide_charger_menu();
+ 		return;
+ 	}
+ }
