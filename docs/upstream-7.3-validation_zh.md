@@ -46,6 +46,14 @@ nix --extra-experimental-features 'nix-command flakes' \
 
 完成并确认 CI 使用的锁文件后，再把 `nixos/flake.lock` 在**实验分支**提交固定，避免后续评测自动漂移。不要把更新后的锁文件合并回正式分支。
 
+## 完整 rootfs 构建（基线 CI 通过之后）
+
+本实验新增的 CI **只产生 boot 镜像和配套模块归档**，暂不生成完整 rootfs，也不会自动发布 Release。要做真正的上机测试，需要用**同一个实验分支**生成 stage-2 rootfs。
+
+可以使用仓库原有的 GitHub Actions `Build NixOS RootFS` 工作流，运行时选择 `exp/upstream-7.3-validation` 分支，并保持 `skip_release=true`。按该工作流原有输入要求提供测试用户和 root 的 **crypt 密码哈希**，不要在仓库提交明文或真实个人密码。选择需要的 `mobileRootfsImageGnome` 或 `mobileRootfsImage` 变体。
+
+注意：现有 rootfs 工作流是为 7.1.8 制定的，可能仍有额外的硬件检查。**只有 rootfs CI 也通过、且校验内部 `/lib/modules/` 与 7.3 构建对应，才进入刷机阶段。** 如果出现因缺失本地驱动导致的失败，应记录并在实验分支处理，不要关闭正式分支的验收规则。
+
 ## B. 第一次上机之前（人工操作）
 
 - [ ] CI 内核与 boot 镜像构建成功，记录构建对应的 commit、lock、SHA256。
