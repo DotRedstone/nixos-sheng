@@ -168,11 +168,44 @@ jobs:
             }
           done
 
-      - name: Upload artifact
+      # Upload a compressed image directly rather than wrapping a ~4 GiB
+      # deflated file in yet another ZIP. Only the experimental branch has
+      # this transport change; the regular release's raw .img is untouched.
+      - name: Compress verified rootfs for direct download
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          images=(out/nixos-sheng-*.img)
+          if [ "${#images[@]}" -ne 1 ]; then
+            echo "Expected exactly one built rootfs image, got ${#images[@]}" >&2
+            exit 1
+          fi
+          mkdir -p out/direct
+          image="${images[0]}"
+          compressed="out/direct/$(basename "$image").zst"
+          zstd -T0 -3 --check -f "$image" -o "$compressed"
+          zstd -t "$compressed"
+          (
+            cd out/direct
+            sha256sum "$(basename "$compressed")" > SHA256SUMS
+            cat SHA256SUMS
+          )
+          echo "Compressed rootfs SHA256: $(sha256sum "$compressed")"
+          echo "Original rootfs SHA256: $(sha256sum "$image")"
+
+      - name: Upload rootfs directly as zstd (no ZIP wrapper)
         uses: actions/upload-artifact@v7
         with:
-          name: nixos-sheng-rootfs-${{ github.event.inputs.rootfs_flake_attr }}
-          path: out/nixos-sheng-*.img
+          path: out/direct/*.img.zst
+          archive: false
+          retention-days: 14
+
+      - name: Upload zstd SHA256 checksum directly
+        uses: actions/upload-artifact@v7
+        with:
+          path: out/direct/SHA256SUMS
+          archive: false
           retention-days: 14
 
       - name: Create release
