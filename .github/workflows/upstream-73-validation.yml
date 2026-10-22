@@ -1,0 +1,80 @@
+# Experimental upstream-kernel bring-up. Never publishes a release or flashes a device.
+name: Validate Sheng Upstream 7.3 Baseline
+
+on:
+  push:
+    branches:
+      - exp/upstream-7.3-validation
+    paths:
+      - "nixos/**"
+      - ".github/workflows/upstream-73-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    name: Build 7.3 boot image and matching kernel modules
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 360
+    steps:
+      - name: Checkout experimental branch
+        uses: actions/checkout@v6
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Resolve experimental kernel input
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The main branch lock deliberately remains pinned to 7.1.8.
+          # Refresh only this experiment's kernel input before building.
+          nix flake lock --update-input shengKernelSrc ./nixos
+          jq -e '.nodes.shengKernelSrc.locked.rev == "9ce9cb0e1543980f85f5a44c074e44c569cf793d"' nixos/flake.lock
+          jq -r '.nodes.shengKernelSrc.locked | "upstream kernel: \(.owner)/\(.repo) @ \(.rev)"' nixos/flake.lock
+
+      - name: Build experimental Mobile NixOS boot image
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out/baseline
+          nix build ./nixos#mobileAndroidBootimg --out-link out/mobile-bootimg --fallback
+          cp -L out/mobile-bootimg out/baseline/boot_sheng_upstream_7.3_EXPERIMENT.img
+
+      - name: Package kernel modules matching the boot image
+        shell: bash
+        run: |
+          set -euo pipefail
+          nix build './nixos#nixosConfigurations.sheng.config.boot.kernelPackages.kernel' --out-link out/kernel-package --fallback
+          modver="$(nix eval './nixos#nixosConfigurations.sheng.config.boot.kernelPackages.kernel.modDirVersion' --raw)"
+          test -d "out/kernel-package/lib/modules/$modver"
+          tar -C out/kernel-package/lib/modules -czf "out/baseline/modules-$modver-EXPERIMENT.tar.gz" "$modver"
+          sha256sum out/baseline/boot_sheng_upstream_7.3_EXPERIMENT.img out/baseline/modules-*.tar.gz > out/baseline/SHA256SUMS
+          {
+            echo 'EXPERIMENTAL upstream-7.3 bring-up only.'
+            echo 'NOT a complete flashable release.'
+            echo 'The stage-2 rootfs modules MUST match the experimental kernel.'
+            echo 'Fingerprints, THP stylus, and Xiaomi MiPPS features may be absent or incompatible.'
+            echo 'Do not flash until you have a known-good boot backup and recovery route.'
+            echo 'Kernel source: DotRedstone/linux-sheng exp/sheng-7.3-baseline at 9ce9cb0e1543980f85f5a44c074e44c569cf793d'
+          } > out/baseline/READ_ME_FIRST.txt
+
+      - name: Upload build-only experimental artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: sheng-upstream-7.3-baseline-UNVERIFIED
+          path: out/baseline/
+          retention-days: 14
+
+      - name: Upload resolved flake lock for follow-up commit
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: sheng-upstream-7.3-resolved-flake-lock
+          path: nixos/flake.lock
+          retention-days: 14
