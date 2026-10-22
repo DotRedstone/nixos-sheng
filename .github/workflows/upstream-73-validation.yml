@@ -43,9 +43,11 @@ jobs:
           set -uo pipefail
           mkdir -p out/baseline
           # Capture the entire Nix build output rather than only the last 25 lines.
+          set +e
           nix build -L ./nixos#mobileAndroidBootimg --out-link out/mobile-bootimg --fallback \
             2>&1 | tee out/baseline/nix-build.log
           status=${PIPESTATUS[0]}
+          set -e
           if [ "$status" -ne 0 ]; then
             drv="$(grep -oE '/nix/store/[a-z0-9]+-linux-7\.3\.0\.drv' out/baseline/nix-build.log | tail -1 || true)"
             if [ -n "$drv" ]; then
