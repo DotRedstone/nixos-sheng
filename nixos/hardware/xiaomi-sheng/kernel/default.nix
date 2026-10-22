@@ -15,8 +15,9 @@ let
   llvmPkgs = pkgs.llvmPackages;
 in
 mobile-nixos.kernel-builder-clang {
-  version = "7.1.8";
-  modDirVersion = "7.1.8";
+  # Experimental upstream bring-up. Do not use as a daily-driver kernel.
+  version = "7.3.0";
+  modDirVersion = "7.3.0";
   src = shengKernelSrc;
   configfile = ./config.aarch64;
   patches = [ ];
@@ -69,7 +70,8 @@ mobile-nixos.kernel-builder-clang {
     require_config "CONFIG_VFAT_FS=m"
     require_config "CONFIG_BTRFS_FS=m"
     require_config "CONFIG_EROFS_FS=m"
-    require_config "CONFIG_INPUT_FPC1552=y"
+    # INPUT_FPC1552 is not provided by the pristine upstream 7.3 tree.
+    # The fingerprint bring-up will be tested in a later patch stage.
 
     # These groups can disappear without making the image unbootable. Check
     # the effective Kconfig so dependency changes fail in CI instead of later
@@ -110,6 +112,9 @@ mobile-nixos.kernel-builder-clang {
     require_config "CONFIG_TOUCHSCREEN_NT36532E_SPI=m"
     require_config "CONFIG_VIDEO_S5KJN1_SHENG=m"
     require_config "CONFIG_VIDEO_OV32D40=m"
+
+    echo "--- upstream baseline capability gaps (expected) ---"
+    grep -nE "^CONFIG_INPUT_FPC1552=|^# CONFIG_INPUT_FPC1552 is not set" build/.config || true
 
     echo "--- io_uring ---"
     grep -nE '^CONFIG_IO_URING=|^# CONFIG_IO_URING is not set' build/.config || true
