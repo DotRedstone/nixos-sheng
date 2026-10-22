@@ -28,22 +28,38 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
 
-      - name: Resolve experimental kernel input
+      - name: Validate pinned upstream kernel input
         shell: bash
         run: |
           set -euo pipefail
-          # The main branch lock deliberately remains pinned to 7.1.8.
-          # Refresh only this experiment's kernel input before building.
-          nix flake lock --update-input shengKernelSrc ./nixos
+          # Keep this isolated experiment reproducible without a dirty Git tree.
           jq -e '.nodes.shengKernelSrc.locked.rev == "9ce9cb0e1543980f85f5a44c074e44c569cf793d"' nixos/flake.lock
+          jq -e '.nodes.shengKernelSrc.original.ref == "exp/sheng-7.3-baseline"' nixos/flake.lock
           jq -r '.nodes.shengKernelSrc.locked | "upstream kernel: \(.owner)/\(.repo) @ \(.rev)"' nixos/flake.lock
 
       - name: Build experimental Mobile NixOS boot image
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
           mkdir -p out/baseline
-          nix build ./nixos#mobileAndroidBootimg --out-link out/mobile-bootimg --fallback
+          # Capture the entire Nix build output rather than only the last 25 lines.
+          nix build -L ./nixos#mobileAndroidBootimg --out-link out/mobile-bootimg --fallback \
+            2>&1 | tee out/baseline/nix-build.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            drv="$(grep -oE '/nix/store/[a-z0-9]+-linux-7\\.3\\.0\\.drv' out/baseline/nix-build.log | tail -1 || true)"
+            if [ -n "$drv" ]; then
+              echo "===== Full kernel builder log: $drv ====="
+              nix log "$drv" > out/baseline/kernel-builder.log 2>&1 || true
+              grep -nEi -C 8 'fatal error:|error:|undefined reference|No rule to make target|Error [0-9]+|FAILED|Killed process' \
+                out/baseline/kernel-builder.log | tail -260 || true
+              echo "===== Final kernel builder lines ====="
+              tail -180 out/baseline/kernel-builder.log || true
+            else
+              echo "No linux-7.3.0 derivation found; see nix-build.log"
+            fi
+            exit "$status"
+          fi
           cp -L out/mobile-bootimg out/baseline/boot_sheng_upstream_7.3_EXPERIMENT.img
 
       - name: Package kernel modules matching the boot image
@@ -63,6 +79,17 @@ jobs:
             echo 'Do not flash until you have a known-good boot backup and recovery route.'
             echo 'Kernel source: DotRedstone/linux-sheng exp/sheng-7.3-baseline at 9ce9cb0e1543980f85f5a44c074e44c569cf793d'
           } > out/baseline/READ_ME_FIRST.txt
+
+      - name: Upload logs (including failed builds)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: sheng-upstream-7.3-build-logs
+          path: |
+            out/baseline/nix-build.log
+            out/baseline/kernel-builder.log
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Upload build-only experimental artifacts
         uses: actions/upload-artifact@v7
