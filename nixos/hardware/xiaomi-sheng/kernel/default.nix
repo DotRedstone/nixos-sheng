@@ -43,6 +43,9 @@ mobile-nixos.kernel-builder-clang {
     "OBJDUMP=${llvmPkgs.llvm}/bin/llvm-objdump"
     "READELF=${llvmPkgs.llvm}/bin/llvm-readelf"
     "STRIP=${llvmPkgs.llvm}/bin/llvm-strip"
+    # Linux 7.3 uses certs/extract-cert at build time; embed OpenSSL's Nix store
+    # runtime library path in host tools so libcrypto.so.3 can be resolved.
+    "HOSTLDFLAGS=-Wl,-rpath,${buildPackages.openssl.out}/lib"
     "KCFLAGS=-Wno-error=unused-command-line-argument"
     "KCPPFLAGS=-Wno-error=unused-command-line-argument"
   ];
