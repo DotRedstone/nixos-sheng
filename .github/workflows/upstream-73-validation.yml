@@ -32,12 +32,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Resolve the isolated ramoops-only kernel ref; upload the resulting
-          # lock to permit committing the immutable NAR hash after CI verifies it.
-          nix flake lock --update-input shengKernelSrc ./nixos
+          # All inputs must be committed and reproducible before building.
           jq -e '.nodes.shengKernelSrc.original.ref == "contrib/sheng-ramoops-20261022"' nixos/flake.lock
-          jq -e '.nodes.shengKernelSrc.locked.rev != "9ce9cb0e1543980f85f5a44c074e44c569cf793d"' nixos/flake.lock
-          jq -r '.nodes.shengKernelSrc.locked | "candidate kernel: \(.owner)/\(.repo) @ \(.rev), NAR \(.narHash)"' nixos/flake.lock
+          jq -e '.nodes.shengKernelSrc.locked.rev == "f1673fdecc2ce36d3804c9950bdc2b565a612e5b"' nixos/flake.lock
+          jq -e '.nodes.shengKernelSrc.locked.narHash == "sha256-Vz7n866MDgwtVPJ+NLUVHo5BN2nnHNYmgwDxLpYW39g="' nixos/flake.lock
+          jq -r '.nodes.shengKernelSrc.locked | "pinned candidate: \\(.owner)/\\(.repo) @ \\(.rev), NAR \\(.narHash)"' nixos/flake.lock
 
       - name: Build experimental Mobile NixOS boot image
         shell: bash

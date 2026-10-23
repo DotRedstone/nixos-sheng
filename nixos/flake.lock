@@ -100,16 +100,16 @@
     "shengKernelSrc": {
       "flake": false,
       "locked": {
-        "lastModified": 1792575642,
-        "narHash": "sha256-1Z2BiXMNiEdMiUrBV7SApZh9NxauqcpiCF1WGhufFnE=",
+        "lastModified": 1792655400,
+        "narHash": "sha256-Vz7n866MDgwtVPJ+NLUVHo5BN2nnHNYmgwDxLpYW39g=",
         "owner": "DotRedstone",
         "repo": "linux-sheng",
-        "rev": "9ce9cb0e1543980f85f5a44c074e44c569cf793d",
+        "rev": "f1673fdecc2ce36d3804c9950bdc2b565a612e5b",
         "type": "github"
       },
       "original": {
         "owner": "DotRedstone",
-        "ref": "exp/sheng-7.3-baseline",
+        "ref": "contrib/sheng-ramoops-20261022",
         "repo": "linux-sheng",
         "type": "github"
       }
