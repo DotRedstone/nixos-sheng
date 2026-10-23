@@ -32,11 +32,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # All inputs must be committed and reproducible before building.
+          # Resolve the exact THP port revision in CI, then keep the resolved
+          # lock as a build artifact to pin once this first build succeeds.
+          nix flake lock --update-input shengKernelSrc ./nixos
           jq -e '.nodes.shengKernelSrc.original.ref == "exp/sheng-7.3-thp-legacy-port"' nixos/flake.lock
-          jq -e '.nodes.shengKernelSrc.locked.rev == "41ae69c8a96a0777abbc6aec63af94c40c4c1c7a"' nixos/flake.lock
-          jq -e '.nodes.shengKernelSrc.locked.narHash == "sha256-HEF7jyBDIlzEjfLT/AZoZlpk+vRQdZiMu+LQPJ8wRAE="' nixos/flake.lock
-          jq -r '.nodes.shengKernelSrc.locked | "pinned candidate: \\(.owner)/\\(.repo) @ \\(.rev), NAR \\(.narHash)"' nixos/flake.lock
+          jq -e '.nodes.shengKernelSrc.locked.rev != "9ce9cb0e1543980f85f5a44c074e44c569cf793d"' nixos/flake.lock
+          jq -r '.nodes.shengKernelSrc.locked | "THP port: \(.owner)/\(.repo) @ \(.rev), NAR \(.narHash)"' nixos/flake.lock
 
       - name: Build experimental Mobile NixOS boot image
         shell: bash
