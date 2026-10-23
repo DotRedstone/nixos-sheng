@@ -44,19 +44,17 @@
     "qrtr"
   ];
 
-  # WCN7850 occasionally exposes only 2.4 GHz after its first firmware boot.
-  # Prevent PCI modalias autoload so the service below can complete the known
-  # good two-pass initialization before NetworkManager starts scanning.
+  # 7.3-specific A/B regression test: use a single firmware initialization.
+  # The 7.1.8 two-pass unload/reload workaround may interact badly with the
+  # ath12k firmware mission-mode transition. This is a hypothesis, NOT a fix.
+  # Keep modalias autoload blocked so we can guarantee exactly one modprobe.
   boot.blacklistedKernelModules = [ "ath12k_wifi7" ];
 
   systemd.services.sheng-wifi-modules = {
-    description = "Load sheng Wi-Fi PCIe/MHI/ath12k modules";
+    description = "Load WCN7850 once (Linux 7.3 Wi-Fi regression A/B test)";
     wantedBy = [ "multi-user.target" ];
     after = [ "systemd-modules-load.service" ];
-    before = [
-      "NetworkManager.service"
-      "wpa_supplicant.service"
-    ];
+    before = [ "NetworkManager.service" "wpa_supplicant.service" ];
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
@@ -66,31 +64,17 @@
         ${pkgs.kmod}/bin/modprobe "$module" || true
       done
 
-      # The first WCN firmware cycle can leave all 5 GHz BSSes invisible even
-      # after the regulatory domain settles. A driver-only second cycle fixes
-      # it without rebooting the tablet or resetting shared Bluetooth power.
+      # Do not unload/reload ath12k on this experimental branch.
       ${pkgs.kmod}/bin/modprobe ath12k_wifi7
-      for attempt in $(seq 1 10); do
-        if [ -e /sys/class/net/wlan0 ] || [ -e /sys/class/net/wlp1s0 ]; then
-          break
-        fi
-        sleep 1
-      done
-      sleep 2
-
-      ${pkgs.kmod}/bin/modprobe -r ath12k_wifi7 || true
-      ${pkgs.kmod}/bin/modprobe -r ath12k || true
-      sleep 1
-      ${pkgs.kmod}/bin/modprobe ath12k_wifi7
-
       for attempt in $(seq 1 15); do
         if [ -e /sys/class/net/wlan0 ] || [ -e /sys/class/net/wlp1s0 ]; then
+          echo "WCN7850 appeared after single-pass initialization"
           exit 0
         fi
         sleep 1
       done
 
-      echo "WCN7850 interface did not return after the recovery cycle" >&2
+      echo "WCN7850 interface missing after single-pass initialization" >&2
       exit 1
     '';
   };
