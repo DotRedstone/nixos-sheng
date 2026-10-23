@@ -73,8 +73,9 @@ mobile-nixos.kernel-builder-clang {
     require_config "CONFIG_VFAT_FS=m"
     require_config "CONFIG_BTRFS_FS=m"
     require_config "CONFIG_EROFS_FS=m"
-    # INPUT_FPC1552 is not provided by the pristine upstream 7.3 tree.
-    # The fingerprint bring-up will be tested in a later patch stage.
+    # This branch restores the FPC1552 resource/IRQ driver from 7.1.8.
+    # Verify that it is actually compiled into this experimental kernel.
+    require_config "CONFIG_INPUT_FPC1552=y"
 
     # These groups can disappear without making the image unbootable. Check
     # the effective Kconfig so dependency changes fail in CI instead of later
