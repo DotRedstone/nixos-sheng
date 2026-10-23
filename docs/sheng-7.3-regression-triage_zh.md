@@ -10,8 +10,8 @@
 
 ## A. 为什么先不乱改 Wi-Fi 和 FastRPC
 
-- Wi-Fi 实测为 `wlp1s0` 枚举成功，但执行 UP 时 WMI 16387 / QMI -110 超时。此日志不足以区分固件模式转换、PCIe/ASPM、电源、驱动回归和设备配置。旧 7.1.8 与上游 7.3 板级 DTS 的 Wi-Fi 供电节点非常相近，不能先验认定是 PCIe 时序问题。
-- `no reserved DMA memory for FASTRPC` 是 `drivers/misc/fastrpc.c` 在 `of_reserved_mem_device_init_by_idx()` 失败时打印的 `dev_info`，**旧版 7.1.8 与 7.3 的实现都存在这条信息**。旧版 sheng DTS 同样没有本文所述的专用 FastRPC 内存池。它不等价于 DMA 分配必然失败，因此**禁止未经内存布局核对就随意在 DTS 硬编码一块 CMA/reserved-memory**。
+- Wi-Fi 实测为 `wlp1s0` 枚举成功，但执行 UP 时 WMI 16387 / QMI -110 超时。此日志不足以区分固件模式转换、PCIe/ASPM、电源、驱动回归和设备配置。旧 7.1.8 与上游 7.3 板级 DTS 的 Wi-Fi 供电节点非常相近，不能先验认定是 PCIe 时序问题。 作为线索：2026-09 的 [Linux 7.3-rc2 QRTR HELLO 回归讨论](https://lists.openwall.net/netdev/2026/09/13/32) 也报告同样的 WMI 16387 超时，但其复现条件是 **休眠恢复**；本设备报告的是 **链路激活**，不能直接 cherry-pick 当作已证实修复。
+- `no reserved DMA memory for FASTRPC` 是 `drivers/misc/fastrpc.c` 在 `of_reserved_mem_device_init_by_idx()` 失败时打印的 `dev_info`，**旧版 7.1.8 与 7.3 的实现都存在这条信息**。旧版 sheng DTS 同样没有本文所述的专用 FastRPC 内存池。它不等价于 DMA 分配必然失败，因此**禁止未经内存布局核对就随意在 DTS 硬编码一块 CMA/reserved-memory**。 Linux 内核维护者在 2026-10-02 的 [FastRPC 日志降噪补丁](https://lists.openwall.net/linux-kernel/2026/10/02/973) 也明确说明缺少 reserved DMA memory 可以是有效配置（不会导致该 probe 分支直接失败）。
 - 报告中“摄像头通过”主要来自节点/管道枚举，不等于真实取帧；“音频通过”主要来自编解码器/功放绑定，不等于六颗扬声器均有声音。人工测试前状态应为“枚举 PASS / 物理输出待验证”。
 - `/sys/fs/pstore` 为空不代表 ramoops 初始化失败；没有上一次崩溃时它可以为空。只核验注册、DT reserved-memory、驱动日志，不故意触发 panic。
 
