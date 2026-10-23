@@ -1,10 +1,10 @@
 # Experimental upstream-kernel bring-up. Never publishes a release or flashes a device.
-name: Validate Sheng Upstream 7.3 Baseline
+name: Validate Sheng 7.3 THP Legacy Candidate
 
 on:
   push:
     branches:
-      - exp/upstream-7.3-validation
+      - exp/7.3-thp-legacy-validation
     paths:
       - "nixos/**"
       - ".github/workflows/upstream-73-validation.yml"
@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   baseline:
-    name: Build 7.3 boot image and matching kernel modules
+    name: Build 7.3 legacy THP boot image and matching modules
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 360
     steps:
@@ -32,10 +32,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Keep this isolated experiment reproducible without a dirty Git tree.
-          jq -e '.nodes.shengKernelSrc.locked.rev == "9ce9cb0e1543980f85f5a44c074e44c569cf793d"' nixos/flake.lock
-          jq -e '.nodes.shengKernelSrc.original.ref == "exp/sheng-7.3-baseline"' nixos/flake.lock
-          jq -r '.nodes.shengKernelSrc.locked | "upstream kernel: \(.owner)/\(.repo) @ \(.rev)"' nixos/flake.lock
+          # All inputs must be committed and reproducible before building.
+          jq -e '.nodes.shengKernelSrc.original.ref == "exp/sheng-7.3-thp-legacy-port"' nixos/flake.lock
+          jq -e '.nodes.shengKernelSrc.locked.rev == "41ae69c8a96a0777abbc6aec63af94c40c4c1c7a"' nixos/flake.lock
+          jq -e '.nodes.shengKernelSrc.locked.narHash == "sha256-HEF7jyBDIlzEjfLT/AZoZlpk+vRQdZiMu+LQPJ8wRAE="' nixos/flake.lock
+          jq -r '.nodes.shengKernelSrc.locked | "pinned candidate: \\(.owner)/\\(.repo) @ \\(.rev), NAR \\(.narHash)"' nixos/flake.lock
 
       - name: Build experimental Mobile NixOS boot image
         shell: bash
@@ -62,7 +63,7 @@ jobs:
             fi
             exit "$status"
           fi
-          cp -L out/mobile-bootimg out/baseline/boot_sheng_upstream_7.3_EXPERIMENT.img
+          cp -L out/mobile-bootimg out/baseline/boot_sheng_7.3_THP_LEGACY_EXPERIMENT.img
 
       - name: Package kernel modules matching the boot image
         shell: bash
@@ -72,21 +73,21 @@ jobs:
           modver="$(nix eval './nixos#nixosConfigurations.sheng.config.boot.kernelPackages.kernel.modDirVersion' --raw)"
           test -d "out/kernel-package/lib/modules/$modver"
           tar -C out/kernel-package/lib/modules -czf "out/baseline/modules-$modver-EXPERIMENT.tar.gz" "$modver"
-          sha256sum out/baseline/boot_sheng_upstream_7.3_EXPERIMENT.img out/baseline/modules-*.tar.gz > out/baseline/SHA256SUMS
+          sha256sum out/baseline/boot_sheng_7.3_THP_LEGACY_EXPERIMENT.img out/baseline/modules-*.tar.gz > out/baseline/SHA256SUMS
           {
             echo 'EXPERIMENTAL upstream-7.3 bring-up only.'
             echo 'NOT a complete flashable release.'
             echo 'The stage-2 rootfs modules MUST match the experimental kernel.'
             echo 'Fingerprints, THP stylus, and Xiaomi MiPPS features may be absent or incompatible.'
             echo 'Do not flash until you have a known-good boot backup and recovery route.'
-            echo 'Kernel source: DotRedstone/linux-sheng exp/sheng-7.3-baseline at 9ce9cb0e1543980f85f5a44c074e44c569cf793d'
+            echo 'Kernel source: DotRedstone/linux-sheng exp/sheng-7.3-thp-legacy-port (upstream baseline 9ce9cb0e plus 7.1.8 Novatek THP driver port only)'
           } > out/baseline/READ_ME_FIRST.txt
 
       - name: Upload logs (including failed builds)
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: sheng-upstream-7.3-build-logs
+          name: sheng-7.3-thp-legacy-build-logs
           path: |
             out/baseline/nix-build.log
             out/baseline/kernel-builder.log
@@ -96,7 +97,7 @@ jobs:
       - name: Upload build-only experimental artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: sheng-upstream-7.3-baseline-UNVERIFIED
+          name: sheng-7.3-thp-legacy-UNVERIFIED
           path: out/baseline/
           retention-days: 14
 
@@ -104,6 +105,56 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: sheng-upstream-7.3-resolved-flake-lock
+          name: sheng-7.3-thp-legacy-resolved-flake-lock
           path: nixos/flake.lock
+          retention-days: 14
+
+      # Flashable GNOME stage-2 is built from the SAME resolved kernel flake
+      # input as the boot image. Public test image uses the repository's
+      # disposable luser auto-login profile, not private user credentials.
+      - name: Build matching GNOME rootfs
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y zstd e2fsprogs
+          nix build -L ./nixos#mobileRootfsImageGnome --out-link out/gnome-rootfs --fallback
+          img="$(find -L out/gnome-rootfs -type f -name rootfs.img -print -quit)"
+          test -n "$img"
+          sudo e2fsck -fn "$img"
+          version="$(nix eval './nixos#nixosConfigurations.sheng.config.boot.kernelPackages.kernel.modDirVersion' --raw)"
+          mountpoint="$(mktemp -d)"
+          cleanup() {
+            if mountpoint -q "$mountpoint"; then sudo umount "$mountpoint"; fi
+            rmdir "$mountpoint"
+          }
+          trap cleanup EXIT
+          sudo mount -o loop,ro "$img" "$mountpoint"
+          test -d "$mountpoint/lib/modules/$version" || {
+            echo "ERROR: rootfs lacks module tree $version" >&2
+            exit 1
+          }
+          test -e "$mountpoint/nix-path-registration" || {
+            echo "ERROR: rootfs missing Nix closure registration" >&2
+            exit 1
+          }
+          echo "rootfs version $version matches boot kernel"
+          sudo umount "$mountpoint"
+          mkdir -p out/full
+          zstd -T0 -3 --check -f "$img" -o "out/full/sheng-7.3-thp-legacy-gnome.img.zst"
+          zstd -t "out/full/sheng-7.3-thp-legacy-gnome.img.zst"
+          (cd out/full && sha256sum *.img.zst > SHA256SUMS)
+
+      - name: Upload matching GNOME rootfs without ZIP wrapper
+        uses: actions/upload-artifact@v7
+        with:
+          path: out/full/sheng-7.3-thp-legacy-gnome.img.zst
+          archive: false
+          retention-days: 14
+
+      - name: Upload GNOME rootfs checksums
+        uses: actions/upload-artifact@v7
+        with:
+          path: out/full/SHA256SUMS
+          archive: false
           retention-days: 14
