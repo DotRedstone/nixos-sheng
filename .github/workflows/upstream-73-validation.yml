@@ -109,3 +109,53 @@ jobs:
           name: sheng-7.3-fpc1553-resolved-flake-lock
           path: nixos/flake.lock
           retention-days: 14
+
+      # Flashable GNOME stage-2 is built from the SAME resolved kernel flake
+      # input as the boot image. Public test image uses the repository's
+      # disposable luser auto-login profile, not private user credentials.
+      - name: Build matching GNOME rootfs
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y zstd e2fsprogs
+          nix build -L ./nixos#mobileRootfsImageGnome --out-link out/gnome-rootfs --fallback
+          img="$(find -L out/gnome-rootfs -type f -name rootfs.img -print -quit)"
+          test -n "$img"
+          sudo e2fsck -fn "$img"
+          version="$(nix eval './nixos#nixosConfigurations.sheng.config.boot.kernelPackages.kernel.modDirVersion' --raw)"
+          mountpoint="$(mktemp -d)"
+          cleanup() {
+            if mountpoint -q "$mountpoint"; then sudo umount "$mountpoint"; fi
+            rmdir "$mountpoint"
+          }
+          trap cleanup EXIT
+          sudo mount -o loop,ro "$img" "$mountpoint"
+          test -d "$mountpoint/lib/modules/$version" || {
+            echo "ERROR: rootfs lacks module tree $version" >&2
+            exit 1
+          }
+          test -e "$mountpoint/nix-path-registration" || {
+            echo "ERROR: rootfs missing Nix closure registration" >&2
+            exit 1
+          }
+          echo "rootfs version $version matches boot kernel"
+          sudo umount "$mountpoint"
+          mkdir -p out/full
+          zstd -T0 -3 --check -f "$img" -o "out/full/sheng-7.3-fpc1553-gnome.img.zst"
+          zstd -t "out/full/sheng-7.3-fpc1553-gnome.img.zst"
+          (cd out/full && sha256sum *.img.zst > SHA256SUMS)
+
+      - name: Upload matching GNOME rootfs without ZIP wrapper
+        uses: actions/upload-artifact@v7
+        with:
+          path: out/full/sheng-7.3-fpc1553-gnome.img.zst
+          archive: false
+          retention-days: 14
+
+      - name: Upload GNOME rootfs checksums
+        uses: actions/upload-artifact@v7
+        with:
+          path: out/full/SHA256SUMS
+          archive: false
+          retention-days: 14
