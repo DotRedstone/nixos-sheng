@@ -44,56 +44,10 @@
     "qrtr"
   ];
 
-  # WCN7850 occasionally exposes only 2.4 GHz after its first firmware boot.
-  # Prevent PCI modalias autoload so the service below can complete the known
-  # good two-pass initialization before NetworkManager starts scanning.
-  boot.blacklistedKernelModules = [ "ath12k_wifi7" ];
-
-  systemd.services.sheng-wifi-modules = {
-    description = "Load sheng Wi-Fi PCIe/MHI/ath12k modules";
-    wantedBy = [ "multi-user.target" ];
-    after = [ "systemd-modules-load.service" ];
-    before = [
-      "NetworkManager.service"
-      "wpa_supplicant.service"
-    ];
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-    };
-    script = ''
-      for module in pwrseq_qcom_wcn mhi mhi_pci_generic qrtr_mhi mhi_wwan_ctrl mhi_wwan_mbim mhi_net cfg80211; do
-        ${pkgs.kmod}/bin/modprobe "$module" || true
-      done
-
-      # The first WCN firmware cycle can leave all 5 GHz BSSes invisible even
-      # after the regulatory domain settles. A driver-only second cycle fixes
-      # it without rebooting the tablet or resetting shared Bluetooth power.
-      ${pkgs.kmod}/bin/modprobe ath12k_wifi7
-      for attempt in $(seq 1 10); do
-        if [ -e /sys/class/net/wlan0 ] || [ -e /sys/class/net/wlp1s0 ]; then
-          break
-        fi
-        sleep 1
-      done
-      sleep 2
-
-      ${pkgs.kmod}/bin/modprobe -r ath12k_wifi7 || true
-      ${pkgs.kmod}/bin/modprobe -r ath12k || true
-      sleep 1
-      ${pkgs.kmod}/bin/modprobe ath12k_wifi7
-
-      for attempt in $(seq 1 15); do
-        if [ -e /sys/class/net/wlan0 ] || [ -e /sys/class/net/wlp1s0 ]; then
-          exit 0
-        fi
-        sleep 1
-      done
-
-      echo "WCN7850 interface did not return after the recovery cycle" >&2
-      exit 1
-    '';
-  };
+  # Linux 7.3 alternative A/B: allow kernel PCI modalias auto-probing.
+  # Do not blacklist ath12k_wifi7 or force legacy 7.1.8 reinitialization.
+  # The upstream driver probes from udev; failure to enumerate is part of
+  # this experiment, not a reason to silently trigger a second probe.
 
   hardware.bluetooth = {
     enable = true;
