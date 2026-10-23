@@ -32,12 +32,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Resolve the isolated native pen kernel ref; upload the resulting
-          # lock to permit committing the immutable NAR hash after CI verifies it.
-          nix flake lock --update-input shengKernelSrc ./nixos
+          # All inputs must be committed and reproducible before building.
           jq -e '.nodes.shengKernelSrc.original.ref == "exp/sheng-7.3-native-pen-probe"' nixos/flake.lock
-          jq -e '.nodes.shengKernelSrc.locked.rev != "9ce9cb0e1543980f85f5a44c074e44c569cf793d"' nixos/flake.lock
-          jq -r '.nodes.shengKernelSrc.locked | "candidate kernel: \(.owner)/\(.repo) @ \(.rev), NAR \(.narHash)"' nixos/flake.lock
+          jq -e '.nodes.shengKernelSrc.locked.rev == "41ae69c8a96a0777abbc6aec63af94c40c4c1c7a"' nixos/flake.lock
+          jq -e '.nodes.shengKernelSrc.locked.narHash == "sha256-HEF7jyBDIlzEjfLT/AZoZlpk+vRQdZiMu+LQPJ8wRAE="' nixos/flake.lock
+          jq -r '.nodes.shengKernelSrc.locked | "pinned candidate: \\(.owner)/\\(.repo) @ \\(.rev), NAR \\(.narHash)"' nixos/flake.lock
 
       - name: Build experimental Mobile NixOS boot image
         shell: bash
