@@ -18,7 +18,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     shengKernelSrc = {
-      url = "github:DotRedstone/linux-sheng/exp/sheng-7.3-baseline";
+      url = "github:DotRedstone/linux-sheng/contrib/sheng-ramoops-20261022";
       flake = false;
     };
     shengFirmware = {
