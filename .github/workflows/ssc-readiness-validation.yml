@@ -1,0 +1,71 @@
+# Linux 7.3 SSC service-readiness A/B test. Keep the original 7.3 kernel.
+name: Validate Sheng 7.3 SSC Readiness
+
+on:
+  push:
+    branches:
+      - exp/7.3-ssc-readiness
+    paths:
+      - "nixos/**"
+      - ".github/workflows/ssc-readiness-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rootfs:
+    name: GNOME rootfs with extended SSC readiness
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v6
+      - uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - name: Verify unchanged upstream 7.3 kernel pin
+        run: |
+          set -euo pipefail
+          jq -e '.nodes.shengKernelSrc.locked.rev == "9ce9cb0e1543980f85f5a44c074e44c569cf793d"' nixos/flake.lock
+          jq -e '.nodes.shengKernelSrc.original.ref == "exp/sheng-7.3-baseline"' nixos/flake.lock
+          grep -q 'for attempt in $(seq 1 30); do' nixos/hardware/xiaomi-sheng/sensors/default.nix
+
+      - name: Build GNOME stage-2 and flashable rootfs
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y e2fsprogs zstd
+          nix build -L ./nixos#mobileRootfsImageGnome -o result-gnome --fallback
+          image="$(find -L result-gnome -type f -name rootfs.img -print -quit)"
+          test -n "$image"
+          sudo e2fsck -fn "$image"
+          target_ver="$(nix eval './nixos#nixosConfigurations.sheng.config.boot.kernelPackages.kernel.modDirVersion' --raw)"
+          mnt="$(mktemp -d)"
+          cleanup() {
+            mountpoint -q "$mnt" && sudo umount "$mnt"
+            rmdir "$mnt"
+          }
+          trap cleanup EXIT
+          sudo mount -o loop,ro "$image" "$mnt"
+          test -d "$mnt/lib/modules/$target_ver"
+          test -e "$mnt/nix-path-registration"
+          sudo umount "$mnt"
+          mkdir -p out
+          zstd -T0 -3 --check -f "$image" -o out/sheng-7.3-ssc-readiness-gnome.img.zst
+          zstd -t out/sheng-7.3-ssc-readiness-gnome.img.zst
+          (cd out && sha256sum *.img.zst > SHA256SUMS)
+
+      - name: Upload SSC readiness GNOME rootfs
+        uses: actions/upload-artifact@v7
+        with:
+          path: out/sheng-7.3-ssc-readiness-gnome.img.zst
+          archive: false
+          retention-days: 14
+
+      - name: Upload rootfs checksum
+        uses: actions/upload-artifact@v7
+        with:
+          path: out/SHA256SUMS
+          archive: false
+          retention-days: 14

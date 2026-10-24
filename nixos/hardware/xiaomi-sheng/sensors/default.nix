@@ -62,16 +62,18 @@ let
     echo "ADSP FastRPC did not settle in time" >&2
     exit 1
   '';
+  # Linux 7.3 A/B trial: extend the existing SSC readiness gate without
+  # inventing new FastRPC reserved physical memory.
   wait-for-sheng-ssc = pkgs.writeShellScript "wait-for-sheng-ssc" ''
     set -eu
 
-    for attempt in $(seq 1 6); do
+    for attempt in $(seq 1 30); do
       if ${libssc}/bin/ssccli --sensor light --timeout 1 >/dev/null 2>&1; then
         echo "sheng SSC is queryable after attempt $attempt"
         exit 0
       fi
 
-      echo "waiting for sheng SSC service ($attempt/6)"
+      echo "waiting for sheng SSC service ($attempt/30)"
       sleep 1
     done
 
@@ -221,7 +223,7 @@ in
       ExecStartPost = wait-for-sheng-ssc;
       Restart = "on-failure";
       RestartSec = "5";
-      TimeoutStartSec = 20;
+      TimeoutStartSec = 90;
       BindReadOnlyPaths = [ "/etc/sensors/config:/odm/etc/sensors/config" ];
       Environment = [
         "ADSP_LIBRARY_PATH=/usr/share/qcom/sm8550/Xiaomi/sheng;/run/pd-mapper-firmware;/run/pd-mapper-firmware/qcom/sm8550/sheng;/lib/firmware/qcom/sm8550/sheng"
@@ -250,7 +252,7 @@ in
       ExecStartPre = wait-for-sheng-ssc;
       Restart = "on-failure";
       RestartSec = 10;
-      TimeoutStartSec = 20;
+      TimeoutStartSec = 90;
     };
   };
 
