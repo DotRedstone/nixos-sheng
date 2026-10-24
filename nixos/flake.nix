@@ -18,7 +18,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     shengKernelSrc = {
-      url = "github:DotRedstone/linux-sheng/exp/sheng-7.3-baseline";
+      url = "github:DotRedstone/linux-sheng/exp/sheng-7.3-fpc1553";
       flake = false;
     };
     shengFirmware = {
