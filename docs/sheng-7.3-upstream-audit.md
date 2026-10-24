@@ -62,7 +62,7 @@ NixOS #46 的 `nixos/hardware/xiaomi-sheng/sensors/default.nix` 以 `ssccli --se
 | 层级 | 本轮结果 |
 | --- | --- |
 | Git/范围 | 两仓库起始 `git status --short` 为空；未切换原检出目录。内核和 NixOS 改动在独立工作树完成。#3/#4 只改 sheng DTS；#5 改 DTS、Kconfig、Makefile 和一个驱动；#46 改服务与专用 CI；#47–#49 各自使用不同内核 pin。 |
-| 静态 | #3 修复 `git diff --check`、`checkpatch.pl --no-tree --strict` 通过（0 error/warning）；预处理 + `dtc` 成功，基线与修复版均为相同 23 行既有 DTC 警告。通过 Nix 临时提供的 `dtschema` 执行 `dt-mk-schema`，再用 `dt-validate -l ramoops` 检查修复版 DTB，目标节点 0 诊断。#5 checkpatch 为 0 error、1 MAINTAINERS warning。尚未执行完整 `make dtbs_check`：当前内核是稀疏检出；目标 schema 通过不代替全树检查。 |
+| 静态 | #3 全部当前 PR diff 的 `git diff --check`、`checkpatch.pl --no-tree --strict` 通过（0 error/warning）；#4 checkpatch 也是 0 error/warning。#3 预处理 + `dtc` 成功，基线与修复版均为相同 23 行既有 DTC 警告。通过 Nix 临时提供的 `dtschema` 执行 `dt-mk-schema`，再用 `dt-validate -l ramoops` 检查修复版 DTB，目标节点 0 诊断。#5 checkpatch 为 0 error、1 MAINTAINERS warning。尚未执行完整 `make dtbs_check`：当前内核是稀疏检出；目标 schema 通过不代替全树检查。 |
 | Nix evaluation | #47 新 pin 的 `nix flake update shengKernelSrc --flake ./nixos` 仅改该输入的 rev、NAR hash、时间；`jq` 校验通过；`nix eval './nixos#nixosConfigurations.sheng.config.boot.kernelPackages.kernel.modDirVersion' --raw` 得到 `7.3.0`。未在本机编译完整新 boot/rootfs。 |
 | CI 构建 | 旧 PR 的 NixOS Actions 曾成功：[SSC](https://github.com/DotRedstone/nixos-sheng/actions/runs/39907775319)、[ramoops 旧 pin](https://github.com/DotRedstone/nixos-sheng/actions/runs/39916464434)、[CS35L43](https://github.com/DotRedstone/nixos-sheng/actions/runs/39916551027)、[FPC](https://github.com/DotRedstone/nixos-sheng/actions/runs/39916481771)。#47 新 pin 的 [public flake 检查](https://github.com/DotRedstone/nixos-sheng/actions/runs/40118923955) 已成功，匹配 boot/模块/rootfs 的 [构建](https://github.com/DotRedstone/nixos-sheng/actions/runs/40118920838) 截至本报告更新时仍在运行；旧 run 不覆盖修复。内核 PR 无独立 status checks。 |
 | 设备 | 仅审阅 `~/sheng-7.3-testing` 报告及原始日志。本轮未接触设备。ramoops 原始日志见注册，pmsg 写入只有专题报告描述；CS35L43 原始日志见探测，双声道播放只有专题报告描述；FPC 原始日志见资源/TEE 枚举，复位计数只有专题报告描述；SSC 仅见一轮就绪；Wi-Fi 和原生笔未通过功能验收。 |
@@ -70,3 +70,5 @@ NixOS #46 的 `nixos/hardware/xiaomi-sheng/sensors/default.nix` 以 `ssccli --se
 代码修改只影响候选内核 DTS（未来刷 `boot_b`）和 #47 的内核 pin/构建工作流（须重新构建配套 boot、模块、rootfs；若实际部署，`boot_b` 与 `linux` 成套）。本轮无刷写。回退方式是在各 PR 分支撤销本轮小提交或将锁文件恢复到原提交，保留旧镜像和测试日志。不能将旧 rootfs 模块与新内核混用。
 
 推荐顺序：先使 #3 的内存归属、DT schema、新镜像和安全跨重启检查成立，再单独向 `map220v/sm8550-mainline` 的 `sheng-7.3` 提交设备 DTS；#4 仅在 A/B 证明平台确需 standby 后作为第二个独立 DTS 候选；#5 先重构并完成真正认证验收，暂不上游；SSC 留在 NixOS。最后建立一个组合内核 revision，统一重新锁定 NAR hash，构建 boot + rootfs 并做独立集成回归，之后才讨论正式 `sheng`。
+
+本轮没有向设备内核上游创建 PR：#3 尚缺物理内存归属和新镜像实机保留性证据，#4 尚缺收益或必要性的 A/B，#5 的 binding/ABI 尚未成立。#3 当前补丁可从[上游基线比较页](https://github.com/map220v/sm8550-mainline/compare/sheng-7.3...DotRedstone:linux-sheng:contrib/sheng-ramoops-20261022)独立复核；该链接仅供审查，不表示已满足合并条件。
