@@ -146,6 +146,17 @@ GNOME、DSI 和背光状态正常，失败服务为 0。使用者现场确认这
 这证明目标链 `ABL → U-Boot → systemd-boot → EFI Image → stage-1 → stage-2` 可用。`boot_a`、
 Android `userdata`、`super`、基带与其他固件分区没有写入。
 
+2026-10-25 以 PR #51 的 ARM boot 候选（提交 `5acd5a5`，镜像 SHA-256
+`5424227afacf8e9d219430ca8985cc409ff594fce5e45b53e54c2c53e7c1099e`）执行
+`fastboot boot` 临时启动。主机依次观察到 U-Boot USB gadget、Mobile NixOS stage-1 和
+stage-2 ADB；运行内核为 7.1.8，EFI runtime 存在，启动目标为旧 ESP 菜单中的第 99 世代。
+设备现用 rootfs 已转为 7.3.0，系统 profile 只有第 1 世代，`/lib/modules` 也只有 7.3.0；
+因此该旧 EFI 内核无法加载 vfat 等模块，`/boot` 挂载及多个服务失败。测试后设备已重启回
+原有 7.3.0 `boot_b`，分区完整 SHA-256 与测试前备份相同；未安装候选 ESP，也未写入
+`boot_b`。当前分支的 EFI 载荷仍由 7.1.8 内核构建，必须先生成与现用 rootfs 匹配的
+7.3.0 EFI 内核、stage-1 和菜单条目，才能继续持久启动、关机充电画面顺序、冷启动及
+恢复键验收。
+
 ## 当前基线
 
 `shengUbootAndroidBootimg` 固定官方 U-Boot `v2026.10-rc5` 的带签名标签提交
