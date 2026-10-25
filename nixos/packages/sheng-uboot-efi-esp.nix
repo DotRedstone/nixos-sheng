@@ -74,6 +74,7 @@ runCommand "sheng-uboot-efi-esp-${version}" {
   chmod 0644 "$out/esp/${payloadDirectory}/linux"
   install -m 0644 ${initrd} "$out/esp/${payloadDirectory}/initrd"
   install -m 0644 ${deviceTree} "$out/esp/${payloadDirectory}/sm8550-xiaomi-sheng.dtb"
+  printf '%s\n' '${kernel}' > "$out/esp/${payloadDirectory}/kernel.store-path"
 
   cat > "$out/esp/loader/loader.conf" <<'EOF'
   default nixos-sheng-${payloadId}.conf
@@ -118,6 +119,8 @@ runCommand "sheng-uboot-efi-esp-${version}" {
   mcopy -i "$fat_image" "$out/esp/${payloadDirectory}/initrd" ::/${payloadDirectory}/initrd
   mcopy -i "$fat_image" "$out/esp/${payloadDirectory}/sm8550-xiaomi-sheng.dtb" \
     ::/${payloadDirectory}/sm8550-xiaomi-sheng.dtb
+  mcopy -i "$fat_image" "$out/esp/${payloadDirectory}/kernel.store-path" \
+    ::/${payloadDirectory}/kernel.store-path
   mcopy -i "$fat_image" "$out/esp/loader/loader.conf" ::/loader/loader.conf
   mcopy -i "$fat_image" "$out/esp/loader/entries/nixos-sheng-${payloadId}.conf" \
     ::/loader/entries/nixos-sheng-${payloadId}.conf
