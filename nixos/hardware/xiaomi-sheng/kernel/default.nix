@@ -15,6 +15,7 @@ let
   llvmPkgs = pkgs.llvmPackages;
 in
 mobile-nixos.kernel-builder-clang {
+  # Experimental upstream bring-up. Do not use as a daily-driver kernel.
   version = "7.3.0";
   modDirVersion = "7.3.0";
   src = shengKernelSrc;
@@ -42,7 +43,8 @@ mobile-nixos.kernel-builder-clang {
     "OBJDUMP=${llvmPkgs.llvm}/bin/llvm-objdump"
     "READELF=${llvmPkgs.llvm}/bin/llvm-readelf"
     "STRIP=${llvmPkgs.llvm}/bin/llvm-strip"
-    # 7.3 的 certs/extract-cert 在构建时需要 OpenSSL 运行库。
+    # Linux 7.3 uses certs/extract-cert at build time; embed OpenSSL's Nix store
+    # runtime library path in host tools so libcrypto.so.3 can be resolved.
     "HOSTLDFLAGS=-Wl,-rpath,${buildPackages.openssl.out}/lib"
     "KCFLAGS=-Wno-error=unused-command-line-argument"
     "KCPPFLAGS=-Wno-error=unused-command-line-argument"
@@ -71,7 +73,8 @@ mobile-nixos.kernel-builder-clang {
     require_config "CONFIG_VFAT_FS=m"
     require_config "CONFIG_BTRFS_FS=m"
     require_config "CONFIG_EROFS_FS=m"
-    # 原生 7.3 基线暂不提供 FPC1552；后续设备补丁另行验收。
+    # INPUT_FPC1552 is not provided by the pristine upstream 7.3 tree.
+    # The fingerprint bring-up will be tested in a later patch stage.
 
     # These groups can disappear without making the image unbootable. Check
     # the effective Kconfig so dependency changes fail in CI instead of later
@@ -112,6 +115,9 @@ mobile-nixos.kernel-builder-clang {
     require_config "CONFIG_TOUCHSCREEN_NT36532E_SPI=m"
     require_config "CONFIG_VIDEO_S5KJN1_SHENG=m"
     require_config "CONFIG_VIDEO_OV32D40=m"
+
+    echo "--- upstream baseline capability gaps (expected) ---"
+    grep -nE "^CONFIG_INPUT_FPC1552=|^# CONFIG_INPUT_FPC1552 is not set" build/.config || true
 
     echo "--- io_uring ---"
     grep -nE '^CONFIG_IO_URING=|^# CONFIG_IO_URING is not set' build/.config || true
