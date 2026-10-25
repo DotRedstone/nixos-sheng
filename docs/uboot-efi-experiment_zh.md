@@ -34,7 +34,7 @@ Host node: /dev/ttyACM0
 本次实测的本仓库镜像 SHA-256 为
 `ace4caa74df60600ce9f799ac260743030999a24eca3b8e0bc4d077580167231`；试验后已将已知可启动的
 Mobile NixOS boot 镜像（SHA-256
-`def3f8d2d3219d64e660f1c848d59e13371ab6102596dd8832ac5b65c7370160`）保留为 ABL fastboot 回退物；当前 B 槽已写入实验 U-Boot。
+`def3f8d2d3219d64e660f1c848d59e13371ab6102596dd8832ac5b65c7370160`）保留为 ABL fastboot 回退物；当时 B 槽写入了实验 U-Boot。这条历史记录不代表设备现用镜像。
 
 同一基线的只读 fastboot 探针也已完成实机验证。它启动后由主机返回
 `version: 0.4` 与 `product: xiaomi-sheng`，证明 U-Boot 的 fastboot 协议可用。探针禁用
@@ -112,7 +112,7 @@ EFI 载荷将动画 VT2 纳入 `fbcon` 映射。实机日志显示动画服务�
 向 systemd-boot 提供仅本次启动有效的 `LoaderConfigTimeout=menu-hidden`。这样充电启动可跳过
 世代菜单；普通电源键开机仍按现有配置显示菜单。该变量不写入非易失存储，也不修改 ESP、
 `linux` 或 Android 槽位。源码评估、本地交叉构建和 RAM 正常启动进入第 99 世代均已通过；
-关机插线的画面顺序仍待实机确认。设备当前第 99 世代仍运行旧版
+关机插线的画面顺序仍待实机确认。该次验证时，设备第 99 世代运行旧版
 `sheng-reboot-bootloader`，它不会写入正常重启标记；直接用它进入 fastboot 后临时启动，
 stage-1 会把混合 USB 原因判为充电启动。手动预写标记后，新候选镜像读取到
 `bootinfo.pureason=0x40011`，没有设置隐藏菜单变量，最终进入第 99 世代正常目标；
