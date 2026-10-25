@@ -48,9 +48,11 @@ The first public release is available from
 [GitHub Releases](https://github.com/DotRedstone/nixos-sheng/releases/latest).
 Some hardware remains partially supported; review the status table and known
 issues before flashing.
-This experimental branch pins Linux 7.3.0 for EFI payload validation. The
-hardware status below describes earlier verified builds; 7.3.0 has not passed
-the same device acceptance, and its baseline lacks the FPC1552 kernel driver.
+This experimental branch pins the Linux 7.3.0 revision used by the current test
+tablet rootfs for EFI payload validation. It adds six CS35L43 standby DTS
+properties to the upstream baseline and does not include the FPC1552 kernel
+driver. The hardware status below describes earlier verified builds; this EFI
+candidate has not passed the same device acceptance.
 
 | Area | Status | Notes |
 | --- | --- | --- |
@@ -86,7 +88,7 @@ the same device acceptance, and its baseline lacks the FPC1552 kernel driver.
 The kernel source is configured in `nixos/flake.nix`:
 
 ```nix
-shengKernelSrc.url = "github:DotRedstone/linux-sheng/exp/sheng-7.3-baseline";
+shengKernelSrc.url = "github:DotRedstone/linux-sheng/contrib/sheng-cs35l43-standby-20261022";
 ```
 
 ## How Boot Works
