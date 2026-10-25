@@ -1,12 +1,12 @@
 # Sheng Linux 7.3 补丁上游价值审计
 
-审计日期：2026-10-25。范围是 `map220v/sm8550-mainline` 的 `sheng-7.3`（`9ce9cb0e`）、`DotRedstone/linux-sheng` PR #3–#5、`nixos-sheng` PR #46–#49，以及未提交 PR 的 Wi-Fi、原生笔、THP、MiPPS 实验分支。本报告区分源码推断、构建结果和设备日志；已短时刷入并验证 ramoops 候选 boot 镜像，随后恢复原 boot 镜像；没有刷写 `linux` 或制造 kernel panic。
+审计日期：2026-10-25。范围是 `map220v/sm8550-mainline` 的 `sheng-7.3`（`9ce9cb0e`）、`DotRedstone/linux-sheng` PR #3–#5、`nixos-sheng` PR #46–#49，以及未提交 PR 的 Wi-Fi、原生笔、THP、MiPPS 实验分支。本报告区分源码推断、构建结果和设备日志；已短时刷入并对比新旧 ramoops boot 镜像，随后恢复原 boot 镜像；没有刷写 `linux` 或制造 kernel panic。
 
 ## 结论与 PR 状态
 
 | PR | 真实增量及价值 | 审计处置 |
 | --- | --- | --- |
-| [内核 #3](https://github.com/DotRedstone/linux-sheng/pull/3) | sheng 独有的 ramoops 保留区有诊断价值。原版 2 MiB console + 2 MiB pmsg 占满 4 MiB，且未设 `record-size`，没有 oops/panic 记录槽。 | 已追加修复提交 `3864dca`，保持 Draft。新镜像构建及运行中保留区注册均通过，但 pmsg 标记在两种正常重启路径后均未读回；须查明保留性问题后再考虑上游。 |
+| [内核 #3](https://github.com/DotRedstone/linux-sheng/pull/3) | sheng 独有的 ramoops 保留区有诊断价值。原版 2 MiB console + 2 MiB pmsg 占满 4 MiB，且未设 `record-size`，没有 oops/panic 记录槽。 | 已追加修复提交 `3864dca`，保持 Draft。新旧镜像构建及运行中注册均成立，但两种布局的 pmsg 标记在正常重启后均未读回；须查明共同的保留性问题后再考虑上游。 |
 | [内核 #4](https://github.com/DotRedstone/linux-sheng/pull/4) | 六颗功放的合法 DTS 属性被驱动读取，改变 hibernate/standby 策略。它不自动意味着降低功耗。 | 保留候选并转 Draft；需同条件功耗和稳定性 A/B。暂不向上游提交。 |
 | [内核 #5](https://github.com/DotRedstone/linux-sheng/pull/5) | 增加 FPC 资源、复位和 IRQ 桥接；对下游 TEE 方案可能有用，未证明生物识别流程。 | 维持 Draft；先厘清 binding、ABI、来源与生命周期问题，不作为正式 Linux 上游驱动提交。 |
 | [NixOS #46](https://github.com/DotRedstone/nixos-sheng/pull/46) | SSC 启动等待由 6 次改为 30 次、超时由 20 秒改为 90 秒，是 NixOS 用户态时序缓解。 | 更新证据描述并转 Draft；需要冷启动 A/B 和失败路径测试。 |
@@ -28,7 +28,14 @@
 
 新镜像 CI 构建成功，解包后的 boot 镜像确有 256 KiB `record-size`、各 1 MiB 的 console/pmsg 与 4 MiB 保留区。新模块包与设备原有模块包 SHA256 完全一致，设备上的 867 个 `.ko.zst` 也逐个一致，因此本轮只刷 `boot_b`，未改变 `linux`。运行中的设备树、`/sys/module/ramoops/parameters/` 和 dmesg 均确认新布局，`/dev/pmsg0` 写入返回成功。首次测试脚本因 ADB shell 未可靠传递 `grep` 退出状态而误报通过；修正为检查明确的 `FOUND`/`MISSING` 后，普通 `systemctl reboot` 和经 ABL fastboot 返回的两次新启动均找不到先前标记，`/sys/fs/pstore` 为空，`systemd-pstore` 因目录为空而跳过。此结果不能证明崩溃转储可跨重启保留。源码显示 ramoops 探测成功后会将 DT 尺寸同步到模块参数；未探测时该文件仅反映默认值。
 
-下一步需确定是启动链重置该物理 RAM、早期启动覆盖缓冲区，还是 ramoops 读取/映射问题；在找到证据前不应新增猜测性 DTS 属性或向上游提交。测试没有主动触发 panic，也没有做冷启动或真实 oops 测试。
+随后使用此前成功构建的旧版 `f1673fd` boot 镜像作 A/B。镜像 SHA256 与原 CI 清单一致，模块包与现有 rootfs 模块一致；仍只刷 `boot_b`。旧布局没有 `record-size`，console/pmsg 各 2 MiB；写入 `/dev/pmsg0` 返回成功，但普通重启后 pstore 同样为空，`systemd-pstore` 同样跳过。因此标记缺失不是本轮把 console/pmsg 缩为各 1 MiB 才出现的回归。
+
+| boot 候选 | `record-size` | console / pmsg | pmsg 写入 | 普通重启后读回 |
+| --- | ---: | ---: | --- | --- |
+| 旧版 `f1673fd` | 0 | 2 MiB / 2 MiB | 成功 | 未找到 |
+| 修复版 `3864dca` | 256 KiB | 1 MiB / 1 MiB | 成功 | 未找到；经 ABL fastboot 返回也未找到 |
+
+下一步需确定是启动链重置该物理 RAM、早期启动覆盖缓冲区，还是 ramoops 读取/映射问题；在找到证据前不应新增猜测性 DTS 属性或向上游提交。测试没有主动触发 panic，也没有做冷启动或真实 oops 测试。两轮 A/B 后均恢复原 CS35L43 boot 镜像，并按镜像长度从设备读回、校验其字节内容。
 
 ### CS35L43：属性有效，功耗结论反向风险较大
 
@@ -67,10 +74,10 @@ NixOS #46 的 `nixos/hardware/xiaomi-sheng/sensors/default.nix` 以 `ssccli --se
 | 静态 | #3 全部当前 PR diff 的 `git diff --check`、`checkpatch.pl --no-tree --strict` 通过（0 error/warning）；#4 checkpatch 也是 0 error/warning。#3 预处理 + `dtc` 成功，基线与修复版均为相同 23 行既有 DTC 警告。通过 Nix 临时提供的 `dtschema` 执行 `dt-mk-schema`，再用 `dt-validate -l ramoops` 检查修复版 DTB，目标节点 0 诊断。#5 checkpatch 为 0 error、1 MAINTAINERS warning。尚未执行完整 `make dtbs_check`：当前内核是稀疏检出；目标 schema 通过不代替全树检查。 |
 | Nix evaluation | #47 新 pin 的 `nix flake update shengKernelSrc --flake ./nixos` 仅改该输入的 rev、NAR hash、时间；`jq` 校验通过；`nix eval './nixos#nixosConfigurations.sheng.config.boot.kernelPackages.kernel.modDirVersion' --raw` 得到 `7.3.0`。未在本机编译完整新 boot/rootfs。 |
 | CI 构建 | 旧 PR 的 NixOS Actions 曾成功：[SSC](https://github.com/DotRedstone/nixos-sheng/actions/runs/39907775319)、[ramoops 旧 pin](https://github.com/DotRedstone/nixos-sheng/actions/runs/39916464434)、[CS35L43](https://github.com/DotRedstone/nixos-sheng/actions/runs/39916551027)、[FPC](https://github.com/DotRedstone/nixos-sheng/actions/runs/39916481771)。#47 新 pin 的 [public flake 检查](https://github.com/DotRedstone/nixos-sheng/actions/runs/40118923955) 与匹配 boot/模块/rootfs 的 [构建](https://github.com/DotRedstone/nixos-sheng/actions/runs/40118920838) 均成功。内核 PR 无独立 status checks。 |
-| 设备 | 原始实验日志的界限仍如前述。本轮从设备读取并校验 192 MiB `boot_b` 回退镜像，确认 A 槽厂商 DTBO 的日志区地址；项目专用 `RESTART2("bootloader")` 脚本进入 ABL fastboot 后成功返回系统，活动槽为 B。新 ramoops boot 镜像仅短时刷入 `boot_b`：预留区和 pmsg 写入成立，但普通重启与 fastboot 返回后标记均未保留。已恢复原 CS35L43 boot 镜像，并按原镜像长度从设备读回、逐字节校验；`linux` 未刷写。 |
+| 设备 | 原始实验日志的界限仍如前述。本轮从设备读取并校验 192 MiB `boot_b` 回退镜像，确认 A 槽厂商 DTBO 的日志区地址；项目专用 `RESTART2("bootloader")` 脚本进入 ABL fastboot 后成功返回系统，活动槽为 B。新旧两版 ramoops 镜像均短时刷入 `boot_b` 做 A/B：预留区和 pmsg 写入成立，但普通重启后标记均未保留；修复版经 fastboot 返回也未保留。已再次恢复原 CS35L43 boot 镜像并从设备读回校验；`linux` 未刷写。 |
 
-代码修改只影响候选内核 DTS 和 #47 的内核 pin/构建工作流。由于新模块包与设备现有模块包字节一致，本轮短时仅刷 `boot_b`；测试后已恢复原镜像并校验，`linux` 未变。后续若内核模块发生变化，仍须重新构建并部署匹配的 rootfs。代码回退可在各 PR 分支撤销本轮小提交或将锁文件恢复到原提交；保留旧镜像和测试日志。
+代码修改只影响候选内核 DTS 和 #47 的内核 pin/构建工作流。由于新旧两版模块包均与设备现有模块包字节一致，本轮 A/B 仅刷 `boot_b`；测试后已恢复原镜像并校验，`linux` 未变。后续若内核模块发生变化，仍须重新构建并部署匹配的 rootfs。代码回退可在各 PR 分支撤销本轮小提交或将锁文件恢复到原提交；保留旧镜像和测试日志。
 
 推荐顺序：先查清 #3 跨重启记录缺失的原因并复测通过，再单独向 `map220v/sm8550-mainline` 的 `sheng-7.3` 提交设备 DTS；#4 仅在 A/B 证明平台确需 standby 后作为第二个独立 DTS 候选；#5 先重构并完成真正认证验收，暂不上游；SSC 留在 NixOS。最后建立一个组合内核 revision，统一重新锁定 NAR hash，构建 boot + rootfs 并做独立集成回归，之后才讨论正式 `sheng`。
 
-本轮没有向设备内核上游创建 PR：#3 的新镜像跨重启 pmsg 保留性未通过，完整 `dtbs_check` 也未完成；#4 尚缺收益或必要性的 A/B，#5 的 binding/ABI 尚未成立。#3 当前补丁可从[上游基线比较页](https://github.com/map220v/sm8550-mainline/compare/sheng-7.3...DotRedstone:linux-sheng:contrib/sheng-ramoops-20261022)独立复核；该链接仅供审查，不表示已满足合并条件。
+本轮没有向设备内核上游创建 PR：#3 的新旧镜像跨重启 pmsg 保留性均未通过，完整 `dtbs_check` 也未完成；#4 尚缺收益或必要性的 A/B，#5 的 binding/ABI 尚未成立。#3 当前补丁可从[上游基线比较页](https://github.com/map220v/sm8550-mainline/compare/sheng-7.3...DotRedstone:linux-sheng:contrib/sheng-ramoops-20261022)独立复核；该链接仅供审查，不表示已满足合并条件。
