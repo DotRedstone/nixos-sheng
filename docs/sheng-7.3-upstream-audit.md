@@ -35,7 +35,9 @@
 | 旧版 `f1673fd` | 0 | 2 MiB / 2 MiB | 成功 | 未找到 |
 | 修复版 `3864dca` | 256 KiB | 1 MiB / 1 MiB | 成功 | 未找到；经 ABL fastboot 返回也未找到 |
 
-下一步需确定是启动链重置该物理 RAM、早期启动覆盖缓冲区，还是 ramoops 读取/映射问题；在找到证据前不应新增猜测性 DTS 属性或向上游提交。测试没有主动触发 panic，也没有做冷启动或真实 oops 测试。两轮 A/B 后均恢复原 CS35L43 boot 镜像，并按镜像长度从设备读回、校验其字节内容。
+为定位读取阶段，又把修复版 CI boot 镜像逐字节重建为相同文件，再仅在 4096 字节的 Android boot 头中加入 `dyndbg="file fs/pstore/ram_core.c +p"`；内核、ramdisk 和 DTB 内容未改。临时镜像启动并写入新标记后，普通重启仍无 pstore 文件。早期 `persistent_ram_post_init()` 日志显示所有记录区、console 和 pmsg 均为 `no valid data in buffer`；pmsg 签名为 `0x00000000`，与写入前启动所见相同。其他区的无效签名也在两次启动间保持相同。由此可直接确认：下一次内核探测时没有看到本次 Linux 初始化并写入的有效 ramoops 头；仅凭这组日志仍无法区分启动链重置/覆盖该区域与内存映射或写入持久化问题。
+
+下一步需确定上述物理 RAM 在重启链中的实际保留与写入语义；在找到证据前不应新增猜测性 DTS 属性或向上游提交。测试没有主动触发 panic，也没有做冷启动或真实 oops 测试。所有测试后均恢复原 CS35L43 boot 镜像，并按镜像长度从设备读回、校验其字节内容；临时调试镜像和原始分区备份仅留本机私有目录。
 
 ### CS35L43：属性有效，功耗结论反向风险较大
 
@@ -74,7 +76,7 @@ NixOS #46 的 `nixos/hardware/xiaomi-sheng/sensors/default.nix` 以 `ssccli --se
 | 静态 | #3 全部当前 PR diff 的 `git diff --check`、`checkpatch.pl --no-tree --strict` 通过（0 error/warning）；#4 checkpatch 也是 0 error/warning。#3 预处理 + `dtc` 成功，基线与修复版均为相同 23 行既有 DTC 警告。通过 Nix 临时提供的 `dtschema` 执行 `dt-mk-schema`，再用 `dt-validate -l ramoops` 检查修复版 DTB，目标节点 0 诊断。#5 checkpatch 为 0 error、1 MAINTAINERS warning。尚未执行完整 `make dtbs_check`：当前内核是稀疏检出；目标 schema 通过不代替全树检查。 |
 | Nix evaluation | #47 新 pin 的 `nix flake update shengKernelSrc --flake ./nixos` 仅改该输入的 rev、NAR hash、时间；`jq` 校验通过；`nix eval './nixos#nixosConfigurations.sheng.config.boot.kernelPackages.kernel.modDirVersion' --raw` 得到 `7.3.0`。未在本机编译完整新 boot/rootfs。 |
 | CI 构建 | 旧 PR 的 NixOS Actions 曾成功：[SSC](https://github.com/DotRedstone/nixos-sheng/actions/runs/39907775319)、[ramoops 旧 pin](https://github.com/DotRedstone/nixos-sheng/actions/runs/39916464434)、[CS35L43](https://github.com/DotRedstone/nixos-sheng/actions/runs/39916551027)、[FPC](https://github.com/DotRedstone/nixos-sheng/actions/runs/39916481771)。#47 新 pin 的 [public flake 检查](https://github.com/DotRedstone/nixos-sheng/actions/runs/40118923955) 与匹配 boot/模块/rootfs 的 [构建](https://github.com/DotRedstone/nixos-sheng/actions/runs/40118920838) 均成功。内核 PR 无独立 status checks。 |
-| 设备 | 原始实验日志的界限仍如前述。本轮从设备读取并校验 192 MiB `boot_b` 回退镜像，确认 A 槽厂商 DTBO 的日志区地址；项目专用 `RESTART2("bootloader")` 脚本进入 ABL fastboot 后成功返回系统，活动槽为 B。新旧两版 ramoops 镜像均短时刷入 `boot_b` 做 A/B：预留区和 pmsg 写入成立，但普通重启后标记均未保留；修复版经 fastboot 返回也未保留。已再次恢复原 CS35L43 boot 镜像并从设备读回校验；`linux` 未刷写。 |
+| 设备 | 原始实验日志的界限仍如前述。本轮从设备读取并校验 192 MiB `boot_b` 回退镜像，确认 A 槽厂商 DTBO 的日志区地址；项目专用 `RESTART2("bootloader")` 脚本进入 ABL fastboot 后成功返回系统，活动槽为 B。新旧两版 ramoops 镜像均短时刷入 `boot_b` 做 A/B：预留区和 pmsg 写入成立，但普通重启后标记均未保留；修复版经 fastboot 返回也未保留。额外的临时调试 boot 镜像显示重启后的 ramoops 头签名无效。已再次恢复原 CS35L43 boot 镜像并从设备读回校验；`linux` 未刷写。 |
 
 代码修改只影响候选内核 DTS 和 #47 的内核 pin/构建工作流。由于新旧两版模块包均与设备现有模块包字节一致，本轮 A/B 仅刷 `boot_b`；测试后已恢复原镜像并校验，`linux` 未变。后续若内核模块发生变化，仍须重新构建并部署匹配的 rootfs。代码回退可在各 PR 分支撤销本轮小提交或将锁文件恢复到原提交；保留旧镜像和测试日志。
 
