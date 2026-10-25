@@ -38,6 +38,7 @@ jobs:
             --out-link out/sheng-u-boot-experimental-boot_b.img
           file out/sheng-u-boot-experimental-boot_b.img
           sha256sum out/sheng-u-boot-experimental-boot_b.img > out/sheng-u-boot-experimental-boot_b.img.sha256
+          printf '%s\n' "$GITHUB_SHA" > out/sheng-u-boot-experimental-boot_b.img.source-revision
       - name: Upload experimental boot image
         uses: actions/upload-artifact@v4
         with:
@@ -45,4 +46,5 @@ jobs:
           path: |
             out/sheng-u-boot-experimental-boot_b.img
             out/sheng-u-boot-experimental-boot_b.img.sha256
+            out/sheng-u-boot-experimental-boot_b.img.source-revision
           if-no-files-found: error

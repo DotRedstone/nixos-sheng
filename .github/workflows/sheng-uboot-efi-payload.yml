@@ -105,7 +105,9 @@ jobs:
             -maxdepth 1 -type f -name 'nixos-sheng-*.conf' -print -quit)
           test -n "$entry"
           grep -Fx "default $(basename "$entry")" out/sheng-uboot-efi-esp/esp/loader/loader.conf
+          (cd out/sheng-uboot-efi-esp/esp && sha256sum -c manifest.sha256)
           sha256sum out/sheng-uboot-efi-esp/esp/manifest.sha256 > out/sheng-uboot-efi-esp.manifest.sha256
+          printf '%s\n' "$GITHUB_SHA" > out/sheng-uboot-efi-esp.source-revision
       - name: Upload validated EFI payload
         uses: actions/upload-artifact@v4
         with:
@@ -113,4 +115,5 @@ jobs:
           path: |
             out/sheng-uboot-efi-esp
             out/sheng-uboot-efi-esp.manifest.sha256
+            out/sheng-uboot-efi-esp.source-revision
           if-no-files-found: error
