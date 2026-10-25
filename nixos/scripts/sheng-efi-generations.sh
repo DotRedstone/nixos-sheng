@@ -72,10 +72,19 @@ for path in "$linux_path" "$initrd_path" "$dtb_path"; do
 done
 kernel_identity=$esp${linux_path%/linux}/kernel.store-path
 expected_kernel=
+expected_version=
 if [[ -s $kernel_identity ]]; then
   expected_kernel=$(<"$kernel_identity")
   [[ $expected_kernel == /nix/store/*-linux-* ]] || {
     echo 'Invalid EFI payload kernel identity.' >&2
+    exit 1
+  }
+else
+  # 旧载荷没有闭包标识；至少核对内核版本，不能把现用世代指向旧内核。
+  base_version=$(field version "$base")
+  expected_version=${base_version%%-*}
+  [[ $expected_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+    echo 'Invalid legacy EFI payload kernel version.' >&2
     exit 1
   }
 fi
@@ -91,11 +100,12 @@ for profile in "$profiles"/system-*-link; do
   [[ $number =~ ^[0-9]+$ ]] || continue
   target=$(readlink -f -- "$profile")
   [[ $target == /nix/store/*-nixos-system-* && -x $target/init ]] || continue
-  # 新载荷只为同一内核闭包的世代生成菜单项；旧载荷没有标识，沿用原规则以便回退。
+  [[ -e $target/kernel ]] || continue
+  profile_kernel=$(readlink -f -- "$target/kernel")
   if [[ -n $expected_kernel ]]; then
-    [[ -e $target/kernel ]] || continue
-    profile_kernel=$(readlink -f -- "$target/kernel")
     [[ ${profile_kernel%/*} == "$expected_kernel" ]] || continue
+  else
+    [[ ${profile_kernel%/*} == /nix/store/*-linux-"$expected_version" ]] || continue
   fi
   entry="nixos-sheng-generation-$number.conf"
   cat > "$staging/$entry" <<EOF

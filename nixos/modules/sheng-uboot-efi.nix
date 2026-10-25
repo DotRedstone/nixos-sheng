@@ -105,7 +105,7 @@ let
         echo "Default:"
         awk '$1 == "default" { print "  " $2 }' "$esp/loader/loader.conf"
         if [ -f "$state/previous-loader.conf" ]; then
-          echo "Rollback default:"
+          echo "Previous default (may no longer be bootable):"
           awk '$1 == "default" { print "  " $2 }' "$state/previous-loader.conf"
         fi
         if [ -f "$state/last-boot-success" ]; then
@@ -267,11 +267,13 @@ let
         trap - EXIT
         rm -rf "$staging"
         echo "Installed and selected EFI payload: $version"
-        echo "The previous default is retained; run 'sheng-efi rollback' before reboot if needed."
+        echo "The previous boot manager and immutable payload are retained."
+        echo "Rollback requires a matching kernel identity (or release for legacy payloads)."
       }
 
       rollback() {
-        local previous_manager
+        local previous_manager previous_base previous_linux previous_version previous_kernel_identity
+        local current_kernel
         check_esp
         if [ ! -s "$state/previous-loader.conf" ]; then
           echo "No previous EFI loader configuration has been recorded." >&2
@@ -300,6 +302,25 @@ let
             echo "Previous EFI payload entry is missing." >&2
             exit 1
           }
+          previous_linux="$(awk '$1 == "linux" { print $2; exit }' "$esp/loader/entries/$previous_base")"
+          if [[ "$previous_linux" != /EFI/NixOS/sheng-*/linux ]]; then
+            echo "Previous EFI payload path is invalid." >&2
+            exit 1
+          fi
+          previous_kernel_identity="$esp''${previous_linux%/linux}/kernel.store-path"
+          if [ -s "$previous_kernel_identity" ]; then
+            current_kernel="$(dirname "$(readlink -f /run/current-system/kernel)")"
+            if [ "$(cat "$previous_kernel_identity")" != "$current_kernel" ]; then
+              echo "Previous EFI payload kernel does not match the current system; refusing rollback." >&2
+              exit 1
+            fi
+          else
+            previous_version="$(awk '$1 == "version" { print $2; exit }' "$esp/loader/entries/$previous_base")"
+            if [ "''${previous_version%%-*}" != "$(uname -r)" ]; then
+              echo "Previous EFI payload kernel version does not match the current system; refusing rollback." >&2
+              exit 1
+            fi
+          fi
           awk -v selected="$previous_base" '
             $1 == "default" { print "default " selected; next }
             { print }
