@@ -153,7 +153,7 @@ stage-2 ADB；运行内核为 7.1.8，EFI runtime 存在，启动目标为旧 ES
 设备现用 rootfs 已转为 7.3.0，系统 profile 只有第 1 世代，`/lib/modules` 也只有 7.3.0；
 因此该旧 EFI 内核无法加载 vfat 等模块，`/boot` 挂载及多个服务失败。测试后设备已重启回
 原有 7.3.0 `boot_b`，分区完整 SHA-256 与测试前备份相同；未安装候选 ESP，也未写入
-`boot_b`。当前分支的 EFI 载荷仍由 7.1.8 内核构建，必须先生成与现用 rootfs 匹配的
+`boot_b`。该次测试使用的 EFI 载荷仍由 7.1.8 内核构建，必须先生成与现用 rootfs 匹配的
 7.3.0 EFI 内核、stage-1 和菜单条目，才能继续持久启动、关机充电画面顺序、冷启动及
 恢复键验收。
 
@@ -258,7 +258,7 @@ sudo sheng-efi status
 安装器只接受含完整 `manifest.sha256` 的 `shengUbootEfiEsp/esp` 树，并确认 `/boot` 是
 PARTLABEL 为 `linux-boot` 的 FAT ESP。它先把新的版本化目录
 `EFI/NixOS/sheng-<kernel-version>-<payload-hash>/`、BLS 条目和 systemd-boot 写入临时目录，再逐文件校验；
-新载荷全部存在后才用重命名切换 `loader.conf` 的默认项，再同步世代条目。旧 BLS 条目和旧内核/initrd/DTB 保留在 ESP；旧 `loader.conf` 和 `BOOTAA64.EFI` 备份在 `/var/lib/sheng-efi/`，供 `sheng-efi rollback` 使用。早期安装只在 ESP 留有 `BOOTAA64.EFI.previous` 时，回退器会使用这份备份。
+新载荷全部存在后才用重命名切换 `loader.conf` 的默认项，再同步世代条目。安装前还会核对载荷记录的内核 store 路径与当前系统内核闭包完全一致，并确认运行内核版本相同；不满足时拒绝写入 ESP。旧 BLS 条目和旧内核/initrd/DTB 保留在 ESP；旧 `loader.conf` 和 `BOOTAA64.EFI` 备份在 `/var/lib/sheng-efi/`，供 `sheng-efi rollback` 使用。早期安装只在 ESP 留有 `BOOTAA64.EFI.previous` 时，回退器会使用这份备份。
 
 如果还没有重启，或者在仍可进入 stage-2 时决定撤销默认项：
 

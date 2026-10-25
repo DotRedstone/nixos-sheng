@@ -5,7 +5,7 @@
 Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的 Mobile NixOS 移植项目。
 
 ![设备](https://img.shields.io/badge/device-Xiaomi%20Pad%206S%20Pro%2012.4-blue)
-![内核](https://img.shields.io/badge/kernel-7.1.8-blueviolet)
+![内核](https://img.shields.io/badge/kernel-7.3.0%20experimental-blueviolet)
 ![NixOS](https://img.shields.io/badge/NixOS-Mobile%20NixOS-5277c3)
 ![许可证](https://img.shields.io/badge/license-MIT%20%2B%20third--party%20terms-orange)
 
@@ -39,6 +39,8 @@ Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的 Mobile NixOS 移植项目�
 首个公开版本可从
 [GitHub Releases](https://github.com/DotRedstone/nixos-sheng/releases/latest)
 下载。部分硬件仍未完全支持，刷写前请阅读下方状态表和已知问题。
+此实验分支固定 Linux 7.3.0 以验证 EFI 载荷；下表的硬件状态来自先前已验证的构建，
+7.3.0 尚未完成同等实机验收，其基线也缺少 FPC1552 内核驱动。
 
 | 领域 | 状态 | 备注 |
 | --- | --- | --- |
@@ -73,7 +75,7 @@ Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的 Mobile NixOS 移植项目�
 内核源码在 `nixos/flake.nix` 中配置：
 
 ```nix
-shengKernelSrc.url = "github:DotRedstone/linux-sheng/upgrade/sheng-7.1.8";
+shengKernelSrc.url = "github:DotRedstone/linux-sheng/exp/sheng-7.3-baseline";
 ```
 
 ## 启动原理

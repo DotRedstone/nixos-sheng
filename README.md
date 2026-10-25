@@ -6,7 +6,7 @@ Mobile NixOS port for the Xiaomi Pad 6S Pro 12.4 (`sheng`,
 Qualcomm SM8550).
 
 ![Device](https://img.shields.io/badge/device-Xiaomi%20Pad%206S%20Pro%2012.4-blue)
-![Kernel](https://img.shields.io/badge/kernel-7.1.8-blueviolet)
+![Kernel](https://img.shields.io/badge/kernel-7.3.0%20experimental-blueviolet)
 ![NixOS](https://img.shields.io/badge/NixOS-Mobile%20NixOS-5277c3)
 ![License](https://img.shields.io/badge/license-MIT%20%2B%20third--party%20terms-orange)
 
@@ -48,6 +48,9 @@ The first public release is available from
 [GitHub Releases](https://github.com/DotRedstone/nixos-sheng/releases/latest).
 Some hardware remains partially supported; review the status table and known
 issues before flashing.
+This experimental branch pins Linux 7.3.0 for EFI payload validation. The
+hardware status below describes earlier verified builds; 7.3.0 has not passed
+the same device acceptance, and its baseline lacks the FPC1552 kernel driver.
 
 | Area | Status | Notes |
 | --- | --- | --- |
@@ -83,7 +86,7 @@ issues before flashing.
 The kernel source is configured in `nixos/flake.nix`:
 
 ```nix
-shengKernelSrc.url = "github:DotRedstone/linux-sheng/upgrade/sheng-7.1.8";
+shengKernelSrc.url = "github:DotRedstone/linux-sheng/exp/sheng-7.3-baseline";
 ```
 
 ## How Boot Works
