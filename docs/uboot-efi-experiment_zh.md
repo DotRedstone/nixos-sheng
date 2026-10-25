@@ -231,7 +231,7 @@ stage-1 判定，再交给 stage-2 充电目标。备份 `boot_b` 的刷回与�
 ## 已接入的 EFI 载荷更新路径
 
 `services.sheng-uboot-efi` 向 rootfs 安装 `sheng-efi`，并通过
-`sheng-efi-sync-generations.path` 监听系统 profile 的世代变化。普通 `nixos-rebuild` 只增加或切换 stage-2 世代；同步服务在 ESP 上为现存可启动的 `system-N-link` 生成 Type #1 条目，把 `system` profile 对应的条目设为默认。它不会覆盖固定的 EFI 内核、DTB 或 stage-1 initrd。
+`sheng-efi-sync-generations.path` 监听系统 profile 的世代变化。普通 `nixos-rebuild` 只增加或切换 stage-2 世代；同步服务在 ESP 上为现存且内核闭包与 EFI 载荷一致的 `system-N-link` 生成 Type #1 条目，把匹配的 `system` profile 条目设为默认。不匹配的默认世代会使同步失败，已有菜单保持不变。它不会覆盖固定的 EFI 内核、DTB 或 stage-1 initrd。
 
 手动核对或同步菜单：
 
