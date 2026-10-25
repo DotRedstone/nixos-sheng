@@ -106,6 +106,11 @@ jobs:
           test -n "$entry"
           grep -Fx "default $(basename "$entry")" out/sheng-uboot-efi-esp/esp/loader/loader.conf
           (cd out/sheng-uboot-efi-esp/esp && sha256sum -c manifest.sha256)
+          kernel_identity=$(find out/sheng-uboot-efi-esp/esp/EFI/NixOS \
+            -name kernel.store-path -type f -print -quit)
+          test -n "$kernel_identity"
+          printf 'EFI payload kernel closure: '
+          cat "$kernel_identity"
           sha256sum out/sheng-uboot-efi-esp/esp/manifest.sha256 > out/sheng-uboot-efi-esp.manifest.sha256
           printf '%s\n' "$GITHUB_SHA" > out/sheng-uboot-efi-esp.source-revision
       - name: Upload validated EFI payload
