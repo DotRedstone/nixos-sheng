@@ -116,7 +116,7 @@ let
 
       install_payload() {
         local supplied=$1 source entry entries version payload linux_path initrd_path dtb_path
-        local staging backup_loader previous_default previous_linux previous_base candidate
+        local staging backup_loader backup_manager previous_default previous_linux previous_base candidate
 
         source="$(readlink -f -- "$supplied")"
         if [ "$source" = "$esp" ] || [ ! -d "$source" ]; then
@@ -212,7 +212,12 @@ let
         # and in persistent rootfs state. The old BLS entry and its payload
         # are deliberately retained.
         backup_loader="$state/previous-loader.conf"
+        backup_manager="$state/previous-BOOTAA64.EFI"
         if [ -f "$esp/loader/loader.conf" ]; then
+          if [ ! -s "$esp/EFI/BOOT/BOOTAA64.EFI" ]; then
+            echo "Cannot back up the previous EFI boot manager." >&2
+            exit 1
+          fi
           install -m 0600 "$esp/loader/loader.conf" "$backup_loader"
           install -m 0644 "$esp/loader/loader.conf" "$esp/loader/loader.conf.previous"
           previous_default="$(awk '$1 == "default" { print $2; exit }' "$backup_loader")"
@@ -231,6 +236,9 @@ let
             exit 1
           fi
           printf '%s\n' "$previous_base" > "$state/previous-payload-entry"
+          install -m 0600 "$esp/EFI/BOOT/BOOTAA64.EFI" "$backup_manager.new"
+          cmp "$esp/EFI/BOOT/BOOTAA64.EFI" "$backup_manager.new"
+          mv "$backup_manager.new" "$backup_manager"
         fi
         if [ -f "$esp/EFI/BOOT/BOOTAA64.EFI" ]; then
           install -m 0644 "$esp/EFI/BOOT/BOOTAA64.EFI" "$esp/EFI/BOOT/BOOTAA64.EFI.previous"
@@ -250,6 +258,7 @@ let
       }
 
       rollback() {
+        local previous_manager
         check_esp
         if [ ! -s "$state/previous-loader.conf" ]; then
           echo "No previous EFI loader configuration has been recorded." >&2
@@ -258,6 +267,16 @@ let
         install -d -m 0700 "$state"
         exec 9>"$state/install.lock"
         flock -x 9
+        previous_manager="$state/previous-BOOTAA64.EFI"
+        # Existing installations may only have the ESP-side backup. Prefer
+        # the persistent copy made by newer installations when both exist.
+        if [ ! -s "$previous_manager" ]; then
+          previous_manager="$esp/EFI/BOOT/BOOTAA64.EFI.previous"
+        fi
+        if [ ! -s "$previous_manager" ]; then
+          echo "No previous EFI boot manager has been recorded." >&2
+          exit 1
+        fi
         if [ -s "$state/previous-payload-entry" ]; then
           previous_base="$(cat "$state/previous-payload-entry")"
           case "$previous_base" in
@@ -275,11 +294,15 @@ let
         else
           install -m 0644 "$state/previous-loader.conf" "$esp/loader/loader.conf.new"
         fi
+        install -m 0644 "$previous_manager" "$esp/EFI/BOOT/BOOTAA64.EFI.new"
+        cmp "$previous_manager" "$esp/EFI/BOOT/BOOTAA64.EFI.new"
+        sync
+        mv "$esp/EFI/BOOT/BOOTAA64.EFI.new" "$esp/EFI/BOOT/BOOTAA64.EFI"
         mv "$esp/loader/loader.conf.new" "$esp/loader/loader.conf"
         rebuild_manifest
         ${shengEfiGenerations}/bin/sheng-efi-generations "$esp"
         rm -f "$state/pending-version"
-        echo "Restored the previous EFI default entry."
+        echo "Restored the previous EFI boot manager and default entry."
       }
 
       mark_successful() {
