@@ -15,8 +15,8 @@ let
   llvmPkgs = pkgs.llvmPackages;
 in
 mobile-nixos.kernel-builder-clang {
-  version = "7.1.8";
-  modDirVersion = "7.1.8";
+  version = "7.3.0";
+  modDirVersion = "7.3.0";
   src = shengKernelSrc;
   configfile = ./config.aarch64;
   patches = [ ];
@@ -42,6 +42,8 @@ mobile-nixos.kernel-builder-clang {
     "OBJDUMP=${llvmPkgs.llvm}/bin/llvm-objdump"
     "READELF=${llvmPkgs.llvm}/bin/llvm-readelf"
     "STRIP=${llvmPkgs.llvm}/bin/llvm-strip"
+    # 7.3 的 certs/extract-cert 在构建时需要 OpenSSL 运行库。
+    "HOSTLDFLAGS=-Wl,-rpath,${buildPackages.openssl.out}/lib"
     "KCFLAGS=-Wno-error=unused-command-line-argument"
     "KCPPFLAGS=-Wno-error=unused-command-line-argument"
   ];
@@ -69,7 +71,7 @@ mobile-nixos.kernel-builder-clang {
     require_config "CONFIG_VFAT_FS=m"
     require_config "CONFIG_BTRFS_FS=m"
     require_config "CONFIG_EROFS_FS=m"
-    require_config "CONFIG_INPUT_FPC1552=y"
+    # 原生 7.3 基线暂不提供 FPC1552；后续设备补丁另行验收。
 
     # These groups can disappear without making the image unbootable. Check
     # the effective Kconfig so dependency changes fail in CI instead of later
