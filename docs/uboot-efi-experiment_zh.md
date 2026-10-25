@@ -247,7 +247,7 @@ sudo sheng-efi status
 安装器只接受含完整 `manifest.sha256` 的 `shengUbootEfiEsp/esp` 树，并确认 `/boot` 是
 PARTLABEL 为 `linux-boot` 的 FAT ESP。它先把新的版本化目录
 `EFI/NixOS/sheng-<kernel-version>-<payload-hash>/`、BLS 条目和 systemd-boot 写入临时目录，再逐文件校验；
-新载荷全部存在后才用重命名切换 `loader.conf` 的默认项，再同步世代条目。旧 BLS 条目和旧内核/initrd/DTB 不会被删除；旧 `loader.conf` 与所选固定载荷会保存在 `/var/lib/sheng-efi/`，供 `sheng-efi rollback` 使用。
+新载荷全部存在后才用重命名切换 `loader.conf` 的默认项，再同步世代条目。旧 BLS 条目和旧内核/initrd/DTB 保留在 ESP；旧 `loader.conf` 和 `BOOTAA64.EFI` 备份在 `/var/lib/sheng-efi/`，供 `sheng-efi rollback` 使用。早期安装只在 ESP 留有 `BOOTAA64.EFI.previous` 时，回退器会使用这份备份。
 
 如果还没有重启，或者在仍可进入 stage-2 时决定撤销默认项：
 
@@ -255,6 +255,12 @@ PARTLABEL 为 `linux-boot` 的 FAT ESP。它先把新的版本化目录
 sudo sheng-efi rollback
 sudo sheng-efi status
 ```
+
+回退先校验旧 boot manager 备份，再恢复 `BOOTAA64.EFI` 和旧默认项；如果备份缺失，命令会在切换默认项前报错。ESP 的 FAT 文件替换不具备跨文件事务能力，回退完成后仍需执行 `sheng-efi status` 核对清单与默认项。若设备已无法进入 stage-2，须从 ABL fastboot 将已知可启动的 Mobile NixOS 镜像刷回 `boot_b`，不能依赖设备内的回退命令。
+
+boot 镜像和 ESP 载荷由两个独立 workflow 构建。准备同一发布候选时，先核对两份 artifact 内的 `*.source-revision` 完全相同，且等于审查的提交；再分别校验 boot 镜像 SHA-256 和 ESP 的 `manifest.sha256`。内核版本、U-Boot 版本或 workflow 均成功不能代替提交一致性检查。
+
+同一候选的最短设备验收顺序是：确认 B 槽及已知可启动的 `boot_b` 备份，安装对应 ESP 载荷，临时启动或刷入对应 U-Boot 镜像；验证普通启动、真实关机插线时直接出现离线充电画面且无世代菜单、断电后的冷启动、恢复键进入可用恢复路径；最后从 ABL fastboot 刷回备份 `boot_b` 并再次启动稳定系统。每次记录屏幕画面和实际启动目标，且运行 `systemctl is-system-running`、`systemctl --failed`。在当前候选补齐关机插线画面顺序、冷启动和恢复键证据前，不能把既有启动记录视作发布验收。
 
 成功到达 `multi-user.target` 后，`sheng-efi-mark-successful.service` 会记录当时配置的 EFI 默认项和时间。
 它是运行时健康记录，不能单独证明用户没有从 systemd-boot 菜单手动选择旧条目；它不会自动清理旧载荷，也不会修改 Android 分区。
