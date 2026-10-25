@@ -144,7 +144,9 @@ move through the EFI menu on-device. The updated U-Boot image has booted from
 `boot_b`; flashing the known-good backup and restoring the experimental image
 have been tested. Fastboot reboot without a prewritten normal-boot marker
 returned to the normal system. Cold boot and recovery-key behavior still need
-validation.
+validation. A 7.3.0 EFI payload matched to the current rootfs has also reached
+generation 1 through a RAM-only U-Boot boot, mounted the ESP, and returned to
+the unchanged B-slot boot path on reboot.
 See [`docs/uboot-efi-experiment_zh.md`](docs/uboot-efi-experiment_zh.md)
 for the architecture, checks, and rollback procedure.
 

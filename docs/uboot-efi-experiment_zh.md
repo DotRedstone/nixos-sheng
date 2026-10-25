@@ -60,7 +60,15 @@ scripts/sheng-adb-reboot-bootloader.sh
 
 `adb reboot bootloader` 是 ADB daemon 的普通重启请求，不能稳定映射为 Linux 的
 `RESTART2("bootloader")`；主机包装脚本和 rootfs 命令专门补足这个原因传递。
-直接调用 `RESTART2` 不经过 systemd 的 `reboot.target`，因此这两个命令会先持久化一次性
+ABL fastboot 的枚举窗口可能很短。临时启动 U-Boot 时使用主机脚本，先让
+`fastboot boot` 等待设备，再触发同一 `RESTART2` 请求：
+
+```bash
+scripts/sheng-adb-ram-boot.sh out/sheng-u-boot-experimental-boot_b.img
+```
+
+该命令只把镜像送入 RAM，不刷写 `boot_b`。
+直接调用 `RESTART2` 不经过 systemd 的 `reboot.target`，因此上述命令会先持久化一次性
 `force-normal-once` 标记。设备从 ABL fastboot 执行 `fastboot reboot` 后，stage-1 用该标记
 优先选择正常启动，stage-2 随后清除标记。更新 rootfs 前应使用仓库中的主机包装脚本。
 
@@ -166,7 +174,22 @@ EFI 载荷配对，或取得内核、设备树和模块的完整等价证据，�
 
 现用 rootfs 的原始 CI 构建固定 `linux-sheng` 修订 `024eda3`：它以 `9ce9cb0` 为父提交，
 只增加上述六处 DTS 属性。实验分支已改用相同的锁定内核来源与构建定义；新的 ESP
-候选仍须由 ARM CI 确认其内核和模块闭包与设备完全一致，确认前不得安装。
+候选在本地 Nix 求值中得到与设备完全一致的内核和模块闭包路径。提交 `c69921d` 的
+ARM boot、ESP 与完整 minimal stage-2 构建成功；ESP artifact 的 manifest、内核路径、
+解压后的 `Image` 和 DTB 均已与设备逐项核对。
+
+同日将该 ESP 载荷安装到 `linux-boot`，并以同提交的 U-Boot 镜像执行 `fastboot boot`
+临时启动。随后用 `scripts/sheng-adb-ram-boot.sh` 重复通过同一路径。`bootctl` 报告
+`Das U-Boot`、systemd-boot 260.1 和第 1 世代；运行内核为
+7.3.0，`/boot` 以 vfat 挂载，stage-2 已进入现用系统。失败服务只有测试前已存在的
+`home-manager-luser.service` 与 `logrotate-checkconf.service`。普通重启后设备从原有 B 槽
+进入非 EFI 启动链，`boot_b` 完整 SHA-256 与测试前备份相同。ESP 新载荷仍保留供后续
+验证；未刷写 `boot_b`、`boot_a`、`linux` 或 `userdata`。
+
+当前 rootfs 只有第 1 世代，旧 7.1.8 EFI 载荷不能作为 7.3.0 的可启动回退项。
+`sheng-efi rollback` 已增加写入前的版本/闭包核对，会拒绝这种跨内核回退。新载荷验证
+失败时，应使用原有 `boot_b` 返回现用系统，再从备份恢复 ESP 元数据；
+不要把旧 EFI 菜单中的第 99 世代视作可用的 rootfs 回滚。
 
 ## 当前基线
 
