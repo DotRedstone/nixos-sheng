@@ -32,8 +32,9 @@ Android A 槽有 v4 格式的 `boot_a`、`vendor_boot_a`、`init_boot_a`，以�
 | 目标 | 当前状态 | 下一项可验证结果 |
 | --- | --- | --- |
 | NixOS 世代 | EFI 菜单、内核 7.3.0 与现用 rootfs 已实机启动 | 保持更新、回退和离线充电路径稳定 |
-| Alpine 3.24.3 临时探针 | 官方 aarch64 minirootfs 已校验并打包为独立 initrd；尚未上机 | 复用同源 EFI 内核与 DTB，从临时菜单项启动并读回结果标记 |
-| 第二个 Linux | 未安装，不能把另一个 NixOS 世代算作独立系统 | 使用单独 rootfs 与适配 Sheng 的内核/DTB/initrd 完成一次可回退启动 |
+| Alpine 3.24.3 | 独立 ext4 rootfs 的 `/init` 在平板以 PID 1 运行，随后返回 NixOS | 验证完整服务、交互、设备支持及长期安装 |
+| Debian 13 | 官方 arm64 最小用户态的独立 ext4 rootfs 已以 PID 1 运行，随后返回 NixOS | 验证完整服务、交互、设备支持及长期安装 |
+| 更多 Linux 发行版 | 尚未实机启动；不能把另一个 NixOS 世代算作独立系统 | 使用单独 rootfs 与适配 Sheng 的内核/DTB/initrd 完成可回退启动 |
 | Android A 槽 | Android 16 启动完成，ADB 回到 fastboot 后已切回 B 槽 NixOS | 继续验证可从统一菜单直接选择 Android，且返回机制可靠 |
 | Android 统一菜单入口 | 未实现 | 单独证明从菜单选择后正确装载 Android v4 启动链，且下次开机仍能返回统一界面 |
 | Windows on Arm | 未评估这台设备的 Windows 启动与驱动 | 先审计 UEFI 服务、ACPI 表、启动存储和 Arm64 驱动，再考虑 Windows PE 启动探针 |
@@ -49,7 +50,9 @@ Android A 槽有 v4 格式的 `boot_a`、`vendor_boot_a`、`init_boot_a`，以�
 
 其他 Linux 可复用统一界面的 EFI 入口，但每个系统需要自己的适配 Sheng 的内核、DTB、initrd、模块和固件，规划独立或明确共享的根文件系统，并验证更新及回退。`linux-boot` ESP 目前只承担 EFI 引导载荷；不得把 Android `userdata`、`super` 或固件分区改作 Linux 存储。
 
-`scripts/sheng-build-alpine-initrd-probe.sh` 可将 SHA-256 固定的 [Alpine 3.24.3 aarch64 minirootfs](https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/aarch64/) 打包为临时 RAM 启动探针。它在成功执行 Alpine `/init` 后，仅向现有 `linux` 分区写入 `/var/lib/sheng-multiboot/alpine-initrd-probe` 并自动重启；不安装 Alpine，也不修改 Android 分区。主机已验证上游归档校验值、aarch64 BusyBox 可执行、脚本语法与 initrd 内容。尚无平板启动结果，因此不能将它计作第二个已适配发行版。
+`scripts/sheng-build-alpine-initrd-probe.sh` 将 SHA-256 固定的 [Alpine 3.24.3 aarch64 minirootfs](https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/aarch64/) 打包为临时 RAM 探针。首次实机测试确认 Alpine `/init` 执行，写下版本与内核标记后自动返回 NixOS。随后在现有 `linux` 分区内建立独立的 128 MiB ext4 镜像，用相同的设备内核和 DTB 从 EFI 临时条目启动，`switch_root` 后 Alpine 根文件系统中的 `/init` 以 PID 1 写下 `rootfs=alpine`、`version=3.24.3`、`kernel=7.3.0`，再自动返回 NixOS。ESP 默认项、临时条目与 initrd 已恢复或清理，B 槽哈希未变。此结果证明第二套 Linux 用户态及独立根文件系统的短时启动；还不是 Alpine 桌面或长期安装验收。
+
+Debian 使用 [Debian 13 trixie arm64 官方容器镜像](https://github.com/docker-library/official-images/blob/master/library/debian)导出的最小用户态，镜像摘要为 `sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f`。在同一 EFI 内核、DTB 与临时 initrd 下，独立的 256 MiB ext4 镜像完成挂载与 `switch_root`，Debian `/init` 以 PID 1 写下 `rootfs=debian`、`version=13`、`kernel=7.3.0`，随后自动返回 NixOS。两个探针均通过 RAM 启动 U-Boot；临时 ESP 条目和两个 ext4 测试镜像在保存结果后已清理，默认项恢复为 NixOS，B 槽完整哈希仍与可启动备份相同。Debian 服务、图形、硬件与更新机制尚未验证。
 
 Windows on Arm 对固件的要求超出“能运行一个 EFI 程序”：需检查 UEFI 启动与运行时服务、图形和存储协议、ACPI 描述、启动所需设备和原生 Arm64 驱动。当前 U-Boot/Linux 的 DTB 启动成功不能推出 Windows 可启动。应先做不写分区的固件能力审计，再尝试 Windows PE；完整安装须等启动链和驱动有独立证据。[Microsoft UEFI 要求](https://learn.microsoft.com/en-us/windows-hardware/drivers/bringup/uefi-requirements-that-apply-to-all-windows-platforms)、[Windows on Arm 设备制造与驱动](https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/arm64-device-manufacturing)
 

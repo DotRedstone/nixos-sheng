@@ -353,5 +353,19 @@ SHA-256、ESP manifest 和所有列入 manifest 的文件、默认 EFI 条目及
 `sys.boot_completed=1` 且图形服务运行；通过 Android ADB 返回 fastboot 并切回 B 槽，
 NixOS 7.3.0 再次启动。B 槽完整哈希与原始备份一致，A 槽关键启动分区未变。
 这不是从 U-Boot / EFI 菜单启动 Android 的验证。
+
+同日验证了另一个 Linux 用户态：官方 Alpine 3.24.3 aarch64 minirootfs 首先作为
+独立 initrd 从 EFI 菜单短时启动，`/init` 写下 Alpine 版本和内核 7.3.0 标记。
+随后 Alpine 被放入现有 `linux` 分区内的独立 ext4 镜像；EFI 内核经临时 initrd
+挂载该镜像并 `switch_root`，Alpine 根文件系统中的 `/init` 以 PID 1 写下结果标记，
+之后自动重启回非 EFI NixOS。两次均只以 `fastboot boot` 临时启动 U-Boot；ESP
+默认项和临时载荷已恢复或清理，完整 `boot_b` 哈希未变。尚未验证 Alpine 的完整
+服务启动、图形界面、硬件驱动和更新机制，不能称为可供日常使用的发行版移植。
+
+同一方法还短时启动了 Debian 13 arm64 的独立 ext4 根文件系统：临时 EFI 条目
+经已验证的 7.3.0 内核与 Sheng DTB 进入 Debian `/init`，设备记录其 PID 为 1，
+版本为 13，然后自动返回 B 槽 NixOS。Alpine 和 Debian 测试镜像及临时 ESP
+条目均已清理，ESP 默认项和 B 槽完整哈希与测试前一致。两者均只完成启动探针，
+尚未具备可日常使用的桌面、服务与更新支持。
 实际分区边界和验收记录见 [存储迁移预案](uboot-efi-storage-plan_zh.md)。
 Android A 槽与更多 Linux 的可行性及验收边界见[多系统路线图](uboot-multiboot-roadmap_zh.md)。
