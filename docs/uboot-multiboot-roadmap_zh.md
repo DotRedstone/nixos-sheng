@@ -25,7 +25,7 @@ Android ABL / B 槽
 
 现用 `sheng-uboot.env` 在正常路径先加载 systemd-boot，U-Boot 自带 `bootmenu` 仅在 EFI 启动失败后提供诊断与恢复命令，因此当前还不是一个覆盖所有系统的顶层界面。U-Boot 的 `bootmenu` 使用 ANSI 终端菜单；若最终界面采用图形方式，应先验证本机 EFI 图形输出与实体键输入，再选择或实现统一的 EFI 前端，而不是仅给诊断菜单增加系统名称。[U-Boot bootmenu 说明](https://docs.u-boot.org/en/stable/usage/cmd/bootmenu.html)
 
-设备上只读检查表明，Android A 槽有 v4 格式的 `boot_a`、`vendor_boot_a`、`init_boot_a`，以及 `dtbo_a` 和 `vbmeta_a`。A/B 元数据将 A 标记为 bootable、successful，但这不能证明 Android 现状可启动。检查前已将 A 槽关键启动分区与 `misc` 在主机私有目录备份，并逐项比较设备和备份的 SHA-256；未改写 A 槽或 `userdata`。
+Android A 槽有 v4 格式的 `boot_a`、`vendor_boot_a`、`init_boot_a`，以及 `dtbo_a` 和 `vbmeta_a`。2026-10-26 从 B 槽经 ABL fastboot 切至 A 槽后，ADB 报告 Android 16、`_a` 槽、`sys.boot_completed=1`，图形服务运行；随后从 Android ADB 返回 ABL fastboot、切回 B 槽，重新进入非 EFI 的 NixOS 7.3.0。B 槽完整哈希与测试前备份一致，A 槽关键启动分区也与私有备份一致；未刷写 A 槽、`linux` 或 `userdata`。本次证明槽位切换可用，不证明 Android 能从 B 槽 U-Boot 菜单直接启动。
 
 ## 系统适配边界
 
@@ -34,14 +34,14 @@ Android ABL / B 槽
 | NixOS 世代 | EFI 菜单、内核 7.3.0 与现用 rootfs 已实机启动 | 保持更新、回退和离线充电路径稳定 |
 | Alpine 3.24.3 临时探针 | 官方 aarch64 minirootfs 已校验并打包为独立 initrd；尚未上机 | 复用同源 EFI 内核与 DTB，从临时菜单项启动并读回结果标记 |
 | 第二个 Linux | 未安装，不能把另一个 NixOS 世代算作独立系统 | 使用单独 rootfs 与适配 Sheng 的内核/DTB/initrd 完成一次可回退启动 |
-| Android A 槽 | 启动镜像和槽位只读检查完成，尚未实际启动 | 在保留 B 槽恢复路径下验证进入 Android、从 Android 返回 B 槽 |
+| Android A 槽 | Android 16 启动完成，ADB 回到 fastboot 后已切回 B 槽 NixOS | 继续验证可从统一菜单直接选择 Android，且返回机制可靠 |
 | Android 统一菜单入口 | 未实现 | 单独证明从菜单选择后正确装载 Android v4 启动链，且下次开机仍能返回统一界面 |
 | Windows on Arm | 未评估这台设备的 Windows 启动与驱动 | 先审计 UEFI 服务、ACPI 表、启动存储和 Arm64 驱动，再考虑 Windows PE 启动探针 |
 | 原版 iOS / iPadOS | 不列为 Sheng 可交付系统 | Apple 的启动信任链和系统设计依赖 Apple 硬件；不以菜单图标暗示支持 |
 
 ### Android：槽位入口与直接入口
 
-最早可验证的 Android 入口是 ABL A/B 槽位切换：A 槽进入 Android，B 槽进入 U-Boot 和 NixOS。切到 A 后，ABL 直接启动 Android，B 槽的统一界面不会出现；因此这只能是过渡阶段。Android 的 A/B 元数据还承担更新与失败回退，`set_active` 会改变成功和重试状态，不能把槽位切换伪装为无副作用的一次性菜单选择。正式提供此方式前，必须实测 A 槽启动、从 Android 返回 B 槽，以及失败时通过 ABL fastboot 恢复。[Android A/B 实现说明](https://source.android.com/docs/core/ota/ab/ab_implement)
+已验证的 Android 入口是 ABL A/B 槽位切换：A 槽进入 Android，B 槽进入 NixOS，实验时也可进入 U-Boot。切到 A 后，ABL 直接启动 Android，B 槽的统一界面不会出现；因此这只是过渡路径。Android 的 A/B 元数据还承担更新与失败回退，`set_active` 会改变成功和重试状态，不能把槽位切换伪装为无副作用的一次性菜单选择。本次已实测 A 槽启动与经 ABL fastboot 返回 B 槽；未验证 Android 启动失败时的自动回退。[Android A/B 实现说明](https://source.android.com/docs/core/ota/ab/ab_implement)
 
 真正一致的每次开机界面需要从 B 槽 U-Boot 直接交接 Android，或证明等价的安全返回机制。该设备的 Android v4 启动链使用独立的 `vendor_boot`、`init_boot`、DTB/DTBO、bootconfig 和 AVB；还要处理恢复模式与 Android 更新后镜像的变化。U-Boot 通用 Android boot image 支持不足以证明这些设备专属输入已正确组合。该路径必须独立实现、先 RAM 验证，再进行有备份的实机验收。[Android 启动分区说明](https://source.android.com/docs/core/architecture/partitions/generic-boot)、[U-Boot Android 启动镜像](https://docs.u-boot.org/en/stable/android/boot-image.html)
 
@@ -62,7 +62,7 @@ Windows on Arm 对固件的要求超出“能运行一个 EFI 程序”：需检
 1. 维持当前 NixOS EFI 启动、离线充电、冷启动、TWRP 与 `boot_b` 回退路径；改进插墙充时可见的 U-Boot 日志。
 2. 定义统一界面的条目清单和启动适配器边界，实机验证 U-Boot 的图形输出、实体键输入及失败返回；选择或实现一个 EFI 前端。界面仅列已验证条目。
 3. 准备第二个 Linux 的独立 rootfs 和完整载荷，先临时启动，再验证更新、断电冷启动及回退。这是首个真正跨发行版的统一界面验收。
-4. 保持 B 槽稳定镜像和主机备份可用，验证 Android A 槽实际启动及双向返回；之后单独开发可从统一界面选择的 Android 交接。
+4. 保持 B 槽稳定镜像和主机备份可用，在已验证 A 槽 Android 启动与手动返回后，单独开发可从统一界面选择的 Android 交接。
 5. 对 Windows on Arm 先做固件/ACPI/驱动差距审计和可回退的 Windows PE 探针，再决定是否有完整安装条件。
 
 每一步分别记录：源码预期、构建结果、设备画面、进入的系统、失败时的实际恢复路径。新系统通过这些检查后才成为默认可见菜单项；任何阶段都不刷 `userdata`。

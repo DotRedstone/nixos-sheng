@@ -348,5 +348,10 @@ SHA-256、ESP manifest 和所有列入 manifest 的文件、默认 EFI 条目及
 当前候选的 B 槽持久启动、普通重启、关机插墙充、断电冷启动、TWRP 恢复键和稳定镜像刷回
 已实测。充电启动仍显示 U-Boot 日志；Android 与其他 Linux 尚未在本菜单启动。实验分支
 不得当作已完成多系统适配或正式 release 宣传。
+
+2026-10-26 单独验证了 ABL A/B 槽位路径：切至 A 槽后 Android 16 报告启动完成，
+`sys.boot_completed=1` 且图形服务运行；通过 Android ADB 返回 fastboot 并切回 B 槽，
+NixOS 7.3.0 再次启动。B 槽完整哈希与原始备份一致，A 槽关键启动分区未变。
+这不是从 U-Boot / EFI 菜单启动 Android 的验证。
 实际分区边界和验收记录见 [存储迁移预案](uboot-efi-storage-plan_zh.md)。
 Android A 槽与更多 Linux 的可行性及验收边界见[多系统路线图](uboot-multiboot-roadmap_zh.md)。
