@@ -50,6 +50,8 @@ Android A 槽有 v4 格式的 `boot_a`、`vendor_boot_a`、`init_boot_a`，以�
 
 其他 Linux 可复用统一界面的 EFI 入口，但每个系统需要自己的适配 Sheng 的内核、DTB、initrd、模块和固件，规划独立或明确共享的根文件系统，并验证更新及回退。`linux-boot` ESP 目前只承担 EFI 引导载荷；不得把 Android `userdata`、`super` 或固件分区改作 Linux 存储。
 
+社区适配使用[Linux EFI 条目约定](community-linux-efi-entry_zh.md)和只读预检器准备临时条目；长期安装仍须逐发行版验证。
+
 `scripts/sheng-build-alpine-initrd-probe.sh` 将 SHA-256 固定的 [Alpine 3.24.3 aarch64 minirootfs](https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/aarch64/) 打包为临时 RAM 探针。首次实机测试确认 Alpine `/init` 执行，写下版本与内核标记后自动返回 NixOS。随后在现有 `linux` 分区内建立独立的 128 MiB ext4 镜像，用相同的设备内核和 DTB 从 EFI 临时条目启动，`switch_root` 后 Alpine 根文件系统中的 `/init` 以 PID 1 写下 `rootfs=alpine`、`version=3.24.3`、`kernel=7.3.0`，再自动返回 NixOS。ESP 默认项、临时条目与 initrd 已恢复或清理，B 槽哈希未变。此结果证明第二套 Linux 用户态及独立根文件系统的短时启动；还不是 Alpine 桌面或长期安装验收。
 
 Debian 使用 [Debian 13 trixie arm64 官方容器镜像](https://github.com/docker-library/official-images/blob/master/library/debian)导出的最小用户态，镜像摘要为 `sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f`。在同一 EFI 内核、DTB 与临时 initrd 下，独立的 256 MiB ext4 镜像完成挂载与 `switch_root`，Debian `/init` 以 PID 1 写下 `rootfs=debian`、`version=13`、`kernel=7.3.0`，随后自动返回 NixOS。两个探针均通过 RAM 启动 U-Boot；临时 ESP 条目和两个 ext4 测试镜像在保存结果后已清理，默认项恢复为 NixOS，B 槽完整哈希仍与可启动备份相同。Debian 服务、图形、硬件与更新机制尚未验证。
