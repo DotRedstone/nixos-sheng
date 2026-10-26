@@ -242,6 +242,15 @@ systemd-boot 进入 NixOS 7.3.0；命令在 EFI 路径执行普通重启，设�
 `31e4e8bfaa06fedb2e2fa41531b068274d6baafd3ade0886dc279af2a473ae6a`，与备份一致。
 屏幕上 EFI 选择界面的显示仍以使用者现场观察为准。
 
+针对菜单是否可见的疑问，又用同一候选做了一次 B 槽测试。EFI 系统中执行
+`systemctl reboot --boot-loader-menu=10` 报 `Read-only file system`，设备未重启；
+因此该设备当前不能从 Linux 通过 EFI 变量请求一次性菜单超时。临时把 ESP 的
+`loader.conf` 从 `timeout 3` 改成 `timeout 10` 后执行普通重启，设备再次经过
+U-Boot UEFI 和 systemd-boot 进入 NixOS 7.3.0；屏幕菜单是否实际可见仍待现场反馈。
+测试结束后，`loader.conf` 的 SHA-256 恢复为
+`1414ba8826bbbdc8fa8d828ac94edd467f5e20f4071adb08164b98cbefddc4b8`，
+原 192 MiB B 槽镜像完整哈希也与备份一致，设备回到非 EFI NixOS 7.3.0。
+
 当前 rootfs 只有第 1 世代，旧 7.1.8 EFI 载荷不能作为 7.3.0 的可启动回退项。
 `sheng-efi rollback` 已增加写入前的版本/闭包核对，会拒绝这种跨内核回退。新载荷验证
 失败时，应使用原有 `boot_b` 返回现用系统，再从备份恢复 ESP 元数据；
