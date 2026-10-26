@@ -135,6 +135,11 @@
         exit 1
       fi
 
+      # EFI 世代菜单由 systemd-boot 显示；不要留下旧 stage-1 菜单标记。
+      if [ -d /sys/firmware/efi ]; then
+        exec systemctl reboot --boot-loader-menu=10
+      fi
+
       install -d -m 0755 /var/lib/sheng-boot-menu
       : > /var/lib/sheng-boot-menu/requested
       sync
