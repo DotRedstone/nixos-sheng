@@ -270,6 +270,21 @@ LED，而 DRM 面板随后才完成复位和初始化。内核实验提交
 跟踪。这只是待验证的原因假设，不代表白闪已经修复。当前 EFI 内核位于独立的
 `linux-boot` 分区，`boot_b` 中是 U-Boot，`linux` 中是 rootfs；只写后两者
 无法替换 EFI 内核。未获该分区的写入范围确认前，不在设备上安装实验 EFI 载荷。
+ARM [EFI 载荷构建](https://github.com/DotRedstone/nixos-sheng/actions/runs/40374499919)
+已成功；下载产物的内部 manifest 和外层摘要均通过。对应的
+[普通 boot image 工作流](https://github.com/DotRedstone/nixos-sheng/actions/runs/40374773651)
+完成镜像构建后，在后续模块打包门禁因本实验内核缺少 FPC1552 驱动而失败，
+没有上传镜像。该失败不证明背光补丁编译失败，也不能代替实机验证。
+[B 槽诊断作业](https://github.com/DotRedstone/nixos-sheng/actions/runs/40380595505)
+随后在模块门禁前上传镜像；镜像 SHA-256 为
+`645539d4c9c123ef74c7aeaa456e9a86d978174bacad5712f2c4c29c700d2444`。
+离线检查确认 Android boot v0、镜像小于 192 MiB，内核、DTB、initrd 与上述
+EFI 载荷逐字节一致。临时刷入 `boot_b` 后，设备经普通 Mobile NixOS 路径进入
+NixOS 7.3.0，桌面与背光正常；设备端读回镜像 SHA-256 相同。随后将关闭图标的
+U-Boot 候选刷回 `boot_b`，再次经 U-Boot EFI 进入 NixOS；读回前 647168 字节
+SHA-256 为 `a843e13dae29a0972b97c712d9165a8e051c34a890013817cc1c3a3d3293af73`。
+未写 A 槽、`linux`、`linux-boot` 或 `userdata`。本次普通启动缺少可靠的屏幕
+观察，不能判断单帧白闪是否改善；EFI 交接路径也未使用新内核实机测试。
 
 当前 rootfs 只有第 1 世代，旧 7.1.8 EFI 载荷不能作为 7.3.0 的可启动回退项。
 `sheng-efi rollback` 已增加写入前的版本/闭包核对，会拒绝这种跨内核回退。新载荷验证
