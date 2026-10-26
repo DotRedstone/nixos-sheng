@@ -233,6 +233,15 @@ TWRP，并从 `Reboot → System` 返回 EFI 选择界面与 NixOS；ADB 随后�
 B 槽读回 SHA-256 为 `31e4e8bfaa06fedb2e2fa41531b068274d6baafd3ade0886dc279af2a473ae6a`，
 与备份一致。A 槽、`linux`、`userdata` 和 Android 固件分区未写入。
 
+2026-10-27 再次将关闭图标的候选写入 B 槽，临时运行与
+`sheng-reboot-generation-menu` 当前源码相同的 shell 命令。设备已通过 U-Boot UEFI 和
+systemd-boot 进入 NixOS 7.3.0；命令在 EFI 路径执行普通重启，设备再次进入同一 EFI
+启动链，且未生成旧 stage-1 的 `requested` 标记。测试没有更新 rootfs，因此不能证明
+新命令已作为系统包部署。随后从 ABL fastboot 恢复原 192 MiB `boot_b` 备份；设备回到
+非 EFI NixOS 7.3.0，完整 B 槽读回 SHA-256 为
+`31e4e8bfaa06fedb2e2fa41531b068274d6baafd3ade0886dc279af2a473ae6a`，与备份一致。
+屏幕上 EFI 选择界面的显示仍以使用者现场观察为准。
+
 当前 rootfs 只有第 1 世代，旧 7.1.8 EFI 载荷不能作为 7.3.0 的可启动回退项。
 `sheng-efi rollback` 已增加写入前的版本/闭包核对，会拒绝这种跨内核回退。新载荷验证
 失败时，应使用原有 `boot_b` 返回现用系统，再从备份恢复 ESP 元数据；
