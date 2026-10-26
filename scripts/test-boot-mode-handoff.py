@@ -77,7 +77,7 @@ end
 
     # Run the real SwitchRoot selection method: a saved manual choice must
     # override USB-only PON even when a legacy reboot omitted the marker.
-    for pending in (True, False):
+    for selection_mode in ("pending", "charger", "efi"):
         run = root / "selection-run"
         run.mkdir()
         subprocess.run(["ruby", "-e", '''
@@ -85,7 +85,7 @@ require "logger"
 $logger = Logger.new(File::NULL)
 Configuration = {}
 module System
-  def self.cmdline; ["bootinfo.pureason=0x10"]; end
+  def self.cmdline; [ARGV[4] == "efi" ? "bootinfo.pureason=0x80" : "bootinfo.pureason=0x10"]; end
 end
 module Tasks
   class SwitchRoot
@@ -103,7 +103,12 @@ module ShengBootAnimation
   def self.start(*args); $animation = true; end
 end
 module ShengHeadlessGenerationMenu
-  def self.consume_pending_selection(root); ARGV[4] == "yes" ? :chosen : nil; end
+  def self.efi_boot?; ARGV[4] == "efi"; end
+  def self.efi_generation; :chosen; end
+  def self.consume_pending_selection(root)
+    abort "EFI boot consumed an old stage-1 selection" if efi_boot?
+    ARGV[4] == "pending" ? :chosen : nil
+  end
   def self.choose(*args); abort "unexpected menu"; end
 end
 load ARGV[0]
@@ -114,14 +119,16 @@ ShengEarlyChargeGuard.define_singleton_method(:prepare_offline_charging_handoff)
 source = File.read(ARGV[3])
 eval(source[source.rindex("class Tasks::SwitchRoot")..-1], TOPLEVEL_BINDING, ARGV[3])
 selection = Tasks::SwitchRoot.new.selected_generation
-if ARGV[4] == "yes"
+if ARGV[4] == "pending" || ARGV[4] == "efi"
   abort "saved choice entered charging" unless selection == :chosen && $animation && !$handoff
 else
   abort "charger played boot animation" unless selection.path == "default" && $handoff && !$animation
 end
 ''', str(guard), str(marker), str(run / "sheng-boot-ui.mode"), str(menu),
-                        "yes" if pending else "no"], check=True)
-        assert generate(run) == (not pending)
+                        selection_mode], check=True)
+        expect_charger = selection_mode == "charger"
+        reason = "bootinfo.pureason=0x10" if expect_charger else "bootinfo.pureason=0x80"
+        assert generate(run, reason) == expect_charger
         shutil.rmtree(run)
 
     # Old initrd / generator fallback: override consumption must not cause a

@@ -267,6 +267,12 @@ static int boot_animate(int argc, char **argv) {
     }
     if (boot_stop) { result = 0; goto out; }
     if (state.v_active != 2) goto out;
+    if (!handoff) {
+      /* EFI can leave fbdev logically unblanked without a visible first
+       * scanout. Match the charging UI: blank before painting, then unblank
+       * only after a complete first frame is in the framebuffer. */
+      (void)ioctl(target.fd, FBIOBLANK, FB_BLANK_NORMAL);
+    }
   }
   /* Paint black once, including any old menu outside the central composition. */
   for (unsigned y = 0; !handoff && y < target.height; y++)

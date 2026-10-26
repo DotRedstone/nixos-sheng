@@ -156,6 +156,26 @@ module ShengHeadlessGenerationMenu
     nil
   end
 
+  def efi_boot?()
+    File.directory?("/sys/firmware/efi")
+  end
+
+  def efi_generation()
+    argument = System.cmdline().find { |item| item.start_with?("mobile-nixos.generation=") }
+    return nil unless argument
+
+    requested_path = argument.split("=", 2).last
+    generation = Tasks::SwitchRoot::NixOSGeneration.generations().find do |candidate|
+      candidate.path == requested_path && candidate.exist?()
+    end
+    if generation
+      $logger.info("Booting EFI-selected sheng generation '#{requested_path}'.")
+    else
+      $logger.warn("Ignoring stale EFI generation selection '#{requested_path}'.")
+    end
+    generation
+  end
+
   def reboot_with_pending_selection(generation)
     persist_pending_selection(generation)
     # This forced reboot bypasses stage-2's reboot.target marker service.
@@ -1253,7 +1273,8 @@ class Tasks::SwitchRoot
     return @selected_generation if @selected_generation
 
     ShengBootAnimation.stop()
-    pending_generation = ShengHeadlessGenerationMenu.consume_pending_selection(self)
+    efi_boot = ShengHeadlessGenerationMenu.efi_boot?()
+    pending_generation = ShengHeadlessGenerationMenu.consume_pending_selection(self) unless efi_boot
     # A valid pending choice is an explicit normal boot request, including on
     # legacy systems whose menu reboot did not write force-normal-once.
     ShengEarlyChargeGuard.commit_boot_mode("normal") if pending_generation
@@ -1265,6 +1286,11 @@ class Tasks::SwitchRoot
 
     if pending_generation
       @selected_generation = pending_generation
+      ShengBootAnimation.start("start")
+    elsif wants_menu && efi_boot
+      @selected_generation = ShengHeadlessGenerationMenu.efi_generation() ||
+        (NixOSGeneration.default_generation().exist?() ?
+          NixOSGeneration.default_generation() : NixOSGeneration.new(default_selection_path()))
       ShengBootAnimation.start("start")
     elsif wants_menu &&
        ShengHeadlessStage1.enabled? &&

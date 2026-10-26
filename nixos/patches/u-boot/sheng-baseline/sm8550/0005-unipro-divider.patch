@@ -1,0 +1,25 @@
+From: dianqk <dianqk@dianqk.net>
+Date: Tue, 29 Sep 2026 07:45:00 +0800
+Subject: [PATCH] clk: qcom: sm8550: preserve the encoded UniPro divider
+
+F() stores an encoded HID divider. clk_rcg_set_rate() takes an integer
+divisor, encodes it again and ORs it into the previous divider. Thus the
+300 MHz frequency result can disagree with the actual hardware clock.
+Replace the old divider/source/mode fields with the frequency-table values
+and trigger the update. This is the SM8550 counterpart of the previously
+verified SM8450 fix, limited to the local UniPro clock implementation.
+
+Frequency table and register source:
+https://github.com/ianchb/sm8550-mainline/blob/ad75da348a020f0b7cb541ca2f06ab38cf77004d/drivers/clk/qcom/gcc-sm8550.c
+---
+--- a/drivers/clk/qcom/clock-sm8550.c
++++ b/drivers/clk/qcom/clock-sm8550.c
+@@ -1,3 +1,7 @@
+ 		freq = qcom_find_freq(ftbl_ufs_unipro, rate);
+-		clk_rcg_set_rate(priv->base, 0x77098, freq->pre_div, freq->src);
++		clrsetbits_le32(priv->base + 0x7709c,
++			       GENMASK(4, 0) | GENMASK(10, 8) |
++			       GENMASK(13, 12) | BIT(20),
++			       freq->pre_div | freq->src);
++		clk_bcr_update(priv->base + 0x77098);
+ 		return freq->freq;

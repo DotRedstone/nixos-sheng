@@ -1,0 +1,35 @@
+From: nixos-sheng contributors <nixos-sheng@localhost>
+Date: Tue, 13 Oct 2026 00:00:00 +0800
+Subject: [PATCH] input: button-kbd: repeat held navigation buttons
+
+The button keyboard only submits an input event on a state transition, so
+holding a volume key moves the EFI boot menu by only one entry. Re-submit an
+already held Up/Down key during polling and let U-Boot's input layer apply the
+same 400 ms delay and 100 ms interval as the stage-1 generation menu.
+
+Only a lone navigation key is eligible. In particular, a held power/Enter key
+must not be replayed when a volume key is also held.
+---
+--- a/drivers/input/button_kbd.c
++++ b/drivers/input/button_kbd.c
+@@ -95,6 +95,12 @@
+ 			priv->old_state[i - 1] = state;
+ 			/* input_add_keycode's last argument means release. */
+ 			count += input_add_keycode(input, code, state == BUTTON_OFF);
++		} else if (state == BUTTON_ON &&
++			   (code == KEY_UP || code == KEY_DOWN) &&
++			   input->num_prev_keycodes == 1 &&
++			   input->prev_keycodes[0] == code) {
++			/* Only repeat a lone navigation key, never a held Enter. */
++			count += input_add_keycode(input, code, false);
+ 		}
+ 	}
+ 	return count;
+@@ -114,6 +120,7 @@
+ 
+ 	input_init(input, false);
+ 	input_add_tables(input, false);
++	input_set_delays(input, 400, 100);
+ 
+ 	/* Register the device. */
+ 	priv->input = input;
