@@ -149,9 +149,11 @@ See [`docs/boot-generation-menu.md`](docs/boot-generation-menu.md) for details.
 
 The experimental U-Boot path uses a dedicated `linux-boot` ESP and lists NixOS
 generations in systemd-boot. Stage-1 enters the selected EFI generation without
-showing the stage-1 menu. Temporary U-Boot boots have selected generations 97
-and 98 on the tablet; generation 99 has also passed persistent B-slot boot and
-warm reboot. The boot animation and offline-charging battery UI were visually
+showing the stage-1 menu. On the EFI path, `sudo sheng-reboot-generation-menu`
+requests the systemd-boot menu for the next boot. Temporary U-Boot boots have
+selected generations 97 and 98 on the tablet; generation 99 has also passed
+persistent B-slot boot and warm reboot. The boot animation and offline-charging
+battery UI were visually
 confirmed on the experimental EFI path. Short and held volume-key presses now
 move through the EFI menu on-device. The updated U-Boot image has booted from
 `boot_b`; flashing the known-good backup and restoring the experimental image

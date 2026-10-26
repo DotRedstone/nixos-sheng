@@ -21,7 +21,7 @@ Android ABL / B 槽
 
 ## 现有证据
 
-设备由 Android ABL 选择 A/B 槽。A 槽保留 Android 启动分区，B 槽的稳定路径是 Mobile NixOS；实验 U-Boot 可替换 B 槽的 boot 镜像，读取独立的 `linux-boot` ESP，再通过 systemd-boot 选择 NixOS 世代。当前 7.3.0 候选已通过 B 槽持久启动、普通重启、关机插墙充、断开电源冷启动、音量加加电源键进入 TWRP 及刷回稳定镜像的实机验证。插墙充时先显示 U-Boot 日志，随后进入电池画面；当前仍只有 NixOS EFI 条目。
+设备由 Android ABL 选择 A/B 槽。A 槽保留 Android 启动分区，B 槽的稳定路径是 Mobile NixOS；实验 U-Boot 可替换 B 槽的 boot 镜像，读取独立的 `linux-boot` ESP，再通过 systemd-boot 选择 NixOS 世代。当前 7.3.0 候选已通过 B 槽持久启动、普通重启、关机插墙充、断开电源冷启动、音量加加电源键进入 TWRP 及刷回稳定镜像的实机验证。插墙充时不再显示 U-Boot 图标或日志，短暂白屏后进入电池画面；当前仍只有 NixOS EFI 条目。
 
 现用 `sheng-uboot.env` 在正常路径先加载 systemd-boot，U-Boot 自带 `bootmenu` 仅在 EFI 启动失败后提供诊断与恢复命令，因此当前还不是一个覆盖所有系统的顶层界面。U-Boot 的 `bootmenu` 使用 ANSI 终端菜单；若最终界面采用图形方式，应先验证本机 EFI 图形输出与实体键输入，再选择或实现统一的 EFI 前端，而不是仅给诊断菜单增加系统名称。[U-Boot bootmenu 说明](https://docs.u-boot.org/en/stable/usage/cmd/bootmenu.html)
 
@@ -66,7 +66,7 @@ Windows on Arm 对固件的要求超出“能运行一个 EFI 程序”：需检
 
 ## 开发与验收顺序
 
-1. 维持当前 NixOS EFI 启动、离线充电、冷启动、TWRP 与 `boot_b` 回退路径；改进插墙充时可见的 U-Boot 日志。
+1. 维持当前 NixOS EFI 启动、离线充电、冷启动、TWRP 与 `boot_b` 回退路径；定位充电和 EFI 交接时的短暂白屏。
 2. 定义统一界面的条目清单和启动适配器边界，实机验证 U-Boot 的图形输出、实体键输入及失败返回；选择或实现一个 EFI 前端。界面仅列已验证条目。
 3. 在已完成 Alpine 和 Debian 独立 rootfs 短时启动后，继续验证完整服务、设备支持、更新、断电冷启动及回退，形成可长期使用的跨发行版条目。
 4. 保持 B 槽稳定镜像和主机备份可用，在已验证 A 槽 Android 启动与手动返回后，单独开发可从统一界面选择的 Android 交接。
