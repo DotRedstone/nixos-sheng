@@ -32,6 +32,7 @@ Android ABL / B 槽
 | 目标 | 当前状态 | 下一项可验证结果 |
 | --- | --- | --- |
 | NixOS 世代 | EFI 菜单、内核 7.3.0 与现用 rootfs 已实机启动 | 保持更新、回退和离线充电路径稳定 |
+| Alpine 3.24.3 临时探针 | 官方 aarch64 minirootfs 已校验并打包为独立 initrd；尚未上机 | 复用同源 EFI 内核与 DTB，从临时菜单项启动并读回结果标记 |
 | 第二个 Linux | 未安装，不能把另一个 NixOS 世代算作独立系统 | 使用单独 rootfs 与适配 Sheng 的内核/DTB/initrd 完成一次可回退启动 |
 | Android A 槽 | 启动镜像和槽位只读检查完成，尚未实际启动 | 在保留 B 槽恢复路径下验证进入 Android、从 Android 返回 B 槽 |
 | Android 统一菜单入口 | 未实现 | 单独证明从菜单选择后正确装载 Android v4 启动链，且下次开机仍能返回统一界面 |
@@ -47,6 +48,8 @@ Android ABL / B 槽
 ### 其他 Linux 与 Windows on Arm
 
 其他 Linux 可复用统一界面的 EFI 入口，但每个系统需要自己的适配 Sheng 的内核、DTB、initrd、模块和固件，规划独立或明确共享的根文件系统，并验证更新及回退。`linux-boot` ESP 目前只承担 EFI 引导载荷；不得把 Android `userdata`、`super` 或固件分区改作 Linux 存储。
+
+`scripts/sheng-build-alpine-initrd-probe.sh` 可将 SHA-256 固定的 [Alpine 3.24.3 aarch64 minirootfs](https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/aarch64/) 打包为临时 RAM 启动探针。它在成功执行 Alpine `/init` 后，仅向现有 `linux` 分区写入 `/var/lib/sheng-multiboot/alpine-initrd-probe` 并自动重启；不安装 Alpine，也不修改 Android 分区。主机已验证上游归档校验值、aarch64 BusyBox 可执行、脚本语法与 initrd 内容。尚无平板启动结果，因此不能将它计作第二个已适配发行版。
 
 Windows on Arm 对固件的要求超出“能运行一个 EFI 程序”：需检查 UEFI 启动与运行时服务、图形和存储协议、ACPI 描述、启动所需设备和原生 Arm64 驱动。当前 U-Boot/Linux 的 DTB 启动成功不能推出 Windows 可启动。应先做不写分区的固件能力审计，再尝试 Windows PE；完整安装须等启动链和驱动有独立证据。[Microsoft UEFI 要求](https://learn.microsoft.com/en-us/windows-hardware/drivers/bringup/uefi-requirements-that-apply-to-all-windows-platforms)、[Windows on Arm 设备制造与驱动](https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/arm64-device-manufacturing)
 
