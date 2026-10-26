@@ -262,6 +262,15 @@ SHA-256 为 `a843e13dae29a0972b97c712d9165a8e051c34a890013817cc1c3a3d3293af73`�
 `bootctl` 报告 `Das U-Boot`、systemd-boot 260.1，NixOS 7.3.0 与桌面已启动。
 原 192 MiB B 槽备份保留在主机，A 槽、`linux`、`userdata` 未写入。
 
+继续排查白闪时，发现锁定内核的 KTZ8866 驱动在 probe 中以默认亮度立即打开
+LED，而 DRM 面板随后才完成复位和初始化。内核实验提交
+[`f8fe49b`](https://github.com/DotRedstone/linux-sheng/commit/f8fe49bc2236c7ca07fc98129eef61526ffa3e46)
+改为先保持背光关闭，由 `drm_panel_enable()` 在面板准备后打开；该改动通过
+[`linux-sheng` Draft PR #6](https://github.com/DotRedstone/linux-sheng/pull/6)
+跟踪。这只是待验证的原因假设，不代表白闪已经修复。当前 EFI 内核位于独立的
+`linux-boot` 分区，`boot_b` 中是 U-Boot，`linux` 中是 rootfs；只写后两者
+无法替换 EFI 内核。未获该分区的写入范围确认前，不在设备上安装实验 EFI 载荷。
+
 当前 rootfs 只有第 1 世代，旧 7.1.8 EFI 载荷不能作为 7.3.0 的可启动回退项。
 `sheng-efi rollback` 已增加写入前的版本/闭包核对，会拒绝这种跨内核回退。新载荷验证
 失败时，应使用原有 `boot_b` 返回现用系统，再从备份恢复 ESP 元数据；
