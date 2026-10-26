@@ -23,6 +23,8 @@ Android ABL / B 槽
 
 设备由 Android ABL 选择 A/B 槽。A 槽保留 Android 启动分区，B 槽的稳定路径是 Mobile NixOS；实验 U-Boot 可替换 B 槽的 boot 镜像，读取独立的 `linux-boot` ESP，再通过 systemd-boot 选择 NixOS 世代。当前 7.3.0 候选已通过 B 槽持久启动、普通重启、关机插墙充、断开电源冷启动、音量加加电源键进入 TWRP 及刷回稳定镜像的实机验证。插墙充时先显示 U-Boot 日志，随后进入电池画面；当前仍只有 NixOS EFI 条目。
 
+现用 `sheng-uboot.env` 在正常路径先加载 systemd-boot，U-Boot 自带 `bootmenu` 仅在 EFI 启动失败后提供诊断与恢复命令，因此当前还不是一个覆盖所有系统的顶层界面。U-Boot 的 `bootmenu` 使用 ANSI 终端菜单；若最终界面采用图形方式，应先验证本机 EFI 图形输出与实体键输入，再选择或实现统一的 EFI 前端，而不是仅给诊断菜单增加系统名称。[U-Boot bootmenu 说明](https://docs.u-boot.org/en/stable/usage/cmd/bootmenu.html)
+
 设备上只读检查表明，Android A 槽有 v4 格式的 `boot_a`、`vendor_boot_a`、`init_boot_a`，以及 `dtbo_a` 和 `vbmeta_a`。A/B 元数据将 A 标记为 bootable、successful，但这不能证明 Android 现状可启动。检查前已将 A 槽关键启动分区与 `misc` 在主机私有目录备份，并逐项比较设备和备份的 SHA-256；未改写 A 槽或 `userdata`。
 
 ## 系统适配边界
