@@ -15,6 +15,18 @@ the Mobile NixOS Android boot flow: a `boot.img` for the inactive Android slot
 and a Mobile NixOS generated ext4 rootfs image for the dedicated `linux`
 partition.
 
+## U-Boot / EFI progress (experimental)
+
+Experimental U-Boot now reads a dedicated `linux-boot` ESP from slot B and
+offers NixOS generations through systemd-boot. A 7.3.0 candidate matched to
+the current rootfs has passed persistent boot, warm reboot, disconnected cold
+boot, powered-off charger insertion into the battery UI, Volume Up + Power into
+TWRP, and restoration of the original B-slot image with a full partition hash
+check. U-Boot logs remain visible before the battery UI. Android and other
+Linux systems have not booted from this EFI menu. This is development evidence,
+not a flashable U-Boot release. See the [EFI experiment record](docs/uboot-efi-experiment_zh.md)
+and [multiboot roadmap](docs/uboot-multiboot-roadmap_zh.md).
+
 If this project helps you, or if you simply want to see NixOS become more real
 on mobile devices, please consider giving the repository a star. It helps other
 sheng users find the port and makes the late-night boot-image archaeology feel
@@ -143,13 +155,9 @@ confirmed on the experimental EFI path. Short and held volume-key presses now
 move through the EFI menu on-device. The updated U-Boot image has booted from
 `boot_b`; flashing the known-good backup and restoring the experimental image
 have been tested. Fastboot reboot without a prewritten normal-boot marker
-returned to the normal system. Cold boot and recovery-key behavior still need
-validation. A 7.3.0 EFI payload matched to the current rootfs has reached
-generation 1 through RAM-only and persistent B-slot U-Boot boots, including a
-warm reboot. The original B-slot image was then restored and its full partition
-hash matched the backup. Charger insertion, cold boot, and recovery-key behavior
-remain to be checked for this candidate.
-See [`docs/uboot-efi-experiment_zh.md`](docs/uboot-efi-experiment_zh.md)
+returned to the normal system. The current 7.3.0 candidate's device checks
+are summarized above. See
+[`docs/uboot-efi-experiment_zh.md`](docs/uboot-efi-experiment_zh.md)
 for the architecture, checks, and rollback procedure.
 The [multiboot roadmap](docs/uboot-multiboot-roadmap_zh.md) distinguishes the
 Android A-slot path from unverified direct Android and other-Linux boot options.

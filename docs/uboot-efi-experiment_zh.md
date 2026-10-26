@@ -1,6 +1,6 @@
 # Sheng 的 U-Boot / EFI 实验
 
-> 状态：实验性。U-Boot 已从独立 EFI ESP 引导多个 NixOS 世代，并在 B 槽完成持久启动与热重启验证；它不是 release 镜像。
+> 状态：实验性。U-Boot 已从独立 EFI ESP 引导多个 NixOS 世代，并在 B 槽完成持久启动、关机插墙充、冷启动及恢复键验证；它不是 release 镜像。
 
 ## 已确认的启动边界
 
@@ -16,7 +16,7 @@ ABL fastboot / B 槽
     └── 刷回备份的 Android boot_b → Mobile NixOS stage-1 菜单 → stage-2
 ```
 
-实验 EFI 路径不再显示旧的 stage-1 世代菜单；旧 Android boot 镜像保存在主机，供 ABL fastboot 回退。持久启动、音量键短按和长按连续移动、备份镜像刷回及无预写标记的 fastboot 回程均已实机确认。断电冷启动与恢复键仍待验收，因此保持实验分支状态。
+实验 EFI 路径不再显示旧的 stage-1 世代菜单；旧 Android boot 镜像保存在主机，供 ABL fastboot 回退。持久启动、音量键短按和长按连续移动、备份镜像刷回、无预写标记的 fastboot 回程、断电冷启动与恢复键均已实机确认。关机插墙充仍短暂显示 U-Boot 日志，且 Android 与其他 Linux 未从 EFI 菜单启动，因此保持实验分支状态。
 
 2026-10-11 的实机复验确认，`fastboot boot` 可以作为 RAM-only 验证通道：候选镜像在不写入
 `boot_b` 的情况下进入 U-Boot、EFI runtime、stage-1 与 stage-2，且 ADB/USB gadget 正常枚举。此后已备份并刷入 `boot_b`，完成持久启动及从 Linux 热重启复验。`boot_a` 原本是 Android header v4，
@@ -120,7 +120,7 @@ EFI 载荷将动画 VT2 纳入 `fbcon` 映射。实机日志显示动画服务�
 向 systemd-boot 提供仅本次启动有效的 `LoaderConfigTimeout=menu-hidden`。这样充电启动可跳过
 世代菜单；普通电源键开机仍按现有配置显示菜单。该变量不写入非易失存储，也不修改 ESP、
 `linux` 或 Android 槽位。源码评估、本地交叉构建和 RAM 正常启动进入第 99 世代均已通过；
-关机插线的画面顺序仍待实机确认。该次验证时，设备第 99 世代运行旧版
+该次测试尚未确认关机插线的画面顺序；同一功能的后续实测见下文。该次验证时，设备第 99 世代运行旧版
 `sheng-reboot-bootloader`，它不会写入正常重启标记；直接用它进入 fastboot 后临时启动，
 stage-1 会把混合 USB 原因判为充电启动。手动预写标记后，新候选镜像读取到
 `bootinfo.pureason=0x40011`，没有设置隐藏菜单变量，最终进入第 99 世代正常目标；
@@ -194,7 +194,19 @@ ARM boot、ESP 与完整 minimal stage-2 构建成功；ESP artifact 的 manifes
 已有的 `home-manager-luser.service` 和 `logrotate-checkconf.service`。之后从 ABL fastboot
 刷回原 192 MiB `boot_b` 备份，设备进入非 EFI 的现用 7.3.0 系统；完整 B 槽 SHA-256
 恢复为备份值。A 槽、`linux`、`userdata` 和 Android 固件分区没有写入。当前设备保留原
-B 槽镜像。关机插线画面顺序、断电冷启动和恢复键仍待当前候选的实体设备验收。
+B 槽镜像。该段记录截至首次刷回；同一候选随后再次刷入并完成下述实机验收。
+
+2026-10-26 对同一 boot 镜像再次刷入 B 槽。真实关机、拔掉电脑线并插入墙充后，使用者
+现场观察到先显示一段 U-Boot 日志，接着黑屏，最后进入充电电池画面；没有看到 EFI 世代
+菜单。拔掉墙充并等待屏幕熄灭后，只按电源键冷启动，出现 EFI 菜单并进入 NixOS。接回
+电脑后，`bootctl` 报告 U-Boot UEFI、systemd-boot 260.1 与
+`nixos-sheng-generation-1.conf`，内核为 7.3.0。再次关机并用音量加加电源键启动，进入设备
+安装的第三方 TWRP；从 TWRP 选择 `Reboot → System` 后返回 EFI/NixOS 第 1 世代。
+两次返回 NixOS 后只有测试前已有的两个失败服务。最后从 ABL fastboot 刷回原 192 MiB
+`boot_b` 备份，`current-slot: b`，设备从非 EFI 路径进入 7.3.0，完整 B 槽读回 SHA-256 为
+`31e4e8bfaa06fedb2e2fa41531b068274d6baafd3ade0886dc279af2a473ae6a`，与备份一致。
+这些观察证明本次充电、冷启动与恢复键路径可达；充电启动的 U-Boot 日志仍是可见问题，
+充电功率和长时间稳定性没有因此得到证明。
 
 当前 rootfs 只有第 1 世代，旧 7.1.8 EFI 载荷不能作为 7.3.0 的可启动回退项。
 `sheng-efi rollback` 已增加写入前的版本/闭包核对，会拒绝这种跨内核回退。新载荷验证
@@ -327,13 +339,14 @@ scripts/sheng-verify-efi-artifacts.sh \
 SHA-256、ESP manifest 和所有列入 manifest 的文件、默认 EFI 条目及内核闭包标识。
 它不会写入设备；通过预检也不能代替实机启动或 rootfs 配对验证。
 
-同一候选的最短设备验收顺序是：确认 B 槽及已知可启动的 `boot_b` 备份，安装对应 ESP 载荷，临时启动或刷入对应 U-Boot 镜像；验证普通启动、真实关机插线时直接出现离线充电画面且无世代菜单、断电后的冷启动、恢复键进入可用恢复路径；最后从 ABL fastboot 刷回备份 `boot_b` 并再次启动稳定系统。每次记录屏幕画面和实际启动目标，且运行 `systemctl is-system-running`、`systemctl --failed`。在当前候选补齐关机插线画面顺序、冷启动和恢复键证据前，不能把既有启动记录视作发布验收。
+同一候选的最短设备验收顺序是：确认 B 槽及已知可启动的 `boot_b` 备份，安装对应 ESP 载荷，临时启动或刷入对应 U-Boot 镜像；验证普通启动、真实关机插线的画面顺序及有无世代菜单、断电后的冷启动、恢复键进入可用恢复路径；最后从 ABL fastboot 刷回备份 `boot_b` 并再次启动稳定系统。每次记录屏幕画面和实际启动目标，且运行 `systemctl is-system-running`、`systemctl --failed`。当前候选已完成这组实机检查，但充电启动仍显示 U-Boot 日志，应在任何 release 声明中列为已知问题。
 
 成功到达 `multi-user.target` 后，`sheng-efi-mark-successful.service` 会记录当时配置的 EFI 默认项和时间。
 它是运行时健康记录，不能单独证明用户没有从 systemd-boot 菜单手动选择旧条目；它不会自动清理旧载荷，也不会修改 Android 分区。
 
 `uefi_a`、`uefi_b`、`rescue`、`userdata` 与 Android 固件分区仍不可复用，也没有被写入。
-当前候选的 B 槽持久启动、普通重启和稳定镜像刷回已实测；关机插线画面顺序、断电冷启动
-与恢复键仍需分别验收。在这些路径验证前，实验分支不得合并或发布。
+当前候选的 B 槽持久启动、普通重启、关机插墙充、断电冷启动、TWRP 恢复键和稳定镜像刷回
+已实测。充电启动仍显示 U-Boot 日志；Android 与其他 Linux 尚未在本菜单启动。实验分支
+不得当作已完成多系统适配或正式 release 宣传。
 实际分区边界和验收记录见 [存储迁移预案](uboot-efi-storage-plan_zh.md)。
 Android A 槽与更多 Linux 的可行性及验收边界见[多系统路线图](uboot-multiboot-roadmap_zh.md)。

@@ -11,6 +11,16 @@ Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的 Mobile NixOS 移植项目�
 
 本仓库仅提供 NixOS 设备移植。当前维护的刷机路径是基于 Mobile NixOS 的 Android 启动流程：编译一个 `boot.img` 刷入非活动（inactive）的 Android slot，以及一个由 Mobile NixOS 生成的 ext4 rootfs 镜像刷入专门分配的 `linux` 分区。
 
+## U-Boot / EFI 开发进展（实验性）
+
+实验性 U-Boot 已能从 B 槽读取独立的 `linux-boot` ESP，经 systemd-boot 选择 NixOS 世代。
+与现用 rootfs 配对的 7.3.0 候选已在实机完成持久启动、普通重启、断开电源冷启动、
+关机插墙充进入电池画面、音量加加电源键进入 TWRP，以及刷回原 B 槽镜像并核对完整分区哈希。
+插墙充时仍会先显示 U-Boot 日志；Android A 槽和其他 Linux 尚未通过此 EFI 菜单启动。
+当前成果是开发验证，不是可刷写的 U-Boot release。实现与证据见
+[U-Boot / EFI 实验记录](docs/uboot-efi-experiment_zh.md)，后续多系统范围见
+[路线图](docs/uboot-multiboot-roadmap_zh.md)。
+
 如果这个项目帮到了你，或者你只是想看到 NixOS 在移动设备上变得更真实，
 欢迎给仓库点一个 star。它能帮助更多 sheng 用户找到这个移植项目，也能让深夜
 调试 boot image 的人稍微感受到一点人间温度。
@@ -120,7 +130,7 @@ linux 分区
 实验性 U-Boot 路径使用独立的 `linux-boot` ESP，在 systemd-boot 中列出 NixOS 世代；
 stage-1 根据选中的 EFI 条目进入对应系统，不再显示上述 stage-1 菜单。第 97 与第 98 世代
 已经通过临时 U-Boot 引导完成实机切换，第 99 世代也通过持久 B 槽启动和热重启；
-开机动画与关机充电的电池画面已在早期实验 EFI 路径现场确认。实体音量键短按及长按连续切换均已实机确认。与现用 rootfs 配对的 7.3.0 EFI 候选已通过 RAM 临时启动、B 槽持久启动及普通重启进入第 1 世代；随后刷回稳定镜像，完整 B 槽哈希与备份一致。当前候选的关机插线画面顺序、断电冷启动和恢复键仍需单独验收。架构、验证与回退步骤见
+开机动画与关机充电的电池画面已在早期实验 EFI 路径现场确认。实体音量键短按及长按连续切换均已实机确认。现用 7.3.0 候选的实机结果见本页开发进展，架构、验证与回退步骤见
 [`docs/uboot-efi-experiment_zh.md`](docs/uboot-efi-experiment_zh.md)。
 Android A 槽及其他 Linux 的适配范围见[多系统路线图](docs/uboot-multiboot-roadmap_zh.md)。
 

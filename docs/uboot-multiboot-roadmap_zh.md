@@ -4,7 +4,7 @@
 
 ## 已有启动路径
 
-设备由 Android ABL 选择 A/B 槽。A 槽保留 Android 启动分区，B 槽的稳定路径是 Mobile NixOS；实验 U-Boot 可替换 B 槽的 boot 镜像，读取独立的 `linux-boot` ESP，再通过 systemd-boot 选择 NixOS 世代。当前 7.3.0 候选已通过 B 槽持久启动、普通重启及刷回稳定镜像的实机验证；关机插线、断电冷启动和恢复键仍待验收。
+设备由 Android ABL 选择 A/B 槽。A 槽保留 Android 启动分区，B 槽的稳定路径是 Mobile NixOS；实验 U-Boot 可替换 B 槽的 boot 镜像，读取独立的 `linux-boot` ESP，再通过 systemd-boot 选择 NixOS 世代。当前 7.3.0 候选已通过 B 槽持久启动、普通重启、关机插墙充、断开电源冷启动、音量加加电源键进入 TWRP 及刷回稳定镜像的实机验证。插墙充时先显示 U-Boot 日志，随后进入电池画面；当前仍只有 NixOS EFI 条目。
 
 设备上只读检查表明，Android A 槽有 v4 格式的 `boot_a`、`vendor_boot_a`、`init_boot_a`，以及 `dtbo_a` 和 `vbmeta_a`。A/B 元数据将 A 标记为 bootable、successful，但这不能证明 Android 现状可启动。检查前已将 A 槽关键启动分区与 `misc` 在主机私有目录备份，并逐项比较设备和备份的 SHA-256；未改写 A 槽或 `userdata`。
 
@@ -24,7 +24,7 @@
 
 ## 验证顺序
 
-1. 完成当前 U-Boot 候选的关机插线画面、断电冷启动与恢复键验收。
+1. 改进关机插墙充时短暂出现的 U-Boot 日志，并复验充电画面；保留已经通过的冷启动与 TWRP 恢复键记录。
 2. 保持 B 槽稳定镜像和主机备份可用，验证 Android A 槽启动及双向返回路径。
 3. 先实现可恢复的 ABL A/B 双系统使用流程，再单独开发统一菜单中的 Android 启动入口。
 4. 每增加一个 Linux 系统，独立验证其启动、根文件系统、硬件和更新回退。
