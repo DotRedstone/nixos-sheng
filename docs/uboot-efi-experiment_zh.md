@@ -251,6 +251,17 @@ U-Boot UEFI 和 systemd-boot 进入 NixOS 7.3.0；屏幕菜单是否实际可见
 `1414ba8826bbbdc8fa8d828ac94edd467f5e20f4071adb08164b98cbefddc4b8`，
 原 192 MiB B 槽镜像完整哈希也与备份一致，设备回到非 EFI NixOS 7.3.0。
 
+为定位 EFI 菜单确认后的单帧白闪，临时给第 1 世代条目加入
+`video=efifb:off`。设备仍经 U-Boot EFI 进入 NixOS 7.3.0；内核日志不再注册
+`EFI VGA frame buffer`，但使用者仍观察到相同的单帧白闪。因此 Linux 的 efifb
+注册不是白闪的充分原因。另一次测试加入 `sheng.boot-ui=0`，确认该参数生效、
+启动动画未运行且系统进入 NixOS；该次屏幕观察尚待反馈，不能据此排除动画。
+两次测试的 EFI 条目及 3 秒超时均已恢复原哈希。随后按继续使用实验引导的要求，
+将关闭图标的 U-Boot 候选重新写入 B 槽并保留；设备端读回前 647168 字节的
+SHA-256 为 `a843e13dae29a0972b97c712d9165a8e051c34a890013817cc1c3a3d3293af73`，
+`bootctl` 报告 `Das U-Boot`、systemd-boot 260.1，NixOS 7.3.0 与桌面已启动。
+原 192 MiB B 槽备份保留在主机，A 槽、`linux`、`userdata` 未写入。
+
 当前 rootfs 只有第 1 世代，旧 7.1.8 EFI 载荷不能作为 7.3.0 的可启动回退项。
 `sheng-efi rollback` 已增加写入前的版本/闭包核对，会拒绝这种跨内核回退。新载荷验证
 失败时，应使用原有 `boot_b` 返回现用系统，再从备份恢复 ESP 元数据；
