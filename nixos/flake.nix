@@ -18,7 +18,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     shengKernelSrc = {
-      url = "github:DotRedstone/linux-sheng/contrib/sheng-cs35l43-standby-20261022";
+      url = "git+https://github.com/DotRedstone/linux-sheng?ref=exp/ktz8866-panel-enable&rev=f8fe49bc2236c7ca07fc98129eef61526ffa3e46&shallow=1";
       flake = false;
     };
     shengFirmware = {

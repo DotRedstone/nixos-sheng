@@ -101,18 +101,20 @@
     "shengKernelSrc": {
       "flake": false,
       "locked": {
-        "lastModified": 1792655550,
-        "narHash": "sha256-IVGyW4C9NNNdf62Mu4rV0RZ6RwNYs5uFIfvtreJyVZE=",
-        "owner": "DotRedstone",
-        "repo": "linux-sheng",
-        "rev": "024eda33839548f8a1f1c3e8f578a0ad0cc49a54",
-        "type": "github"
+        "lastModified": 1793037334,
+        "narHash": "sha256-ioqdWFPpeyBkZ79NQvLcCH4TAw77Ciy82I6ymtx0e9Y=",
+        "ref": "exp/ktz8866-panel-enable",
+        "rev": "f8fe49bc2236c7ca07fc98129eef61526ffa3e46",
+        "shallow": true,
+        "type": "git",
+        "url": "https://github.com/DotRedstone/linux-sheng"
       },
       "original": {
-        "owner": "DotRedstone",
-        "ref": "contrib/sheng-cs35l43-standby-20261022",
-        "repo": "linux-sheng",
-        "type": "github"
+        "ref": "exp/ktz8866-panel-enable",
+        "rev": "f8fe49bc2236c7ca07fc98129eef61526ffa3e46",
+        "shallow": true,
+        "type": "git",
+        "url": "https://github.com/DotRedstone/linux-sheng"
       }
     },
     "shengUbootSrc": {
