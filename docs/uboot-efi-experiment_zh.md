@@ -349,6 +349,12 @@ SHA-256、ESP manifest 和所有列入 manifest 的文件、默认 EFI 条目及
 已实测。充电启动仍显示 U-Boot 日志；Android 尚未在本菜单启动，Alpine 和 Debian
 仅完成短时独立 rootfs 探针。实验分支不得当作已完成多系统适配或正式 release 宣传。
 
+后续 U-Boot 候选将正常路径的 `stdout`、`stderr` 先导向串口和 USB ACM，在读取 ESP
+并准备交接 EFI 菜单时恢复视频控制台；EFI 失败的救援菜单也恢复视频输出。
+本机构建通过，使用 `fastboot boot` 临时启动后进入 U-Boot UEFI、systemd-boot 与
+NixOS 7.3.0，`boot_b` 完整哈希与可启动备份一致。这个 RAM 启动结果不能证明关机
+插墙充时的屏幕顺序已改善；新候选仍须完成真实充电、冷启动和恢复键的画面验收。
+
 2026-10-26 单独验证了 ABL A/B 槽位路径：切至 A 槽后 Android 16 报告启动完成，
 `sys.boot_completed=1` 且图形服务运行；通过 Android ADB 返回 fastboot 并切回 B 槽，
 NixOS 7.3.0 再次启动。B 槽完整哈希与原始备份一致，A 槽关键启动分区未变。
