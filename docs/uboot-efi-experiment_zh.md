@@ -208,6 +208,16 @@ B 槽镜像。该段记录截至首次刷回；同一候选随后再次刷入并
 这些观察证明本次充电、冷启动与恢复键路径可达；充电启动的 U-Boot 日志仍是可见问题，
 充电功率和长时间稳定性没有因此得到证明。
 
+2026-10-27 将延后视频控制台输出的候选镜像（SHA-256
+`0a58f14f1b4ec39af3b1782b17021f045b485200972c5105b4e4dd6934809fdb`）刷入 B 槽。
+持久启动进入 U-Boot UEFI、systemd-boot 和 NixOS 7.3.0。真实关机插墙充时，先短暂显示
+右上角带 U-Boot 图标的启动画面，随后黑屏并进入充电电池画面；先前可见的多行日志没有再
+出现。断开墙充后冷启动显示 U-Boot/EFI 选择界面，短暂白屏后进入 NixOS。恢复键测试后
+设备也返回 EFI/NixOS，但这次使用者只回复“没问题”，TWRP 画面及其重启选项尚待明确
+复核。最后刷回原 192 MiB `boot_b` 备份，设备从非 EFI 路径进入 NixOS 7.3.0，完整
+B 槽读回 SHA-256 为 `31e4e8bfaa06fedb2e2fa41531b068274d6baafd3ade0886dc279af2a473ae6a`，
+与备份一致。A 槽、`linux`、`userdata` 和 Android 固件分区未写入。
+
 当前 rootfs 只有第 1 世代，旧 7.1.8 EFI 载荷不能作为 7.3.0 的可启动回退项。
 `sheng-efi rollback` 已增加写入前的版本/闭包核对，会拒绝这种跨内核回退。新载荷验证
 失败时，应使用原有 `boot_b` 返回现用系统，再从备份恢复 ESP 元数据；
@@ -339,21 +349,21 @@ scripts/sheng-verify-efi-artifacts.sh \
 SHA-256、ESP manifest 和所有列入 manifest 的文件、默认 EFI 条目及内核闭包标识。
 它不会写入设备；通过预检也不能代替实机启动或 rootfs 配对验证。
 
-同一候选的最短设备验收顺序是：确认 B 槽及已知可启动的 `boot_b` 备份，安装对应 ESP 载荷，临时启动或刷入对应 U-Boot 镜像；验证普通启动、真实关机插线的画面顺序及有无世代菜单、断电后的冷启动、恢复键进入可用恢复路径；最后从 ABL fastboot 刷回备份 `boot_b` 并再次启动稳定系统。每次记录屏幕画面和实际启动目标，且运行 `systemctl is-system-running`、`systemctl --failed`。当前候选已完成这组实机检查，但充电启动仍显示 U-Boot 日志，应在任何 release 声明中列为已知问题。
+同一候选的最短设备验收顺序是：确认 B 槽及已知可启动的 `boot_b` 备份，安装对应 ESP 载荷，临时启动或刷入对应 U-Boot 镜像；验证普通启动、真实关机插线的画面顺序及有无世代菜单、断电后的冷启动、恢复键进入可用恢复路径；最后从 ABL fastboot 刷回备份 `boot_b` 并再次启动稳定系统。每次记录屏幕画面和实际启动目标，且运行 `systemctl is-system-running`、`systemctl --failed`。延后视频控制台的候选已完成真实充电与冷启动检查，但充电时仍闪现 U-Boot 图标；关闭图标的候选尚需同样的画面验收。
 
 成功到达 `multi-user.target` 后，`sheng-efi-mark-successful.service` 会记录当时配置的 EFI 默认项和时间。
 它是运行时健康记录，不能单独证明用户没有从 systemd-boot 菜单手动选择旧条目；它不会自动清理旧载荷，也不会修改 Android 分区。
 
 `uefi_a`、`uefi_b`、`rescue`、`userdata` 与 Android 固件分区仍不可复用，也没有被写入。
-当前候选的 B 槽持久启动、普通重启、关机插墙充、断电冷启动、TWRP 恢复键和稳定镜像刷回
-已实测。充电启动仍显示 U-Boot 日志；Android 尚未在本菜单启动，Alpine 和 Debian
+早期候选的 B 槽持久启动、普通重启、关机插墙充、断电冷启动、TWRP 恢复键和稳定镜像刷回
+已实测。延后视频控制台的候选仍闪现 U-Boot 图标；Android 尚未在本菜单启动，Alpine 和 Debian
 仅完成短时独立 rootfs 探针。实验分支不得当作已完成多系统适配或正式 release 宣传。
 
 后续 U-Boot 候选将正常路径的 `stdout`、`stderr` 先导向串口和 USB ACM，在读取 ESP
 并准备交接 EFI 菜单时恢复视频控制台；EFI 失败的救援菜单也恢复视频输出。
-本机构建通过，使用 `fastboot boot` 临时启动后进入 U-Boot UEFI、systemd-boot 与
-NixOS 7.3.0，`boot_b` 完整哈希与可启动备份一致。这个 RAM 启动结果不能证明关机
-插墙充时的屏幕顺序已改善；新候选仍须完成真实充电、冷启动和恢复键的画面验收。
+关闭 `CONFIG_VIDEO_LOGO` 的候选已构建并使用 `fastboot boot` 临时进入 U-Boot UEFI、
+systemd-boot 与 NixOS 7.3.0，`boot_b` 完整哈希与可启动备份一致。RAM 启动不能证明
+关机插墙充时不再闪现图标；该候选仍须完成真实充电、冷启动和恢复键的画面验收。
 
 2026-10-26 单独验证了 ABL A/B 槽位路径：切至 A 槽后 Android 16 报告启动完成，
 `sys.boot_completed=1` 且图形服务运行；通过 Android ADB 返回 fastboot 并切回 B 槽，

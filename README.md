@@ -22,7 +22,8 @@ offers NixOS generations through systemd-boot. A 7.3.0 candidate matched to
 the current rootfs has passed persistent boot, warm reboot, disconnected cold
 boot, powered-off charger insertion into the battery UI, Volume Up + Power into
 TWRP, and restoration of the original B-slot image with a full partition hash
-check. U-Boot logs remain visible before the battery UI. Android and other
+check. A later candidate still briefly showed the U-Boot logo before the
+battery UI. Android and other
 Linux systems have not booted from this EFI menu. This is development evidence,
 not a flashable U-Boot release. See the [EFI experiment record](docs/uboot-efi-experiment_zh.md)
 and [multiboot roadmap](docs/uboot-multiboot-roadmap_zh.md).
