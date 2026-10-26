@@ -1,6 +1,6 @@
 # Sheng U-Boot / EFI 存储迁移预案
 
-> 状态：存储准备阶段已完成实机验收。`linux-boot` 是独立的 1 GiB FAT32 ESP，稳定 Mobile NixOS 已从缩小后的 `linux` 根分区进入 stage-2。EFI 载荷部署和 U-Boot 引导仍是未完成的实验步骤；本文不是刷机教程，也不能直接用于修改 GPT。
+> 状态：存储准备阶段已完成实机验收。`linux-boot` 是独立的 1 GiB FAT32 ESP，稳定 Mobile NixOS 已从缩小后的 `linux` 根分区进入 stage-2。EFI 载荷已部署，7.3.0 候选已完成 B 槽持久启动、普通重启和刷回；关机插线、冷启动和恢复键仍待验收。本文不是刷机教程，也不能直接用于修改 GPT。
 
 ## 目标启动架构
 
@@ -92,7 +92,8 @@ U-Boot 按 GPT 名 `linux-boot` 查找该分区，并读取 `EFI/BOOT/BOOTAA64.E
 3. 获得用户对 1 GiB 根分区缩容的明确确认，并先验证新 GPT、ext4 与稳定系统启动，再格式化 ESP。
 
 EFI 载荷已构建、离线写入临时 FAT32 并逐项读回校验，随后复制到 `/boot` 并在设备上逐文件 SHA-256 复核。
-下一道门槛是让每个 NixOS generation 受控更新对应的 Type #1 条目。
+现有世代同步只为内核闭包与 EFI 载荷匹配的 NixOS profile 生成 Type #1 条目；
+当前候选已通过第 1 世代实机启动。ESP 更新与回退边界见[EFI 实验记录](uboot-efi-experiment_zh.md)。
 
 ## 验收与回退
 

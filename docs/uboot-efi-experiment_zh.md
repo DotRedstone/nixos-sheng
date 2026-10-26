@@ -186,6 +186,16 @@ ARM boot、ESP 与完整 minimal stage-2 构建成功；ESP artifact 的 manifes
 进入非 EFI 启动链，`boot_b` 完整 SHA-256 与测试前备份相同。ESP 新载荷仍保留供后续
 验证；未刷写 `boot_b`、`boot_a`、`linux` 或 `userdata`。
 
+2026-10-26 将最终提交 `9a69964` 的 U-Boot 镜像（SHA-256
+`5424227afacf8e9d219430ca8985cc409ff594fce5e45b53e7c1099e`）写入 B 槽。
+设备端读回的前 655360 字节与 CI 镜像完全一致。设备从 B 槽持久进入
+`Das U-Boot → systemd-boot → EFI Linux 7.3.0 →` 第 1 世代 stage-2；随后一次普通重启
+再次进入同一 EFI 链，`/boot` 均以 vfat 挂载。两次启动没有新增失败服务，仍只有测试前
+已有的 `home-manager-luser.service` 和 `logrotate-checkconf.service`。之后从 ABL fastboot
+刷回原 192 MiB `boot_b` 备份，设备进入非 EFI 的现用 7.3.0 系统；完整 B 槽 SHA-256
+恢复为备份值。A 槽、`linux`、`userdata` 和 Android 固件分区没有写入。当前设备保留原
+B 槽镜像。关机插线画面顺序、断电冷启动和恢复键仍待当前候选的实体设备验收。
+
 当前 rootfs 只有第 1 世代，旧 7.1.8 EFI 载荷不能作为 7.3.0 的可启动回退项。
 `sheng-efi rollback` 已增加写入前的版本/闭包核对，会拒绝这种跨内核回退。新载荷验证
 失败时，应使用原有 `boot_b` 返回现用系统，再从备份恢复 ESP 元数据；
@@ -305,12 +315,25 @@ sudo sheng-efi status
 
 boot 镜像和 ESP 载荷由两个独立 workflow 构建。准备同一发布候选时，应从同一实验分支提交分别手动触发两项 workflow，核对两份 artifact 内的 `*.source-revision` 完全相同，且等于审查的分支提交；再分别校验 boot 镜像 SHA-256 和 ESP 的 `manifest.sha256`。PR 自动构建采用 GitHub 临时合并提交，`source-revision` 不等于 PR 分支提交，不能直接与分支手动构建产物配对。内核版本、U-Boot 版本或 workflow 均成功不能代替提交一致性检查。
 
+下载两份 artifact 并分别解压到独立目录后，可以在刷写前运行只读预检：
+
+```bash
+scripts/sheng-verify-efi-artifacts.sh \
+  /path/to/boot-artifact /path/to/esp-artifact \
+  0000000000000000000000000000000000000000
+```
+
+将示例提交号替换为要审查的 40 位分支提交 SHA。脚本检查两份来源记录、boot 镜像
+SHA-256、ESP manifest 和所有列入 manifest 的文件、默认 EFI 条目及内核闭包标识。
+它不会写入设备；通过预检也不能代替实机启动或 rootfs 配对验证。
+
 同一候选的最短设备验收顺序是：确认 B 槽及已知可启动的 `boot_b` 备份，安装对应 ESP 载荷，临时启动或刷入对应 U-Boot 镜像；验证普通启动、真实关机插线时直接出现离线充电画面且无世代菜单、断电后的冷启动、恢复键进入可用恢复路径；最后从 ABL fastboot 刷回备份 `boot_b` 并再次启动稳定系统。每次记录屏幕画面和实际启动目标，且运行 `systemctl is-system-running`、`systemctl --failed`。在当前候选补齐关机插线画面顺序、冷启动和恢复键证据前，不能把既有启动记录视作发布验收。
 
 成功到达 `multi-user.target` 后，`sheng-efi-mark-successful.service` 会记录当时配置的 EFI 默认项和时间。
 它是运行时健康记录，不能单独证明用户没有从 systemd-boot 菜单手动选择旧条目；它不会自动清理旧载荷，也不会修改 Android 分区。
 
-`uefi_a`、`uefi_b`、`rescue`、`userdata` 与 Android 固件分区仍不可复用，也没有被写入。接下来仍需单独验证
-断电冷启动与恢复键；在这些路径分别验证前，实验分支不得合并或发布。稳定 `boot_b` 的刷回
-与重新进入实验 U-Boot 已实测。
+`uefi_a`、`uefi_b`、`rescue`、`userdata` 与 Android 固件分区仍不可复用，也没有被写入。
+当前候选的 B 槽持久启动、普通重启和稳定镜像刷回已实测；关机插线画面顺序、断电冷启动
+与恢复键仍需分别验收。在这些路径验证前，实验分支不得合并或发布。
 实际分区边界和验收记录见 [存储迁移预案](uboot-efi-storage-plan_zh.md)。
+Android A 槽与更多 Linux 的可行性及验收边界见[多系统路线图](uboot-multiboot-roadmap_zh.md)。

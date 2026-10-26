@@ -144,11 +144,15 @@ move through the EFI menu on-device. The updated U-Boot image has booted from
 `boot_b`; flashing the known-good backup and restoring the experimental image
 have been tested. Fastboot reboot without a prewritten normal-boot marker
 returned to the normal system. Cold boot and recovery-key behavior still need
-validation. A 7.3.0 EFI payload matched to the current rootfs has also reached
-generation 1 through a RAM-only U-Boot boot, mounted the ESP, and returned to
-the unchanged B-slot boot path on reboot.
+validation. A 7.3.0 EFI payload matched to the current rootfs has reached
+generation 1 through RAM-only and persistent B-slot U-Boot boots, including a
+warm reboot. The original B-slot image was then restored and its full partition
+hash matched the backup. Charger insertion, cold boot, and recovery-key behavior
+remain to be checked for this candidate.
 See [`docs/uboot-efi-experiment_zh.md`](docs/uboot-efi-experiment_zh.md)
 for the architecture, checks, and rollback procedure.
+The [multiboot roadmap](docs/uboot-multiboot-roadmap_zh.md) distinguishes the
+Android A-slot path from unverified direct Android and other-Linux boot options.
 
 ## Repository Layout
 
