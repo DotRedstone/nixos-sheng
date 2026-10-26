@@ -16,7 +16,7 @@ ABL fastboot / B 槽
     └── 刷回备份的 Android boot_b → Mobile NixOS stage-1 菜单 → stage-2
 ```
 
-实验 EFI 路径不再显示旧的 stage-1 世代菜单；旧 Android boot 镜像保存在主机，供 ABL fastboot 回退。持久启动、音量键短按和长按连续移动、备份镜像刷回、无预写标记的 fastboot 回程、断电冷启动与恢复键均已实机确认。关机插墙充仍短暂显示 U-Boot 日志，且 Android 与其他 Linux 未从 EFI 菜单启动，因此保持实验分支状态。
+实验 EFI 路径不再显示旧的 stage-1 世代菜单；旧 Android boot 镜像保存在主机，供 ABL fastboot 回退。持久启动、音量键短按和长按连续移动、备份镜像刷回、无预写标记的 fastboot 回程、断电冷启动与恢复键均已实机确认。关机插墙充仍短暂显示 U-Boot 日志；Android 尚未从 EFI 菜单启动，Alpine 和 Debian 仅完成短时独立 rootfs 探针，因此保持实验分支状态。
 
 2026-10-11 的实机复验确认，`fastboot boot` 可以作为 RAM-only 验证通道：候选镜像在不写入
 `boot_b` 的情况下进入 U-Boot、EFI runtime、stage-1 与 stage-2，且 ADB/USB gadget 正常枚举。此后已备份并刷入 `boot_b`，完成持久启动及从 Linux 热重启复验。`boot_a` 原本是 Android header v4，
@@ -346,8 +346,8 @@ SHA-256、ESP manifest 和所有列入 manifest 的文件、默认 EFI 条目及
 
 `uefi_a`、`uefi_b`、`rescue`、`userdata` 与 Android 固件分区仍不可复用，也没有被写入。
 当前候选的 B 槽持久启动、普通重启、关机插墙充、断电冷启动、TWRP 恢复键和稳定镜像刷回
-已实测。充电启动仍显示 U-Boot 日志；Android 与其他 Linux 尚未在本菜单启动。实验分支
-不得当作已完成多系统适配或正式 release 宣传。
+已实测。充电启动仍显示 U-Boot 日志；Android 尚未在本菜单启动，Alpine 和 Debian
+仅完成短时独立 rootfs 探针。实验分支不得当作已完成多系统适配或正式 release 宣传。
 
 2026-10-26 单独验证了 ABL A/B 槽位路径：切至 A 槽后 Android 16 报告启动完成，
 `sys.boot_completed=1` 且图形服务运行；通过 Android ADB 返回 fastboot 并切回 B 槽，
