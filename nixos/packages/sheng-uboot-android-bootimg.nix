@@ -84,6 +84,8 @@ let
       CONFIG_FS_FAT_HANDLE_SECTOR_SIZE_MISMATCH=y
       CONFIG_CMD_PMIC=y
       CONFIG_NO_FB_CLEAR=y
+      # 继承的 ABL 帧缓冲会在关机充电启动时短暂显示 U-Boot 标志。
+      # CONFIG_VIDEO_LOGO is not set
       # This firmware only reads its EFI payload; Android slot writes stay with ABL.
       # CONFIG_EFI_RUNTIME_UPDATE_CAPSULE is not set
       # CONFIG_EFI_CAPSULE_ON_DISK is not set
@@ -161,6 +163,7 @@ else
   grep -Fx 'CONFIG_PHY_QCOM_PM8550B_EUSB2=y' ${firmware}/.config
   grep -Fx 'CONFIG_FS_FAT_HANDLE_SECTOR_SIZE_MISMATCH=y' ${firmware}/.config
   grep -Fx 'CONFIG_NO_FB_CLEAR=y' ${firmware}/.config
+  grep -Fx '# CONFIG_VIDEO_LOGO is not set' ${firmware}/.config
   strings ${firmware}/u-boot-nodtb.bin | grep -Fq 'qcom,pm8550b-eusb2-repeater'
   test "$(fdtget -t s ${firmware}/u-boot.dtb /soc@0/usb@a600000 dr_mode)" = 'peripheral'
   fdtget ${firmware}/u-boot.dtb /soc@0/usb@a600000 qcom,select-utmi-as-pipe-clk >/dev/null
