@@ -54,6 +54,8 @@ Android A 槽有 v4 格式的 `boot_a`、`vendor_boot_a`、`init_boot_a`，以�
 
 Debian 使用 [Debian 13 trixie arm64 官方容器镜像](https://github.com/docker-library/official-images/blob/master/library/debian)导出的最小用户态，镜像摘要为 `sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f`。在同一 EFI 内核、DTB 与临时 initrd 下，独立的 256 MiB ext4 镜像完成挂载与 `switch_root`，Debian `/init` 以 PID 1 写下 `rootfs=debian`、`version=13`、`kernel=7.3.0`，随后自动返回 NixOS。两个探针均通过 RAM 启动 U-Boot；临时 ESP 条目和两个 ext4 测试镜像在保存结果后已清理，默认项恢复为 NixOS，B 槽完整哈希仍与可启动备份相同。Debian 服务、图形、硬件与更新机制尚未验证。
 
+`scripts/sheng-build-linux-rootfs-probe-initrd.sh` 将已校验的 Alpine minirootfs 打包为可复用的独立 rootfs 交接 initrd。参数依次为 Alpine 归档、探针 ID 和输出路径；设备端从现有 `linux` 分区读取 `/var/lib/sheng-multiboot/<探针 ID>.img`，只读挂载 ext4 并执行镜像内的 `/init`。镜像内须有可执行的 `/init` 及 `host`、`dev`、`proc`、`sys` 目录；`/init` 负责记录结果及返回。stage 将进度写入同目录下的 `<探针 ID>.stage`，失败时尝试重启。该脚本只生成 initrd，不安装菜单条目、不切换默认项，也不证明新发行版已经实机启动；首次用于某个新 rootfs 前仍需逐项核对 EFI 内核、DTB、镜像来源和回退路径。
+
 Windows on Arm 对固件的要求超出“能运行一个 EFI 程序”：需检查 UEFI 启动与运行时服务、图形和存储协议、ACPI 描述、启动所需设备和原生 Arm64 驱动。当前 U-Boot/Linux 的 DTB 启动成功不能推出 Windows 可启动。应先做不写分区的固件能力审计，再尝试 Windows PE；完整安装须等启动链和驱动有独立证据。[Microsoft UEFI 要求](https://learn.microsoft.com/en-us/windows-hardware/drivers/bringup/uefi-requirements-that-apply-to-all-windows-platforms)、[Windows on Arm 设备制造与驱动](https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/arm64-device-manufacturing)
 
 ### iOS / iPadOS
