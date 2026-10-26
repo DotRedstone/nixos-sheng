@@ -11,15 +11,9 @@ Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的 Mobile NixOS 移植项目�
 
 本仓库仅提供 NixOS 设备移植。当前维护的刷机路径是基于 Mobile NixOS 的 Android 启动流程：编译一个 `boot.img` 刷入非活动（inactive）的 Android slot，以及一个由 Mobile NixOS 生成的 ext4 rootfs 镜像刷入专门分配的 `linux` 分区。
 
-## U-Boot / EFI 实验进展（2026-10-26）
+## U-Boot / EFI 实验
 
-独立实验分支已在 Xiaomi Pad 6S Pro 上从 B 槽 U-Boot 读取 `linux-boot` ESP，
-经 systemd-boot 引导与现用 rootfs 配对的 NixOS 7.3.0 第 1 世代。实机已验证持久启动、
-普通重启、断开电源冷启动、关机插墙充进入电池画面、音量加加电源键进入设备上的 TWRP，
-以及刷回原 B 槽镜像并核对完整分区哈希。插墙充时仍会先显示 U-Boot 日志。
-目前只有 NixOS 从此 EFI 菜单启动；Android A 槽和其他 Linux 尚未接入。
-这是一项开发进展，实验 U-Boot 镜像尚未作为正式刷机 Release 发布。
-代码、实机记录和后续边界见 [实验 PR #51](https://github.com/DotRedstone/nixos-sheng/pull/51)。
+已实机验证从 U-Boot / EFI 菜单启动 NixOS 7.3.0。Android 与其他 Linux 发行版尚未从该菜单启动；实验镜像尚未正式发布。详见 [实验 PR #51](https://github.com/DotRedstone/nixos-sheng/pull/51)。
 
 如果这个项目帮到了你，或者你只是想看到 NixOS 在移动设备上变得更真实，
 欢迎给仓库点一个 star。它能帮助更多 sheng 用户找到这个移植项目，也能让深夜
