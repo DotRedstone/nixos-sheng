@@ -15,6 +15,20 @@ the Mobile NixOS Android boot flow: a `boot.img` for the inactive Android slot
 and a Mobile NixOS generated ext4 rootfs image for the dedicated `linux`
 partition.
 
+## U-Boot / EFI experiment update (2026-10-26)
+
+A separate experimental branch has booted the Xiaomi Pad 6S Pro from slot B
+through U-Boot, a dedicated `linux-boot` ESP, and systemd-boot into NixOS 7.3.0
+generation 1 matched to the current rootfs. Device checks covered persistent
+boot, warm reboot, disconnected cold boot, powered-off charger insertion into
+the battery UI, Volume Up + Power into the device's TWRP, and restoration of
+the original B-slot image with a full partition hash check. U-Boot logs remain
+visible before the battery UI. Only NixOS has booted from this EFI menu;
+Android and other Linux systems remain future work. This is a development
+update, and the experimental U-Boot image is not a formal flashing release.
+See [experimental PR #51](https://github.com/DotRedstone/nixos-sheng/pull/51)
+for code, device evidence, and remaining boundaries.
+
 If this project helps you, or if you simply want to see NixOS become more real
 on mobile devices, please consider giving the repository a star. It helps other
 sheng users find the port and makes the late-night boot-image archaeology feel
