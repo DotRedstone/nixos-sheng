@@ -14,8 +14,8 @@ sudo sheng-reboot-generation-menu
 ```
 
 This page describes the stage-1 menu on the original Android `boot_b` path.
-On the experimental U-Boot/EFI path, the same command requests the systemd-boot
-generation menu for the next boot; stage-1 does not show a second menu.
+On the experimental U-Boot/EFI path, the same command reboots into the existing
+systemd-boot generation menu; stage-1 does not show a second menu.
 
 The command reboots the device; opening the menu no longer depends on a
 timing-sensitive triple-press gesture.

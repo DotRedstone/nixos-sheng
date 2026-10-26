@@ -129,7 +129,7 @@ linux 分区
 
 实验性 U-Boot 路径使用独立的 `linux-boot` ESP，在 systemd-boot 中列出 NixOS 世代；
 stage-1 根据选中的 EFI 条目进入对应系统，不再显示上述 stage-1 菜单。在 EFI 路径执行
-`sudo sheng-reboot-generation-menu` 会请求下一次显示 systemd-boot 菜单。第 97 与第 98 世代
+`sudo sheng-reboot-generation-menu` 会正常重启，进入已显示的 systemd-boot 菜单。第 97 与第 98 世代
 已经通过临时 U-Boot 引导完成实机切换，第 99 世代也通过持久 B 槽启动和热重启；
 开机动画与关机充电的电池画面已在早期实验 EFI 路径现场确认。实体音量键短按及长按连续切换均已实机确认。现用 7.3.0 候选的实机结果见本页开发进展，架构、验证与回退步骤见
 [`docs/uboot-efi-experiment_zh.md`](docs/uboot-efi-experiment_zh.md)。

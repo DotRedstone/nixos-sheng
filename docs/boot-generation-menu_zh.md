@@ -13,7 +13,7 @@ sudo sheng-reboot-generation-menu
 ```
 
 本页描述原 Android `boot_b` 路径的 stage-1 菜单。使用实验性 U-Boot/EFI 路径时，
-同一命令改为请求下一次显示 systemd-boot 世代菜单；stage-1 不再重复显示菜单。
+同一命令正常重启到 systemd-boot 世代菜单；stage-1 不再重复显示菜单。
 
 该命令会重启设备；菜单本身不再依赖需要卡时机完成的三击手势。
 
