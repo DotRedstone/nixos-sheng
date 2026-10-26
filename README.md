@@ -17,7 +17,7 @@ partition.
 
 ## U-Boot / EFI experiment
 
-NixOS 7.3.0 has booted from the U-Boot / EFI menu on the tablet. Android and other Linux distributions have not booted from that menu; the experimental image is not a formal release. See [experimental PR #51](https://github.com/DotRedstone/nixos-sheng/pull/51).
+Device tests booted NixOS 7.3.0 and short independent rootfs probes for Alpine 3.24.3 and Debian 13 from the U-Boot / EFI menu. Android 16 booted through ABL slot A but is not in that menu; full multi-OS installation remains unverified, and the experimental image has not been formally released. See [experimental PR #51](https://github.com/DotRedstone/nixos-sheng/pull/51).
 
 If this project helps you, or if you simply want to see NixOS become more real
 on mobile devices, please consider giving the repository a star. It helps other
