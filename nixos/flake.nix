@@ -18,7 +18,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     shengKernelSrc = {
-      url = "github:DotRedstone/linux-sheng/contrib/sheng-cs35l43-standby-20261022";
+      url = "git+https://github.com/DotRedstone/linux-sheng?ref=exp/nt36532e-display-on-enable&rev=50adc32cfe7b3ec953f4cd63a4e8303eca650902&shallow=1";
       flake = false;
     };
     shengFirmware = {
