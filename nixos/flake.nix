@@ -310,6 +310,7 @@
           initrd = mobileEval.outputs.initrd;
           kernelParams = mobileEval.config.boot.kernelParams;
         };
+        shengSystemdBootNoClear = pkgs.callPackage ./packages/sheng-systemd-boot-no-clear.nix { };
         mobileAndroidBootimg = mobileEval.outputs.android.android-bootimg;
         mobileFastbootImages = mobileEval.outputs.android.android-fastboot-images;
         mobileRootfsImage = mobileEval.outputs.generatedFilesystems.rootfs;

@@ -1,0 +1,13 @@
+From: DotRedstone <noreply@github.com>
+Subject: [PATCH] boot: preserve menu frame before starting selected entry
+
+Diagnostic only: isolate whether the final systemd-boot ClearScreen call is
+responsible for Sheng's one-frame flash after selecting NixOS. The menu's
+normal drawing and error handling remain unchanged.
+
+--- a/src/boot/boot.c
++++ b/src/boot/boot.c
+@@ -1003,3 +1003,2 @@ static bool menu_run(
+         *chosen_entry = config->entries[idx_highlight];
+-        clear_screen(COLOR_NORMAL);
+         return action == ACTION_RUN;
