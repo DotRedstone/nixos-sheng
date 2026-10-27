@@ -265,9 +265,9 @@ SHA-256 为 `a843e13dae29a0972b97c712d9165a8e051c34a890013817cc1c3a3d3293af73`�
 继续排查白闪时，发现锁定内核的 KTZ8866 驱动在 probe 中以默认亮度立即打开
 LED，而 DRM 面板随后才完成复位和初始化。内核实验提交
 [`f8fe49b`](https://github.com/DotRedstone/linux-sheng/commit/f8fe49bc2236c7ca07fc98129eef61526ffa3e46)
-改为先保持背光关闭，由 `drm_panel_enable()` 在面板准备后打开；该改动通过
-[`linux-sheng` Draft PR #6](https://github.com/DotRedstone/linux-sheng/pull/6)
-跟踪。这只是待验证的原因假设，不代表白闪已经修复。当前 EFI 内核位于独立的
+改为先保持背光关闭，由 `drm_panel_enable()` 在面板准备后打开；该改动记录在
+已关闭的 [`linux-sheng` PR #6](https://github.com/DotRedstone/linux-sheng/pull/6)。
+当前 EFI 内核位于独立的
 `linux-boot` 分区，`boot_b` 中是 U-Boot，`linux` 中是 rootfs；只写后两者
 无法替换 EFI 内核。未获该分区的写入范围确认前，不在设备上安装实验 EFI 载荷。
 ARM [EFI 载荷构建](https://github.com/DotRedstone/nixos-sheng/actions/runs/40374499919)
@@ -288,6 +288,13 @@ SHA-256 为 `a843e13dae29a0972b97c712d9165a8e051c34a890013817cc1c3a3d3293af73`�
 该路径上的现象。实验内核已从本分支的 flake 输入撤下，恢复与现用 rootfs
 匹配的 `024eda3`。EFI 交接路径没有使用新内核实机测试，不能据此判断
 EFI 交接时白闪的具体原因；该实验补丁也不应作为已验证修复合入稳定内核。
+
+另一处可能的时序点是 NT36532E 面板在 `prepare()` 中发送 DCS `Set Display On`，
+而 DRM 显示启用尚未完成。独立的
+[`linux-sheng` Draft PR #7](https://github.com/DotRedstone/linux-sheng/pull/7)
+将该命令移到 `enable()`，基于现用 rootfs 对应的 `024eda3`，不包含已失败的
+KTZ8866 实验。`codex/exp-nt36532e-display-test` 单独锁定该内核用于 ARM
+镜像构建和短时 B 槽对照；构建和实机结论尚待完成，不影响本分支当前 EFI pin。
 
 当前 rootfs 只有第 1 世代，旧 7.1.8 EFI 载荷不能作为 7.3.0 的可启动回退项。
 `sheng-efi rollback` 已增加写入前的版本/闭包核对，会拒绝这种跨内核回退。新载荷验证
