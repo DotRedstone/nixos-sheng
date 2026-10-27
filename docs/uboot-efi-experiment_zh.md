@@ -294,7 +294,16 @@ EFI 交接时白闪的具体原因；该实验补丁也不应作为已验证修�
 [`linux-sheng` Draft PR #7](https://github.com/DotRedstone/linux-sheng/pull/7)
 将该命令移到 `enable()`，基于现用 rootfs 对应的 `024eda3`，不包含已失败的
 KTZ8866 实验。`codex/exp-nt36532e-display-test` 单独锁定该内核用于 ARM
-镜像构建和短时 B 槽对照；构建和实机结论尚待完成，不影响本分支当前 EFI pin。
+镜像构建和短时 B 槽对照，不影响本分支当前 EFI pin。
+该实验分支的 [ARM boot image 作业](https://github.com/DotRedstone/nixos-sheng/actions/runs/40445887989)
+完成镜像构建与诊断附件上传，后续模块门禁仍因缺少 FPC1552 失败。附件 ZIP
+校验通过，boot image 大小为 57,618,432 字节、SHA-256 为
+`c7929cd78451de1022c83e60067c537932f3190da1b674ce9f8aaa044b75a87f`。
+短时写入 `boot_b` 后，设备端镜像读回哈希一致；普通路径进入 NixOS 7.3.0，
+DRM 背光与 GNOME 正常启动。使用者尚未反馈这次启动的白闪观察，因此只确认
+可启动，不判断白闪改善。随后刷回测试前的整块 192 MiB B 槽备份，设备端
+完整 SHA-256 与备份一致；设备再次经 U-Boot、systemd-boot 进入 NixOS。
+未写 `linux`、`linux-boot`、A 槽或 `userdata`。
 
 当前 rootfs 只有第 1 世代，旧 7.1.8 EFI 载荷不能作为 7.3.0 的可启动回退项。
 `sheng-efi rollback` 已增加写入前的版本/闭包核对，会拒绝这种跨内核回退。新载荷验证
