@@ -1,10 +1,10 @@
 From: Sheng EFI experiment <noreply@example.invalid>
-Subject: [PATCH] efi: mark ExitBootServices phases with green and magenta
+Subject: [PATCH] efi: mark ExitBootServices phases with three colors
 
-Show green at valid ExitBootServices entry and magenta after EFI event
-notifications, each for two seconds. Select the active video device so the
-marker is visible on Sheng. This is a visual timing probe and must not be
-included in normal builds.
+Show green at valid ExitBootServices entry, magenta after EFI event
+notifications, and yellow/cyan after device teardown, each for two seconds.
+The last stage uses the captured framebuffer address because the U-Boot video
+device may have been removed. This is a visual timing probe for Sheng only.
 
 ---
 --- a/lib/efi_loader/efi_boottime.c
@@ -17,26 +17,29 @@ included in normal builds.
  #include <efi_device_path.h>
  #include <efi_loader.h>
  #include <irq_func.h>
-@@ -21,8 +22,10 @@
+@@ -21,8 +22,11 @@
  #include <time.h>
  #include <u-boot/crc.h>
  #include <usb.h>
 +#include <video.h>
  #include <watchdog.h>
++#include <cpu_func.h>
  #include <asm/global_data.h>
 +#include <linux/delay.h>
  #include <linux/libfdt_env.h>
  
  DECLARE_GLOBAL_DATA_PTR;
-@@ -2186,6 +2189,7 @@
+@@ -2186,6 +2190,9 @@
  						  efi_uintn_t map_key)
  {
  	struct efi_event *evt, *next_event;
 +	struct udevice *phase_video = NULL;
++	void *phase_fb = NULL;
++	int phase_fb_size = 0;
  	efi_status_t ret = EFI_SUCCESS;
  
  	EFI_ENTRY("%p, %zx", image_handle, map_key);
-@@ -2199,6 +2203,19 @@
+@@ -2199,6 +2206,23 @@
  	/* Check if ExitBootServices has already been called */
  	if (!systab.boottime)
  		goto out;
@@ -49,6 +52,10 @@ included in normal builds.
 +			break;
 +	}
 +	if (phase_video) {
++		struct video_priv *priv = dev_get_uclass_priv(phase_video);
++
++		phase_fb = priv->fb;
++		phase_fb_size = priv->fb_size;
 +		video_fill(phase_video, 0x0000ff00);
 +		video_sync(phase_video, true);
 +		mdelay(2000);
@@ -56,17 +63,35 @@ included in normal builds.
  
  	/* Notify EFI_EVENT_GROUP_BEFORE_EXIT_BOOT_SERVICES event group. */
  	list_for_each_entry(evt, &efi_events, link) {
-@@ -2238,6 +2255,13 @@
- 	list_for_each_entry_safe(evt, next_event, &efi_events, link) {
- 		if (evt->type != EVT_SIGNAL_VIRTUAL_ADDRESS_CHANGE)
+@@ -2240,12 +2264,31 @@
  			list_del(&evt->link);
-+	}
-+
+ 	}
+ 
 +	/* Diagnostic marker: EFI events completed, before device teardown. */
 +	if (phase_video && device_active(phase_video)) {
 +		video_fill(phase_video, 0x00ff00ff);
 +		video_sync(phase_video, true);
 +		mdelay(2000);
++	}
++
+ 	if (!efi_st_keep_devices) {
+ 		bootm_disable_interrupts();
+ 		if (IS_ENABLED(CONFIG_DM_ETH))
+ 			eth_halt();
+ 		board_quiesce_devices();
+ 		dm_remove_devices_active();
++
++		/* Diagnostic marker: device teardown completed. */
++		if (phase_fb && phase_fb_size > 0) {
++			u32 *pixel = phase_fb;
++			int i;
++
++			for (i = 0; i < phase_fb_size / sizeof(*pixel); i++)
++				pixel[i] = 0x00ffff00;
++			flush_dcache_range((ulong)phase_fb,
++				ALIGN((ulong)phase_fb + phase_fb_size, 64));
++			mdelay(2000);
++		}
  	}
  
- 	if (!efi_st_keep_devices) {
+ 	/* Patch out unsupported runtime function */
