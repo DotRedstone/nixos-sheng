@@ -345,6 +345,16 @@ SHA-256 为 `086a6875ee3da0999acffcff7a04d274c85293318a35e32f3e6d7d0a7f6a987b`�
 `b9024c1599b6b06795ae4c59c990940573e924b6e1374988f157b603d198eea5`，
 原第 1 世代重新启动。仓库源码已撤销该失败实验的配置改动。
 
+systemd-boot 260.1 在菜单确认后调用 `ClearScreen()`。为隔离这一步，
+[ARM 诊断构建](https://github.com/DotRedstone/nixos-sheng/actions/runs/40530622455)
+只删除该调用，产出 AA64 `BOOTAA64.EFI`，SHA-256 为
+`f15f2436c54856708afadc313995707786fc09e06190ff1b0e472d627b849c4e`。
+单文件写入 `linux-boot` ESP 后，`bootctl` 确认从 U-Boot EFI 启动原第 1 世代，
+使用者目视确认仍有单帧白闪并进入桌面。原 EFI 文件已逐字节恢复，其 SHA-256 为
+`9f685a6593cd1c1ad5d8c9caf295dcd11d6e041345a6f5e664c12d27d18ccaf6`；
+`boot_b` 仍与 U-Boot 整分区备份一致。因此菜单退出清屏不是白闪的充分原因，
+诊断补丁不得作为修复部署。
+
 当前 rootfs 只有第 1 世代，旧 7.1.8 EFI 载荷不能作为 7.3.0 的可启动回退项。
 `sheng-efi rollback` 已增加写入前的版本/闭包核对，会拒绝这种跨内核回退。新载荷验证
 失败时，应使用原有 `boot_b` 返回现用系统，再从备份恢复 ESP 元数据；
