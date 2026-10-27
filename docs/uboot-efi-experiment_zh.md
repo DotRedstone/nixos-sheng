@@ -321,6 +321,22 @@ NixOS 7.3.0 桌面。恢复测试前的整块 192 MiB U-Boot 备份后，设备�
 这组对照同时改变了启动路径和运行内核，不能单独归因为 U-Boot 或面板驱动，
 也不能证明组合内核已修复 EFI 交接。未写 `linux`、`linux-boot`、A 槽或 `userdata`。
 
+为隔离启动路径，用同一组合内核构建
+[EFI 载荷](https://github.com/DotRedstone/nixos-sheng/actions/runs/40515526254)。
+作业中的 EFI 载荷构建及附件上传成功，完整 stage-2 构建未启用；下载后校验了
+附件摘要、ZIP CRC 和内部 manifest。写入前备份整块 `linux-boot` ESP，备份
+SHA-256 为 `e657a9350b7d3d4f9cdc371bce8feac000fa28bc4949caa501167e2cdb23d3c7`。
+只新增版本目录 `sheng-7.3.0-9a2dc19773856d69` 的四个载荷文件及一个手动
+测试条目，逐文件在设备端核对哈希。由于 U-Boot 提供的 EFI 变量在 Linux 中
+只读，`bootctl set-oneshot` 失败；临时改动 `loader.conf` 默认项后，
+`bootctl` 确认实际启动的是 `nixos-sheng-panel-backlight-test.conf`。
+使用者目视确认：该 EFI 路径仍有单帧白闪，最终进入 NixOS 桌面。
+因此这两处面板与背光时序改动没有消除 EFI 路径的白闪；其原因仍需在
+U-Boot、systemd-boot 与 Linux 显示交接中进一步定位。测试后将 `loader.conf`
+逐字节恢复，删除新增条目和四个载荷文件；`boot_b` 整分区哈希仍与 U-Boot
+备份一致，随后从原第 1 世代条目正常启动。此测试不构成新内核与现用 rootfs
+闭包兼容性的完整验收；未写 `linux`、A 槽、`userdata` 或设备校准分区。
+
 当前 rootfs 只有第 1 世代，旧 7.1.8 EFI 载荷不能作为 7.3.0 的可启动回退项。
 `sheng-efi rollback` 已增加写入前的版本/闭包核对，会拒绝这种跨内核回退。新载荷验证
 失败时，应使用原有 `boot_b` 返回现用系统，再从备份恢复 ESP 元数据；
