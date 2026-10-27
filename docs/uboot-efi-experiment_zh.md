@@ -395,6 +395,45 @@ SHA-256 为 `b9024c1599b6b06795ae4c59c990940573e924b6e1374988f157b603d198eea5`�
 ESP 的 EFI 管理器文件哈希保持不变。此对照不支持把白闪归因于基线导入后的
 U-Boot 环境或菜单改动。
 
+内核实验提交 `71211ed` 在 EFI 启动时保留面板复位 GPIO 的原状态，跳过首次
+`nt36532e_prepare()` 中的硬复位，后续 prepare 仍按原流程复位。固定该提交的
+[ARM EFI 载荷作业](https://github.com/DotRedstone/nixos-sheng/actions/runs/40538815768)
+成功；附件 ZIP SHA-256 为
+`c3e24e31ea411ccd9454e9592e9281de992d248743eb65ca9ba419172363733e`，
+内部 manifest、ZIP CRC 和设备端四个载荷文件哈希均通过。只在 ESP 增加临时
+载荷目录与条目后，`bootctl` 确认启动该测试项，内核日志确认跳过首次复位，
+使用者仍观察到白闪并进入桌面。因此单独去掉首次面板复位不能修复该现象。
+已恢复原 `loader.conf` 并删除新增条目与载荷；此内核改动仍为诊断分支，
+不得作为已验证的面板修复。
+
+随后依据 [Linux fbcon 文档](https://docs.kernel.org/fb/fbcon.html) 中关于
+framebuffer 内容保留和 `fbcon=map:` 的说明，用原 EFI 内核及载荷只增加
+`fbcon=map:1` 启动参数。设备端确认参数生效、`vtconsole` 只剩 dummy 设备，
+使用者仍观察到白闪并进入桌面；已恢复原默认项并删除测试条目。此对照不支持
+将白闪归因于 fbcon 抢先清屏。当前内核的
+`CONFIG_FRAMEBUFFER_CONSOLE_DEFERRED_TAKEOVER` 未启用，但单独启用该选项也
+不能从这组负结果推定为修复。
+
+研究 Qualcomm DPU 交接时发现，[上游讨论](https://lkml.iu.edu/hypermail/linux/kernel/2202.1/09164.html)
+记录了 bootloader 旧扫描路径与 Linux 新路径并存时，IOMMU 配置变化可使旧路径
+输出 underflow color；讨论也说明真正无闪烁交接需要继承时钟、电源和显示配置。
+该补丁针对另一类接口，[后续评审](https://lists.openwall.net/linux-kernel/2022/02/17/30)
+指出其 `CTL_START` 用法与 DSI 视频模式并不直接对应，不能原样套用到 sheng。
+本机 EFI 启动后 `efifb` 在约 0.12 秒注册、msm DRM 在约 0.62 秒初始化；
+`/proc/iomem` 将 ABL framebuffer 的 `0xb8000000` 区域列为 reserved。
+运行后的 DSI encoder underrun 计数为零，但这不能排除 IRQ 注册前的瞬时异常。
+下一步应在同一内核上分别记录 EFI 与普通 `boot_b` 路径进入 DPU 初始化前的
+CTL/INTF 扫描配置及早期 underflow 事件，再决定是否调整显示交接；目前不应
+直接清除全部 CTL 或改变面板时序。
+
+两项测试结束后，原 `boot_b` 整分区 SHA-256 为
+`b9024c1599b6b06795ae4c59c990940573e924b6e1374988f157b603d198eea5`，
+ESP 的 `loader.conf` 与 EFI 管理器 SHA-256 分别恢复为
+`1414ba8826bbbdc8fa8d828ac94edd467f5e20f4071adb08164b98cbefddc4b8`、
+`9f685a6593cd1c1ad5d8c9caf295dcd11d6e041345a6f5e664c12d27d18ccaf6`；
+第 1 世代重新启动，两个临时条目及新载荷均已删除。未写 `linux`、A 槽、
+`userdata` 或设备校准分区。
+
 当前 rootfs 只有第 1 世代，旧 7.1.8 EFI 载荷不能作为 7.3.0 的可启动回退项。
 `sheng-efi rollback` 已增加写入前的版本/闭包核对，会拒绝这种跨内核回退。新载荷验证
 失败时，应使用原有 `boot_b` 返回现用系统，再从备份恢复 ESP 元数据；
