@@ -422,9 +422,9 @@ framebuffer 内容保留和 `fbcon=map:` 的说明，用原 EFI 内核及载荷�
 本机 EFI 启动后 `efifb` 在约 0.12 秒注册、msm DRM 在约 0.62 秒初始化；
 `/proc/iomem` 将 ABL framebuffer 的 `0xb8000000` 区域列为 reserved。
 运行后的 DSI encoder underrun 计数为零，但这不能排除 IRQ 注册前的瞬时异常。
-下一步应在同一内核上分别记录 EFI 与普通 `boot_b` 路径进入 DPU 初始化前的
-CTL/INTF 扫描配置及早期 underflow 事件，再决定是否调整显示交接；目前不应
-直接清除全部 CTL 或改变面板时序。
+因此先在同一内核上分别记录 EFI 与普通 `boot_b` 路径进入 DPU 初始化时的
+CTL/INTF 配置，再决定是否调整显示交接；早期 underflow 仍需另行定位，
+目前不应直接清除全部 CTL 或改变面板时序。
 
 两项测试结束后，原 `boot_b` 整分区 SHA-256 为
 `b9024c1599b6b06795ae4c59c990940573e924b6e1374988f157b603d198eea5`，
@@ -433,6 +433,34 @@ ESP 的 `loader.conf` 与 EFI 管理器 SHA-256 分别恢复为
 `9f685a6593cd1c1ad5d8c9caf295dcd11d6e041345a6f5e664c12d27d18ccaf6`；
 第 1 世代重新启动，两个临时条目及新载荷均已删除。未写 `linux`、A 槽、
 `userdata` 或设备校准分区。
+
+只读 DPU 诊断内核 [`70cef9e`](https://github.com/DotRedstone/linux-sheng/commit/70cef9e6237c6e040334d0bed7d28d98cf65485b)
+在 `pm_runtime_resume_and_get()` 后、DPU 资源管理器初始化前后记录六个 CTL 和
+两个 DSI 接口的寄存器，不写显示寄存器。NixOS 实验提交 `098fed8` 固定同一
+内核修订。[EFI 载荷作业](https://github.com/DotRedstone/nixos-sheng/actions/runs/40552033039)
+成功，下载后的 manifest 和所有载荷文件哈希通过；
+[普通 boot 作业](https://github.com/DotRedstone/nixos-sheng/actions/runs/40552041932)
+完成镜像构建及诊断镜像上传，随后在既有 FPC1552 模块打包门禁失败，故整个作业
+状态为失败。诊断 boot 镜像 SHA-256 为
+`644f32162f6ac517363a07a9f31a6d1152165e492a2e56cf2ac7ec1e80afb6cd`。
+解包确认两种载荷的解压后 Linux 内核及 initrd 哈希分别相同。
+
+EFI 测试仅增设 ESP 载荷与临时菜单项；`bootctl` 确认从测试项进入第 1 世代。
+随后恢复原默认项并删除新增文件，再将诊断 boot 镜像暂刷 `boot_b`，普通启动
+也进入 NixOS。两次启动的 `before-init` 和 `after-rm-init` 寄存器快照逐项相同：
+所有 CTL 的 START、FETCH_PIPE_ACTIVE、INTF_ACTIVE、PIPE_ACTIVE、
+LAYER_ACTIVE、INTF_MASTER 均为零；两个 DSI 接口的 STATUS 均为零、CONFIG
+均为 `0x00800000`。因此在这两个采样点，没有观察到 EFI 独有的残留 CTL
+扫描配置。采样发生在 DPU 电源恢复之后，不能排除更早的瞬时状态；现场白闪
+观察也须与日志分开记录。两组筛选后的设备日志保存在本地备份，不提交原始
+设备日志。
+
+测试后刷回原 U-Boot 整块 `boot_b`，设备读回 SHA-256 为
+`b9024c1599b6b06795ae4c59c990940573e924b6e1374988f157b603d198eea5`；
+ESP 默认项和 EFI 管理器哈希分别为原值 `1414ba8826bbbdc8fa8d828ac94edd467f5e20f4071adb08164b98cbefddc4b8`、
+`9f685a6593cd1c1ad5d8c9caf295dcd11d6e041345a6f5e664c12d27d18ccaf6`。
+`bootctl` 确认重新经 U-Boot EFI 启动原第 1 世代，临时条目和载荷均已删除。
+未写 `linux`、A 槽、`userdata` 或设备校准分区。
 
 当前 rootfs 只有第 1 世代，旧 7.1.8 EFI 载荷不能作为 7.3.0 的可启动回退项。
 `sheng-efi rollback` 已增加写入前的版本/闭包核对，会拒绝这种跨内核回退。新载荷验证
