@@ -18,7 +18,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     shengKernelSrc = {
-      url = "github:DotRedstone/linux-sheng/contrib/sheng-cs35l43-standby-20261022";
+      url = "git+https://github.com/DotRedstone/linux-sheng?ref=exp/nt36532e-ktz8866-handoff&rev=39465934d026c7f1f8444963300a49d7c8c3e77d&shallow=1";
       flake = false;
     };
     shengFirmware = {
