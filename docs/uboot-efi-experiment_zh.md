@@ -307,6 +307,20 @@ DRM 背光与 GNOME 正常启动。首次测试缺少屏幕观察；再次刷入
 设备再次经 U-Boot、systemd-boot 进入 NixOS，GNOME 正常启动。
 未写 `linux`、`linux-boot`、A 槽或 `userdata`。
 
+随后把 KTZ8866 首次点亮延后和 NT36532E `Set Display On` 延后两项改动合并到
+内核实验修订 `3946593`，由 NixOS 实验分支 `codex/exp-panel-backlight-handoff`
+锁定。对应的 [ARM boot image 作业](https://github.com/DotRedstone/nixos-sheng/actions/runs/40487750612)
+完成镜像构建和诊断附件上传，后续模块打包仍因缺少 `CONFIG_INPUT_FPC1552=y`
+失败。附件摘要及 ZIP CRC 校验通过；Android boot v0 镜像为 57,618,432 字节，
+SHA-256 为 `8e7e21dd9b376f290b63577aa522c25eee85139ff1764c5ff8a8b0cb1aec1ef4`。
+临时写入 `boot_b` 后，设备端整分区哈希与“镜像前缀加原分区尾部”一致。
+使用者目视确认：从 fastboot 启动及随后普通重启，两次均无单帧白闪且进入
+NixOS 7.3.0 桌面。恢复测试前的整块 192 MiB U-Boot 备份后，设备端 SHA-256
+为 `b9024c1599b6b06795ae4c59c990940573e924b6e1374988f157b603d198eea5`，
+与备份一致；EFI 选择界面再次出现，选择后白闪仍在，NixOS 桌面正常。
+这组对照同时改变了启动路径和运行内核，不能单独归因为 U-Boot 或面板驱动，
+也不能证明组合内核已修复 EFI 交接。未写 `linux`、`linux-boot`、A 槽或 `userdata`。
+
 当前 rootfs 只有第 1 世代，旧 7.1.8 EFI 载荷不能作为 7.3.0 的可启动回退项。
 `sheng-efi rollback` 已增加写入前的版本/闭包核对，会拒绝这种跨内核回退。新载荷验证
 失败时，应使用原有 `boot_b` 返回现用系统，再从备份恢复 ESP 元数据；
