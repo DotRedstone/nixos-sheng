@@ -49,6 +49,7 @@ let
       ../patches/u-boot/sheng-baseline/sheng/0003-sheng-abl-framebuffer.patch
       ../patches/u-boot/sheng-baseline/sheng/0004-efi-abl-boot-reason.patch
       ../patches/u-boot/sheng-baseline/sheng/0005-charger-hide-efi-menu.patch
+      ../patches/u-boot/sheng-baseline/sheng/0006-gop-setmode-preserve-framebuffer.patch
     ];
     filesToInstall = [
       "u-boot-nodtb.bin"

@@ -1,0 +1,37 @@
+From: Sheng EFI experiment <noreply@example.invalid>
+Subject: [PATCH] efi: gop: preserve the inherited framebuffer on SetMode(0)
+
+Sheng exposes only GOP mode 0, backed by the framebuffer inherited from ABL.
+For the display handoff experiment, keep its contents when an EFI application
+selects the already active mode. This is a diagnostic change; callers may
+expect SetMode to clear the display, so it must not reach the stable image
+without device validation.
+
+---
+ lib/efi_loader/efi_gop.c | 8 --------
+ 1 file changed, 8 deletions(-)
+
+--- a/lib/efi_loader/efi_gop.c
++++ b/lib/efi_loader/efi_gop.c
+@@ -363,9 +363,6 @@
+  */
+ static efi_status_t EFIAPI gop_set_mode(struct efi_gop *this, u32 mode_number)
+ {
+-	struct efi_gop_obj *gopobj;
+-	struct efi_gop_pixel buffer = {0, 0, 0, 0};
+-	efi_uintn_t vid_bpp;
+ 	efi_status_t ret = EFI_SUCCESS;
+ 
+ 	EFI_ENTRY("%p, %x", this, mode_number);
+@@ -378,11 +375,6 @@
+ 		ret = EFI_UNSUPPORTED;
+ 		goto out;
+ 	}
+-	gopobj = container_of(this, struct efi_gop_obj, ops);
+-	vid_bpp = gop_get_bpp(this);
+-	ret = gop_blt_video_fill(this, &buffer, EFI_BLT_VIDEO_FILL, 0, 0, 0, 0,
+-				 gopobj->info.width, gopobj->info.height, 0,
+-				 vid_bpp);
+ out:
+ 	return EFI_EXIT(ret);
+ }
