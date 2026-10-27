@@ -18,7 +18,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     shengKernelSrc = {
-      url = "git+https://github.com/DotRedstone/linux-sheng?ref=exp/nt36532e-ktz8866-handoff&rev=39465934d026c7f1f8444963300a49d7c8c3e77d&shallow=1";
+      url = "git+https://github.com/DotRedstone/linux-sheng?ref=codex/exp-efi-panel-reset&rev=71211ed3b812aa0ea8723c5a7e83eb24d047e412&shallow=1";
       flake = false;
     };
     shengFirmware = {
