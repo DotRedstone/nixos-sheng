@@ -93,6 +93,18 @@ jobs:
             exit 1
           fi
 
+          sha256sum out/kernel/boot_sheng_nixos.img > out/kernel/boot.sha256
+
+      - name: Upload boot_b diagnostic image
+        uses: actions/upload-artifact@v7
+        with:
+          name: sheng-boot-b-diagnostic
+          path: |
+            out/kernel/boot_sheng_nixos.img
+            out/kernel/boot.sha256
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Package matching kernel modules
         run: |
           set -euo pipefail

@@ -105,7 +105,7 @@ let
         echo "Default:"
         awk '$1 == "default" { print "  " $2 }' "$esp/loader/loader.conf"
         if [ -f "$state/previous-loader.conf" ]; then
-          echo "Rollback default:"
+          echo "Previous default (may no longer be bootable):"
           awk '$1 == "default" { print "  " $2 }' "$state/previous-loader.conf"
         fi
         if [ -f "$state/last-boot-success" ]; then
@@ -116,7 +116,8 @@ let
 
       install_payload() {
         local supplied=$1 source entry entries version payload linux_path initrd_path dtb_path
-        local staging backup_loader previous_default previous_linux previous_base candidate
+        local staging backup_loader backup_manager previous_default previous_linux previous_base candidate
+        local expected_kernel current_kernel kernel_version
 
         source="$(readlink -f -- "$supplied")"
         if [ "$source" = "$esp" ] || [ ! -d "$source" ]; then
@@ -167,12 +168,23 @@ let
           echo "EFI entry paths are not a Sheng versioned payload." >&2
           exit 1
         fi
-        for required in linux initrd sm8550-xiaomi-sheng.dtb; do
+        for required in linux initrd sm8550-xiaomi-sheng.dtb kernel.store-path; do
           test -s "$source/$payload/$required" || {
             echo "EFI payload is missing $payload/$required." >&2
             exit 1
           }
         done
+        expected_kernel="$(cat "$source/$payload/kernel.store-path")"
+        if [ ! -e /run/current-system/kernel ]; then
+          echo "The current system kernel is unavailable for EFI payload verification." >&2
+          exit 1
+        fi
+        current_kernel="$(dirname "$(readlink -f /run/current-system/kernel)")"
+        kernel_version="$(printf '%s\n' "$version" | cut -d- -f1)"
+        if [ "$expected_kernel" != "$current_kernel" ] || [ "$(uname -r)" != "$kernel_version" ]; then
+          echo "EFI payload kernel does not match the running system closure." >&2
+          exit 1
+        fi
 
         check_esp
         install -d -m 0700 "$state"
@@ -189,6 +201,7 @@ let
         install -m 0644 "$source/$payload/linux" "$staging/$payload/linux"
         install -m 0644 "$source/$payload/initrd" "$staging/$payload/initrd"
         install -m 0644 "$source/$payload/sm8550-xiaomi-sheng.dtb" "$staging/$payload/sm8550-xiaomi-sheng.dtb"
+        install -m 0644 "$source/$payload/kernel.store-path" "$staging/$payload/kernel.store-path"
         install -m 0644 "$source/loader/entries/$entry" "$staging/loader/entries/$entry"
         install -m 0644 "$source/loader/entries.srel" "$staging/loader/entries.srel"
         install -m 0644 "$source/EFI/BOOT/BOOTAA64.EFI" "$staging/EFI/BOOT/BOOTAA64.EFI"
@@ -212,7 +225,12 @@ let
         # and in persistent rootfs state. The old BLS entry and its payload
         # are deliberately retained.
         backup_loader="$state/previous-loader.conf"
+        backup_manager="$state/previous-BOOTAA64.EFI"
         if [ -f "$esp/loader/loader.conf" ]; then
+          if [ ! -s "$esp/EFI/BOOT/BOOTAA64.EFI" ]; then
+            echo "Cannot back up the previous EFI boot manager." >&2
+            exit 1
+          fi
           install -m 0600 "$esp/loader/loader.conf" "$backup_loader"
           install -m 0644 "$esp/loader/loader.conf" "$esp/loader/loader.conf.previous"
           previous_default="$(awk '$1 == "default" { print $2; exit }' "$backup_loader")"
@@ -231,6 +249,9 @@ let
             exit 1
           fi
           printf '%s\n' "$previous_base" > "$state/previous-payload-entry"
+          install -m 0600 "$esp/EFI/BOOT/BOOTAA64.EFI" "$backup_manager.new"
+          cmp "$esp/EFI/BOOT/BOOTAA64.EFI" "$backup_manager.new"
+          mv "$backup_manager.new" "$backup_manager"
         fi
         if [ -f "$esp/EFI/BOOT/BOOTAA64.EFI" ]; then
           install -m 0644 "$esp/EFI/BOOT/BOOTAA64.EFI" "$esp/EFI/BOOT/BOOTAA64.EFI.previous"
@@ -246,10 +267,13 @@ let
         trap - EXIT
         rm -rf "$staging"
         echo "Installed and selected EFI payload: $version"
-        echo "The previous default is retained; run 'sheng-efi rollback' before reboot if needed."
+        echo "The previous boot manager and immutable payload are retained."
+        echo "Rollback requires a matching kernel identity (or release for legacy payloads)."
       }
 
       rollback() {
+        local previous_manager previous_base previous_linux previous_version previous_kernel_identity
+        local current_kernel
         check_esp
         if [ ! -s "$state/previous-loader.conf" ]; then
           echo "No previous EFI loader configuration has been recorded." >&2
@@ -258,6 +282,16 @@ let
         install -d -m 0700 "$state"
         exec 9>"$state/install.lock"
         flock -x 9
+        previous_manager="$state/previous-BOOTAA64.EFI"
+        # Existing installations may only have the ESP-side backup. Prefer
+        # the persistent copy made by newer installations when both exist.
+        if [ ! -s "$previous_manager" ]; then
+          previous_manager="$esp/EFI/BOOT/BOOTAA64.EFI.previous"
+        fi
+        if [ ! -s "$previous_manager" ]; then
+          echo "No previous EFI boot manager has been recorded." >&2
+          exit 1
+        fi
         if [ -s "$state/previous-payload-entry" ]; then
           previous_base="$(cat "$state/previous-payload-entry")"
           case "$previous_base" in
@@ -268,6 +302,25 @@ let
             echo "Previous EFI payload entry is missing." >&2
             exit 1
           }
+          previous_linux="$(awk '$1 == "linux" { print $2; exit }' "$esp/loader/entries/$previous_base")"
+          if [[ "$previous_linux" != /EFI/NixOS/sheng-*/linux ]]; then
+            echo "Previous EFI payload path is invalid." >&2
+            exit 1
+          fi
+          previous_kernel_identity="$esp''${previous_linux%/linux}/kernel.store-path"
+          if [ -s "$previous_kernel_identity" ]; then
+            current_kernel="$(dirname "$(readlink -f /run/current-system/kernel)")"
+            if [ "$(cat "$previous_kernel_identity")" != "$current_kernel" ]; then
+              echo "Previous EFI payload kernel does not match the current system; refusing rollback." >&2
+              exit 1
+            fi
+          else
+            previous_version="$(awk '$1 == "version" { print $2; exit }' "$esp/loader/entries/$previous_base")"
+            if [ "''${previous_version%%-*}" != "$(uname -r)" ]; then
+              echo "Previous EFI payload kernel version does not match the current system; refusing rollback." >&2
+              exit 1
+            fi
+          fi
           awk -v selected="$previous_base" '
             $1 == "default" { print "default " selected; next }
             { print }
@@ -275,11 +328,15 @@ let
         else
           install -m 0644 "$state/previous-loader.conf" "$esp/loader/loader.conf.new"
         fi
+        install -m 0644 "$previous_manager" "$esp/EFI/BOOT/BOOTAA64.EFI.new"
+        cmp "$previous_manager" "$esp/EFI/BOOT/BOOTAA64.EFI.new"
+        sync
+        mv "$esp/EFI/BOOT/BOOTAA64.EFI.new" "$esp/EFI/BOOT/BOOTAA64.EFI"
         mv "$esp/loader/loader.conf.new" "$esp/loader/loader.conf"
         rebuild_manifest
         ${shengEfiGenerations}/bin/sheng-efi-generations "$esp"
         rm -f "$state/pending-version"
-        echo "Restored the previous EFI default entry."
+        echo "Restored the previous EFI boot manager and default entry."
       }
 
       mark_successful() {

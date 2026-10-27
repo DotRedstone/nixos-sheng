@@ -6,7 +6,7 @@ Mobile NixOS port for the Xiaomi Pad 6S Pro 12.4 (`sheng`,
 Qualcomm SM8550).
 
 ![Device](https://img.shields.io/badge/device-Xiaomi%20Pad%206S%20Pro%2012.4-blue)
-![Kernel](https://img.shields.io/badge/kernel-7.1.8-blueviolet)
+![Kernel](https://img.shields.io/badge/kernel-7.3.0%20experimental-blueviolet)
 ![NixOS](https://img.shields.io/badge/NixOS-Mobile%20NixOS-5277c3)
 ![License](https://img.shields.io/badge/license-MIT%20%2B%20third--party%20terms-orange)
 
@@ -14,6 +14,19 @@ This repository is a NixOS-only device port. The maintained flashing path is
 the Mobile NixOS Android boot flow: a `boot.img` for the inactive Android slot
 and a Mobile NixOS generated ext4 rootfs image for the dedicated `linux`
 partition.
+
+## U-Boot / EFI progress (experimental)
+
+Experimental U-Boot now reads a dedicated `linux-boot` ESP from slot B and
+offers NixOS generations through systemd-boot. A 7.3.0 candidate matched to
+the current rootfs has passed persistent boot, warm reboot, disconnected cold
+boot, powered-off charger insertion into the battery UI, Volume Up + Power into
+TWRP, and restoration of the original B-slot image with a full partition hash
+check. The current candidate no longer shows the U-Boot logo, but briefly
+flashes white before the battery UI and after EFI selection. Android and other
+Linux systems have not booted from this EFI menu. This is development evidence,
+not a flashable U-Boot release. See the [EFI experiment record](docs/uboot-efi-experiment_zh.md)
+and [multiboot roadmap](docs/uboot-multiboot-roadmap_zh.md).
 
 If this project helps you, or if you simply want to see NixOS become more real
 on mobile devices, please consider giving the repository a star. It helps other
@@ -48,6 +61,11 @@ The first public release is available from
 [GitHub Releases](https://github.com/DotRedstone/nixos-sheng/releases/latest).
 Some hardware remains partially supported; review the status table and known
 issues before flashing.
+This experimental branch pins the Linux 7.3.0 revision used by the current test
+tablet rootfs for EFI payload validation. It adds six CS35L43 standby DTS
+properties to the upstream baseline and does not include the FPC1552 kernel
+driver. The hardware status below describes earlier verified builds; this EFI
+candidate has not passed the same device acceptance.
 
 | Area | Status | Notes |
 | --- | --- | --- |
@@ -83,7 +101,7 @@ issues before flashing.
 The kernel source is configured in `nixos/flake.nix`:
 
 ```nix
-shengKernelSrc.url = "github:DotRedstone/linux-sheng/upgrade/sheng-7.1.8";
+shengKernelSrc.url = "github:DotRedstone/linux-sheng/contrib/sheng-cs35l43-standby-20261022";
 ```
 
 ## How Boot Works
@@ -131,17 +149,23 @@ See [`docs/boot-generation-menu.md`](docs/boot-generation-menu.md) for details.
 
 The experimental U-Boot path uses a dedicated `linux-boot` ESP and lists NixOS
 generations in systemd-boot. Stage-1 enters the selected EFI generation without
-showing the stage-1 menu. Temporary U-Boot boots have selected generations 97
-and 98 on the tablet; generation 99 has also passed persistent B-slot boot and
-warm reboot. The boot animation and offline-charging battery UI were visually
+showing the stage-1 menu. On the EFI path, `sudo sheng-reboot-generation-menu`
+currently performs a normal reboot through U-Boot and systemd-boot; whether
+this command visibly presents the menu still needs on-device confirmation.
+Temporary U-Boot boots have
+selected generations 97 and 98 on the tablet; generation 99 has also passed
+persistent B-slot boot and warm reboot. The boot animation and offline-charging
+battery UI were visually
 confirmed on the experimental EFI path. Short and held volume-key presses now
 move through the EFI menu on-device. The updated U-Boot image has booted from
 `boot_b`; flashing the known-good backup and restoring the experimental image
 have been tested. Fastboot reboot without a prewritten normal-boot marker
-returned to the normal system. Cold boot and recovery-key behavior still need
-validation.
-See [`docs/uboot-efi-experiment_zh.md`](docs/uboot-efi-experiment_zh.md)
+returned to the normal system. The current 7.3.0 candidate's device checks
+are summarized above. See
+[`docs/uboot-efi-experiment_zh.md`](docs/uboot-efi-experiment_zh.md)
 for the architecture, checks, and rollback procedure.
+The [multiboot roadmap](docs/uboot-multiboot-roadmap_zh.md) distinguishes the
+Android A-slot path from unverified direct Android and other-Linux boot options.
 
 ## Repository Layout
 

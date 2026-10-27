@@ -18,7 +18,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     shengKernelSrc = {
-      url = "github:DotRedstone/linux-sheng/upgrade/sheng-7.1.8";
+      url = "github:DotRedstone/linux-sheng/contrib/sheng-cs35l43-standby-20261022";
       flake = false;
     };
     shengFirmware = {

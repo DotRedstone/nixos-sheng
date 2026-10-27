@@ -12,6 +12,9 @@ Sheng 使用固定的 Android `boot_b` 镜像作为启动基础，并从可写�
 sudo sheng-reboot-generation-menu
 ```
 
+本页描述原 Android `boot_b` 路径的 stage-1 菜单。使用实验性 U-Boot/EFI 路径时，
+同一命令正常重启到 systemd-boot 世代菜单；stage-1 不再重复显示菜单。
+
 该命令会重启设备；菜单本身不再依赖需要卡时机完成的三击手势。
 
 菜单会在 framebuffer 上显示两层世代信息、当前选择位置、按键图标和自动启动

@@ -1,6 +1,6 @@
 # Sheng 的 U-Boot / EFI 实验
 
-> 状态：实验性。U-Boot 已从独立 EFI ESP 引导多个 NixOS 世代，并在 B 槽完成持久启动与热重启验证；它不是 release 镜像。
+> 状态：实验性。U-Boot 已从独立 EFI ESP 引导多个 NixOS 世代，并在 B 槽完成持久启动、关机插墙充、冷启动及恢复键验证；它不是 release 镜像。
 
 ## 已确认的启动边界
 
@@ -16,7 +16,7 @@ ABL fastboot / B 槽
     └── 刷回备份的 Android boot_b → Mobile NixOS stage-1 菜单 → stage-2
 ```
 
-实验 EFI 路径不再显示旧的 stage-1 世代菜单；旧 Android boot 镜像保存在主机，供 ABL fastboot 回退。持久启动、音量键短按和长按连续移动、备份镜像刷回及无预写标记的 fastboot 回程均已实机确认。断电冷启动与恢复键仍待验收，因此保持实验分支状态。
+实验 EFI 路径不再显示旧的 stage-1 世代菜单；旧 Android boot 镜像保存在主机，供 ABL fastboot 回退。持久启动、音量键短按和长按连续移动、备份镜像刷回、无预写标记的 fastboot 回程、断电冷启动与恢复键均已实机确认。关闭图标的候选已完成关机插墙充、冷启动、恢复键和原镜像刷回实测；充电及系统启动仍短暂白屏。Android 尚未从 EFI 菜单启动，Alpine 和 Debian 仅完成短时独立 rootfs 探针，因此保持实验分支状态。
 
 2026-10-11 的实机复验确认，`fastboot boot` 可以作为 RAM-only 验证通道：候选镜像在不写入
 `boot_b` 的情况下进入 U-Boot、EFI runtime、stage-1 与 stage-2，且 ADB/USB gadget 正常枚举。此后已备份并刷入 `boot_b`，完成持久启动及从 Linux 热重启复验。`boot_a` 原本是 Android header v4，
@@ -34,7 +34,7 @@ Host node: /dev/ttyACM0
 本次实测的本仓库镜像 SHA-256 为
 `ace4caa74df60600ce9f799ac260743030999a24eca3b8e0bc4d077580167231`；试验后已将已知可启动的
 Mobile NixOS boot 镜像（SHA-256
-`def3f8d2d3219d64e660f1c848d59e13371ab6102596dd8832ac5b65c7370160`）保留为 ABL fastboot 回退物；当前 B 槽已写入实验 U-Boot。
+`def3f8d2d3219d64e660f1c848d59e13371ab6102596dd8832ac5b65c7370160`）保留为 ABL fastboot 回退物；当时 B 槽写入了实验 U-Boot。这条历史记录不代表设备现用镜像。
 
 同一基线的只读 fastboot 探针也已完成实机验证。它启动后由主机返回
 `version: 0.4` 与 `product: xiaomi-sheng`，证明 U-Boot 的 fastboot 协议可用。探针禁用
@@ -60,7 +60,15 @@ scripts/sheng-adb-reboot-bootloader.sh
 
 `adb reboot bootloader` 是 ADB daemon 的普通重启请求，不能稳定映射为 Linux 的
 `RESTART2("bootloader")`；主机包装脚本和 rootfs 命令专门补足这个原因传递。
-直接调用 `RESTART2` 不经过 systemd 的 `reboot.target`，因此这两个命令会先持久化一次性
+ABL fastboot 的枚举窗口可能很短。临时启动 U-Boot 时使用主机脚本，先让
+`fastboot boot` 等待设备，再触发同一 `RESTART2` 请求：
+
+```bash
+scripts/sheng-adb-ram-boot.sh out/sheng-u-boot-experimental-boot_b.img
+```
+
+该命令只把镜像送入 RAM，不刷写 `boot_b`。
+直接调用 `RESTART2` 不经过 systemd 的 `reboot.target`，因此上述命令会先持久化一次性
 `force-normal-once` 标记。设备从 ABL fastboot 执行 `fastboot reboot` 后，stage-1 用该标记
 优先选择正常启动，stage-2 随后清除标记。更新 rootfs 前应使用仓库中的主机包装脚本。
 
@@ -112,7 +120,7 @@ EFI 载荷将动画 VT2 纳入 `fbcon` 映射。实机日志显示动画服务�
 向 systemd-boot 提供仅本次启动有效的 `LoaderConfigTimeout=menu-hidden`。这样充电启动可跳过
 世代菜单；普通电源键开机仍按现有配置显示菜单。该变量不写入非易失存储，也不修改 ESP、
 `linux` 或 Android 槽位。源码评估、本地交叉构建和 RAM 正常启动进入第 99 世代均已通过；
-关机插线的画面顺序仍待实机确认。设备当前第 99 世代仍运行旧版
+该次测试尚未确认关机插线的画面顺序；同一功能的后续实测见下文。该次验证时，设备第 99 世代运行旧版
 `sheng-reboot-bootloader`，它不会写入正常重启标记；直接用它进入 fastboot 后临时启动，
 stage-1 会把混合 USB 原因判为充电启动。手动预写标记后，新候选镜像读取到
 `bootinfo.pureason=0x40011`，没有设置隐藏菜单变量，最终进入第 99 世代正常目标；
@@ -145,6 +153,164 @@ GNOME、DSI 和背光状态正常，失败服务为 0。使用者现场确认这
 
 这证明目标链 `ABL → U-Boot → systemd-boot → EFI Image → stage-1 → stage-2` 可用。`boot_a`、
 Android `userdata`、`super`、基带与其他固件分区没有写入。
+
+2026-10-25 以 PR #51 的 ARM boot 候选（提交 `5acd5a5`，镜像 SHA-256
+`5424227afacf8e9d219430ca8985cc409ff594fce5e45b53e54c2c53e7c1099e`）执行
+`fastboot boot` 临时启动。主机依次观察到 U-Boot USB gadget、Mobile NixOS stage-1 和
+stage-2 ADB；运行内核为 7.1.8，EFI runtime 存在，启动目标为旧 ESP 菜单中的第 99 世代。
+设备现用 rootfs 已转为 7.3.0，系统 profile 只有第 1 世代，`/lib/modules` 也只有 7.3.0；
+因此该旧 EFI 内核无法加载 vfat 等模块，`/boot` 挂载及多个服务失败。测试后设备已重启回
+原有 7.3.0 `boot_b`，分区完整 SHA-256 与测试前备份相同；未安装候选 ESP，也未写入
+`boot_b`。该次测试使用的 EFI 载荷仍由 7.1.8 内核构建。
+
+2026-10-26 的 7.3.0 EFI 候选已通过 ARM boot、ESP 和完整 minimal stage-2 CI 构建。
+ESP 构建所用内核的 Nix store 路径与设备现用 7.3.0 系统内核不同；相同的版本号不能证明
+模块 ABI 或设备树一致。下载的 ESP artifact 已通过 manifest 校验，EFI `Image` 与设备现用
+`Image.gz` 解压后逐字节相同；反编译 DTB 后发现设备现用版本比候选多六处
+`cirrus,low-pwr-mode-standby` 属性，模块闭包也尚未核对。安装器会在写入 ESP 前拒绝这组
+不匹配的载荷，因此它尚未安装到设备，也未用于持久启动。应使用同一构建的 rootfs 与
+EFI 载荷配对，或取得内核、设备树和模块的完整等价证据，再继续关机充电画面顺序、
+冷启动及恢复键验收。
+
+现用 rootfs 的原始 CI 构建固定 `linux-sheng` 修订 `024eda3`：它以 `9ce9cb0` 为父提交，
+只增加上述六处 DTS 属性。实验分支已改用相同的锁定内核来源与构建定义；新的 ESP
+候选在本地 Nix 求值中得到与设备完全一致的内核和模块闭包路径。提交 `c69921d` 的
+ARM boot、ESP 与完整 minimal stage-2 构建成功；ESP artifact 的 manifest、内核路径、
+解压后的 `Image` 和 DTB 均已与设备逐项核对。
+
+同日将该 ESP 载荷安装到 `linux-boot`，并以同提交的 U-Boot 镜像执行 `fastboot boot`
+临时启动。随后用 `scripts/sheng-adb-ram-boot.sh` 重复通过同一路径。`bootctl` 报告
+`Das U-Boot`、systemd-boot 260.1 和第 1 世代；运行内核为
+7.3.0，`/boot` 以 vfat 挂载，stage-2 已进入现用系统。失败服务只有测试前已存在的
+`home-manager-luser.service` 与 `logrotate-checkconf.service`。普通重启后设备从原有 B 槽
+进入非 EFI 启动链，`boot_b` 完整 SHA-256 与测试前备份相同。ESP 新载荷仍保留供后续
+验证；未刷写 `boot_b`、`boot_a`、`linux` 或 `userdata`。
+
+2026-10-26 将最终提交 `9a69964` 的 U-Boot 镜像（SHA-256
+`5424227afacf8e9d219430ca8985cc409ff594fce5e45b53e7c1099e`）写入 B 槽。
+设备端读回的前 655360 字节与 CI 镜像完全一致。设备从 B 槽持久进入
+`Das U-Boot → systemd-boot → EFI Linux 7.3.0 →` 第 1 世代 stage-2；随后一次普通重启
+再次进入同一 EFI 链，`/boot` 均以 vfat 挂载。两次启动没有新增失败服务，仍只有测试前
+已有的 `home-manager-luser.service` 和 `logrotate-checkconf.service`。之后从 ABL fastboot
+刷回原 192 MiB `boot_b` 备份，设备进入非 EFI 的现用 7.3.0 系统；完整 B 槽 SHA-256
+恢复为备份值。A 槽、`linux`、`userdata` 和 Android 固件分区没有写入。当前设备保留原
+B 槽镜像。该段记录截至首次刷回；同一候选随后再次刷入并完成下述实机验收。
+
+2026-10-26 对同一 boot 镜像再次刷入 B 槽。真实关机、拔掉电脑线并插入墙充后，使用者
+现场观察到先显示一段 U-Boot 日志，接着黑屏，最后进入充电电池画面；没有看到 EFI 世代
+菜单。拔掉墙充并等待屏幕熄灭后，只按电源键冷启动，出现 EFI 菜单并进入 NixOS。接回
+电脑后，`bootctl` 报告 U-Boot UEFI、systemd-boot 260.1 与
+`nixos-sheng-generation-1.conf`，内核为 7.3.0。再次关机并用音量加加电源键启动，进入设备
+安装的第三方 TWRP；从 TWRP 选择 `Reboot → System` 后返回 EFI/NixOS 第 1 世代。
+两次返回 NixOS 后只有测试前已有的两个失败服务。最后从 ABL fastboot 刷回原 192 MiB
+`boot_b` 备份，`current-slot: b`，设备从非 EFI 路径进入 7.3.0，完整 B 槽读回 SHA-256 为
+`31e4e8bfaa06fedb2e2fa41531b068274d6baafd3ade0886dc279af2a473ae6a`，与备份一致。
+这些观察证明本次充电、冷启动与恢复键路径可达；充电启动的 U-Boot 日志仍是可见问题，
+充电功率和长时间稳定性没有因此得到证明。
+
+2026-10-27 将关闭 `CONFIG_VIDEO_LOGO` 的候选（SHA-256
+`a843e13dae29a0972b97c712d9165a8e051c34a890013817cc1c3a3d3293af73`）写入 B 槽。
+写入后读回镜像前 647168 字节哈希一致，设备进入 U-Boot UEFI、systemd-boot 与
+NixOS 7.3.0，失败服务仍只有此前已有的两项。关机、断开电脑并插入墙充后，使用者
+观察到短暂白屏，然后进入充电电池画面；未看到 U-Boot 图标、文字日志或 EFI 菜单。
+拔掉墙充后仅按电源键冷启动，直接出现 EFI 选择界面，随后短暂白屏并进入 NixOS。
+白屏的来源及是否可以消除仍需分析。再次远程关机后，使用者确认音量加加电源键进入
+TWRP，并从 `Reboot → System` 返回 EFI 选择界面与 NixOS；ADB 随后确认
+`Das U-Boot`、systemd-boot 260.1 与 B 槽候选哈希。最后从 ABL fastboot 刷回原
+192 MiB `boot_b` 备份，设备从非 EFI 路径进入 NixOS 7.3.0，B 槽完整读回 SHA-256
+为 `31e4e8bfaa06fedb2e2fa41531b068274d6baafd3ade0886dc279af2a473ae6a`，
+与备份一致。只有此前已有的两个失败服务；A 槽、`linux`、`userdata` 和 Android
+固件分区未写入。此候选的充电、冷启动、恢复键与回退路径均已实测，但短暂白屏、
+充电功率和长时间稳定性仍未解决或验证。
+
+2026-10-27 将延后视频控制台输出的候选镜像（SHA-256
+`0a58f14f1b4ec39af3b1782b17021f045b485200972c5105b4e4dd6934809fdb`）刷入 B 槽。
+持久启动进入 U-Boot UEFI、systemd-boot 和 NixOS 7.3.0。真实关机插墙充时，先短暂显示
+右上角带 U-Boot 图标的启动画面，随后黑屏并进入充电电池画面；先前可见的多行日志没有再
+出现。断开墙充后冷启动显示 U-Boot/EFI 选择界面，短暂白屏后进入 NixOS。恢复键测试后
+设备也返回 EFI/NixOS，但这次使用者只回复“没问题”，TWRP 画面及其重启选项尚待明确
+复核。最后刷回原 192 MiB `boot_b` 备份，设备从非 EFI 路径进入 NixOS 7.3.0，完整
+B 槽读回 SHA-256 为 `31e4e8bfaa06fedb2e2fa41531b068274d6baafd3ade0886dc279af2a473ae6a`，
+与备份一致。A 槽、`linux`、`userdata` 和 Android 固件分区未写入。
+
+2026-10-27 再次将关闭图标的候选写入 B 槽，临时运行与
+`sheng-reboot-generation-menu` 当前源码相同的 shell 命令。设备已通过 U-Boot UEFI 和
+systemd-boot 进入 NixOS 7.3.0；命令在 EFI 路径执行普通重启，设备再次进入同一 EFI
+启动链，且未生成旧 stage-1 的 `requested` 标记。测试没有更新 rootfs，因此不能证明
+新命令已作为系统包部署。随后从 ABL fastboot 恢复原 192 MiB `boot_b` 备份；设备回到
+非 EFI NixOS 7.3.0，完整 B 槽读回 SHA-256 为
+`31e4e8bfaa06fedb2e2fa41531b068274d6baafd3ade0886dc279af2a473ae6a`，与备份一致。
+屏幕上 EFI 选择界面的显示仍以使用者现场观察为准。
+
+针对菜单是否可见的疑问，又用同一候选做了一次 B 槽测试。EFI 系统中执行
+`systemctl reboot --boot-loader-menu=10` 报 `Read-only file system`，设备未重启；
+因此该设备当前不能从 Linux 通过 EFI 变量请求一次性菜单超时。临时把 ESP 的
+`loader.conf` 从 `timeout 3` 改成 `timeout 10` 后执行普通重启，设备再次经过
+U-Boot UEFI 和 systemd-boot 进入 NixOS 7.3.0；屏幕菜单是否实际可见仍待现场反馈。
+测试结束后，`loader.conf` 的 SHA-256 恢复为
+`1414ba8826bbbdc8fa8d828ac94edd467f5e20f4071adb08164b98cbefddc4b8`，
+原 192 MiB B 槽镜像完整哈希也与备份一致，设备回到非 EFI NixOS 7.3.0。
+
+为定位 EFI 菜单确认后的单帧白闪，临时给第 1 世代条目加入
+`video=efifb:off`。设备仍经 U-Boot EFI 进入 NixOS 7.3.0；内核日志不再注册
+`EFI VGA frame buffer`，但使用者仍观察到相同的单帧白闪。因此 Linux 的 efifb
+注册不是白闪的充分原因。另一次测试加入 `sheng.boot-ui=0`，确认该参数生效、
+启动动画未运行且系统进入 NixOS；该次屏幕观察尚待反馈，不能据此排除动画。
+两次测试的 EFI 条目及 3 秒超时均已恢复原哈希。随后按继续使用实验引导的要求，
+将关闭图标的 U-Boot 候选重新写入 B 槽并保留；设备端读回前 647168 字节的
+SHA-256 为 `a843e13dae29a0972b97c712d9165a8e051c34a890013817cc1c3a3d3293af73`，
+`bootctl` 报告 `Das U-Boot`、systemd-boot 260.1，NixOS 7.3.0 与桌面已启动。
+原 192 MiB B 槽备份保留在主机，A 槽、`linux`、`userdata` 未写入。
+
+继续排查白闪时，发现锁定内核的 KTZ8866 驱动在 probe 中以默认亮度立即打开
+LED，而 DRM 面板随后才完成复位和初始化。内核实验提交
+[`f8fe49b`](https://github.com/DotRedstone/linux-sheng/commit/f8fe49bc2236c7ca07fc98129eef61526ffa3e46)
+改为先保持背光关闭，由 `drm_panel_enable()` 在面板准备后打开；该改动记录在
+已关闭的 [`linux-sheng` PR #6](https://github.com/DotRedstone/linux-sheng/pull/6)。
+当前 EFI 内核位于独立的
+`linux-boot` 分区，`boot_b` 中是 U-Boot，`linux` 中是 rootfs；只写后两者
+无法替换 EFI 内核。未获该分区的写入范围确认前，不在设备上安装实验 EFI 载荷。
+ARM [EFI 载荷构建](https://github.com/DotRedstone/nixos-sheng/actions/runs/40374499919)
+已成功；下载产物的内部 manifest 和外层摘要均通过。对应的
+[普通 boot image 工作流](https://github.com/DotRedstone/nixos-sheng/actions/runs/40374773651)
+完成镜像构建后，在后续模块打包门禁因本实验内核缺少 FPC1552 驱动而失败，
+没有上传镜像。该失败不证明背光补丁编译失败，也不能代替实机验证。
+[B 槽诊断作业](https://github.com/DotRedstone/nixos-sheng/actions/runs/40380595505)
+随后在模块门禁前上传镜像；镜像 SHA-256 为
+`645539d4c9c123ef74c7aeaa456e9a86d978174bacad5712f2c4c29c700d2444`。
+离线检查确认 Android boot v0、镜像小于 192 MiB，内核、DTB、initrd 与上述
+EFI 载荷逐字节一致。临时刷入 `boot_b` 后，设备经普通 Mobile NixOS 路径进入
+NixOS 7.3.0，桌面与背光正常；设备端读回镜像 SHA-256 相同。随后将关闭图标的
+U-Boot 候选刷回 `boot_b`，再次经 U-Boot EFI 进入 NixOS；读回前 647168 字节
+SHA-256 为 `a843e13dae29a0972b97c712d9165a8e051c34a890013817cc1c3a3d3293af73`。
+未写 A 槽、`linux`、`linux-boot` 或 `userdata`。使用者随后确认：这次带背光
+补丁的普通 `boot_b` 启动仍有单帧白闪，因此延后 KTZ8866 初次点亮没有消除
+该路径上的现象。实验内核已从本分支的 flake 输入撤下，恢复与现用 rootfs
+匹配的 `024eda3`。EFI 交接路径没有使用新内核实机测试，不能据此判断
+EFI 交接时白闪的具体原因；该实验补丁也不应作为已验证修复合入稳定内核。
+
+另一处可能的时序点是 NT36532E 面板在 `prepare()` 中发送 DCS `Set Display On`，
+而 DRM 显示启用尚未完成。独立的
+已关闭的 [`linux-sheng` PR #7](https://github.com/DotRedstone/linux-sheng/pull/7)
+将该命令移到 `enable()`，基于现用 rootfs 对应的 `024eda3`，不包含已失败的
+KTZ8866 实验。`codex/exp-nt36532e-display-test` 单独锁定该内核用于 ARM
+镜像构建和短时 B 槽对照，不影响本分支当前 EFI pin。
+该实验分支的 [ARM boot image 作业](https://github.com/DotRedstone/nixos-sheng/actions/runs/40445887989)
+完成镜像构建与诊断附件上传，后续模块门禁仍因缺少 FPC1552 失败。附件 ZIP
+校验通过，boot image 大小为 57,618,432 字节、SHA-256 为
+`c7929cd78451de1022c83e60067c537932f3190da1b674ce9f8aaa044b75a87f`。
+短时写入 `boot_b` 后，设备端镜像读回哈希一致；普通路径进入 NixOS 7.3.0，
+DRM 背光与 GNOME 正常启动。首次测试缺少屏幕观察；再次刷入同一镜像并目视
+复测时，使用者确认单帧白闪仍在，且正常进入桌面。因此将面板 `Set Display On`
+移到 `enable()` 未消除普通启动路径上的白闪，PR #7 不作为修复合入。
+随后刷回测试前的整块 192 MiB B 槽备份，设备端完整 SHA-256 与备份一致；
+设备再次经 U-Boot、systemd-boot 进入 NixOS，GNOME 正常启动。
+未写 `linux`、`linux-boot`、A 槽或 `userdata`。
+
+当前 rootfs 只有第 1 世代，旧 7.1.8 EFI 载荷不能作为 7.3.0 的可启动回退项。
+`sheng-efi rollback` 已增加写入前的版本/闭包核对，会拒绝这种跨内核回退。新载荷验证
+失败时，应使用原有 `boot_b` 返回现用系统，再从备份恢复 ESP 元数据；
+不要把旧 EFI 菜单中的第 99 世代视作可用的 rootfs 回滚。
 
 ## 当前基线
 
@@ -214,13 +380,14 @@ fastboot reboot
 ```
 
 `boot_a`、`linux`、GPT 与 `userdata` 不属于当前实验写入范围。关机充电由 Mobile NixOS
-stage-1 判定，再交给 stage-2 充电目标。备份 `boot_b` 的刷回与恢复、手动 fastboot 回程均已实测；
-断电冷启动和恢复键仍需分别验收。在这些路径验证前，不得发布或合并此实验分支。
+stage-1 判定，再交给 stage-2 充电目标。备份 `boot_b` 的刷回与恢复、手动 fastboot 回程、
+断电冷启动和恢复键均已实测。统一菜单中的 Android 启动和长期可用的其他 Linux 条目
+仍未验收；本实验分支不得作为完整多系统支持合并或发布刷机镜像。
 
 ## 已接入的 EFI 载荷更新路径
 
 `services.sheng-uboot-efi` 向 rootfs 安装 `sheng-efi`，并通过
-`sheng-efi-sync-generations.path` 监听系统 profile 的世代变化。普通 `nixos-rebuild` 只增加或切换 stage-2 世代；同步服务在 ESP 上为现存可启动的 `system-N-link` 生成 Type #1 条目，把 `system` profile 对应的条目设为默认。它不会覆盖固定的 EFI 内核、DTB 或 stage-1 initrd。
+`sheng-efi-sync-generations.path` 监听系统 profile 的世代变化。普通 `nixos-rebuild` 只增加或切换 stage-2 世代；同步服务在 ESP 上为现存且内核闭包与 EFI 载荷一致的 `system-N-link` 生成 Type #1 条目，把匹配的 `system` profile 条目设为默认。不匹配的默认世代会使同步失败，已有菜单保持不变。它不会覆盖固定的 EFI 内核、DTB 或 stage-1 initrd。
 
 手动核对或同步菜单：
 
@@ -247,7 +414,7 @@ sudo sheng-efi status
 安装器只接受含完整 `manifest.sha256` 的 `shengUbootEfiEsp/esp` 树，并确认 `/boot` 是
 PARTLABEL 为 `linux-boot` 的 FAT ESP。它先把新的版本化目录
 `EFI/NixOS/sheng-<kernel-version>-<payload-hash>/`、BLS 条目和 systemd-boot 写入临时目录，再逐文件校验；
-新载荷全部存在后才用重命名切换 `loader.conf` 的默认项，再同步世代条目。旧 BLS 条目和旧内核/initrd/DTB 不会被删除；旧 `loader.conf` 与所选固定载荷会保存在 `/var/lib/sheng-efi/`，供 `sheng-efi rollback` 使用。
+新载荷全部存在后才用重命名切换 `loader.conf` 的默认项，再同步世代条目。安装前还会核对载荷记录的内核 store 路径与当前系统内核闭包完全一致，并确认运行内核版本相同；不满足时拒绝写入 ESP。旧 BLS 条目和旧内核/initrd/DTB 保留在 ESP；旧 `loader.conf` 和 `BOOTAA64.EFI` 备份在 `/var/lib/sheng-efi/`，供 `sheng-efi rollback` 使用。早期安装只在 ESP 留有 `BOOTAA64.EFI.previous` 时，回退器会使用这份备份。
 
 如果还没有重启，或者在仍可进入 stage-2 时决定撤销默认项：
 
@@ -256,10 +423,55 @@ sudo sheng-efi rollback
 sudo sheng-efi status
 ```
 
+回退先校验旧 boot manager 备份，再恢复 `BOOTAA64.EFI` 和旧默认项；如果备份缺失，命令会在切换默认项前报错。ESP 的 FAT 文件替换不具备跨文件事务能力，回退完成后仍需执行 `sheng-efi status` 核对清单与默认项。若设备已无法进入 stage-2，须从 ABL fastboot 将已知可启动的 Mobile NixOS 镜像刷回 `boot_b`，不能依赖设备内的回退命令。
+
+boot 镜像和 ESP 载荷由两个独立 workflow 构建。准备同一发布候选时，应从同一实验分支提交分别手动触发两项 workflow，核对两份 artifact 内的 `*.source-revision` 完全相同，且等于审查的分支提交；再分别校验 boot 镜像 SHA-256 和 ESP 的 `manifest.sha256`。PR 自动构建采用 GitHub 临时合并提交，`source-revision` 不等于 PR 分支提交，不能直接与分支手动构建产物配对。内核版本、U-Boot 版本或 workflow 均成功不能代替提交一致性检查。
+
+下载两份 artifact 并分别解压到独立目录后，可以在刷写前运行只读预检：
+
+```bash
+scripts/sheng-verify-efi-artifacts.sh \
+  /path/to/boot-artifact /path/to/esp-artifact \
+  0000000000000000000000000000000000000000
+```
+
+将示例提交号替换为要审查的 40 位分支提交 SHA。脚本检查两份来源记录、boot 镜像
+SHA-256、ESP manifest 和所有列入 manifest 的文件、默认 EFI 条目及内核闭包标识。
+它不会写入设备；通过预检也不能代替实机启动或 rootfs 配对验证。
+
+同一候选的最短设备验收顺序是：确认 B 槽及已知可启动的 `boot_b` 备份，安装对应 ESP 载荷，临时启动或刷入对应 U-Boot 镜像；验证普通启动、真实关机插线的画面顺序及有无世代菜单、断电后的冷启动、恢复键进入可用恢复路径；最后从 ABL fastboot 刷回备份 `boot_b` 并再次启动稳定系统。每次记录屏幕画面和实际启动目标，且运行 `systemctl is-system-running`、`systemctl --failed`。关闭图标的候选已完成这组实机检查，充电与冷启动仍出现短暂白屏。
+
 成功到达 `multi-user.target` 后，`sheng-efi-mark-successful.service` 会记录当时配置的 EFI 默认项和时间。
 它是运行时健康记录，不能单独证明用户没有从 systemd-boot 菜单手动选择旧条目；它不会自动清理旧载荷，也不会修改 Android 分区。
 
-`uefi_a`、`uefi_b`、`rescue`、`userdata` 与 Android 固件分区仍不可复用，也没有被写入。接下来仍需单独验证
-断电冷启动与恢复键；在这些路径分别验证前，实验分支不得合并或发布。稳定 `boot_b` 的刷回
-与重新进入实验 U-Boot 已实测。
+`uefi_a`、`uefi_b`、`rescue`、`userdata` 与 Android 固件分区仍不可复用，也没有被写入。
+早期候选的 B 槽持久启动、普通重启、关机插墙充、断电冷启动、TWRP 恢复键和稳定镜像刷回
+已实测。关闭图标的候选在充电与冷启动时仍短暂白屏；Android 尚未在本菜单启动，Alpine 和 Debian
+仅完成短时独立 rootfs 探针。实验分支不得当作已完成多系统适配或正式 release 宣传。
+
+后续 U-Boot 候选将正常路径的 `stdout`、`stderr` 先导向串口和 USB ACM，在读取 ESP
+并准备交接 EFI 菜单时恢复视频控制台；EFI 失败的救援菜单也恢复视频输出。
+关闭 `CONFIG_VIDEO_LOGO` 的候选已构建并通过 `fastboot boot` 临时进入 U-Boot UEFI、
+systemd-boot 与 NixOS 7.3.0；随后刷入 B 槽，完成真实充电与冷启动的现场观察。
+恢复键、原镜像刷回及完整 B 槽哈希核对也已完成。
+
+2026-10-26 单独验证了 ABL A/B 槽位路径：切至 A 槽后 Android 16 报告启动完成，
+`sys.boot_completed=1` 且图形服务运行；通过 Android ADB 返回 fastboot 并切回 B 槽，
+NixOS 7.3.0 再次启动。B 槽完整哈希与原始备份一致，A 槽关键启动分区未变。
+这不是从 U-Boot / EFI 菜单启动 Android 的验证。
+
+同日验证了另一个 Linux 用户态：官方 Alpine 3.24.3 aarch64 minirootfs 首先作为
+独立 initrd 从 EFI 菜单短时启动，`/init` 写下 Alpine 版本和内核 7.3.0 标记。
+随后 Alpine 被放入现有 `linux` 分区内的独立 ext4 镜像；EFI 内核经临时 initrd
+挂载该镜像并 `switch_root`，Alpine 根文件系统中的 `/init` 以 PID 1 写下结果标记，
+之后自动重启回非 EFI NixOS。两次均只以 `fastboot boot` 临时启动 U-Boot；ESP
+默认项和临时载荷已恢复或清理，完整 `boot_b` 哈希未变。尚未验证 Alpine 的完整
+服务启动、图形界面、硬件驱动和更新机制，不能称为可供日常使用的发行版移植。
+
+同一方法还短时启动了 Debian 13 arm64 的独立 ext4 根文件系统：临时 EFI 条目
+经已验证的 7.3.0 内核与 Sheng DTB 进入 Debian `/init`，设备记录其 PID 为 1，
+版本为 13，然后自动返回 B 槽 NixOS。Alpine 和 Debian 测试镜像及临时 ESP
+条目均已清理，ESP 默认项和 B 槽完整哈希与测试前一致。两者均只完成启动探针，
+尚未具备可日常使用的桌面、服务与更新支持。
 实际分区边界和验收记录见 [存储迁移预案](uboot-efi-storage-plan_zh.md)。
+Android A 槽与更多 Linux 的可行性及验收边界见[多系统路线图](uboot-multiboot-roadmap_zh.md)。
