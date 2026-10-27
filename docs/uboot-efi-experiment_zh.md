@@ -291,7 +291,7 @@ EFI 交接时白闪的具体原因；该实验补丁也不应作为已验证修�
 
 另一处可能的时序点是 NT36532E 面板在 `prepare()` 中发送 DCS `Set Display On`，
 而 DRM 显示启用尚未完成。独立的
-[`linux-sheng` Draft PR #7](https://github.com/DotRedstone/linux-sheng/pull/7)
+已关闭的 [`linux-sheng` PR #7](https://github.com/DotRedstone/linux-sheng/pull/7)
 将该命令移到 `enable()`，基于现用 rootfs 对应的 `024eda3`，不包含已失败的
 KTZ8866 实验。`codex/exp-nt36532e-display-test` 单独锁定该内核用于 ARM
 镜像构建和短时 B 槽对照，不影响本分支当前 EFI pin。
@@ -300,9 +300,11 @@ KTZ8866 实验。`codex/exp-nt36532e-display-test` 单独锁定该内核用于 A
 校验通过，boot image 大小为 57,618,432 字节、SHA-256 为
 `c7929cd78451de1022c83e60067c537932f3190da1b674ce9f8aaa044b75a87f`。
 短时写入 `boot_b` 后，设备端镜像读回哈希一致；普通路径进入 NixOS 7.3.0，
-DRM 背光与 GNOME 正常启动。使用者尚未反馈这次启动的白闪观察，因此只确认
-可启动，不判断白闪改善。随后刷回测试前的整块 192 MiB B 槽备份，设备端
-完整 SHA-256 与备份一致；设备再次经 U-Boot、systemd-boot 进入 NixOS。
+DRM 背光与 GNOME 正常启动。首次测试缺少屏幕观察；再次刷入同一镜像并目视
+复测时，使用者确认单帧白闪仍在，且正常进入桌面。因此将面板 `Set Display On`
+移到 `enable()` 未消除普通启动路径上的白闪，PR #7 不作为修复合入。
+随后刷回测试前的整块 192 MiB B 槽备份，设备端完整 SHA-256 与备份一致；
+设备再次经 U-Boot、systemd-boot 进入 NixOS，GNOME 正常启动。
 未写 `linux`、`linux-boot`、A 槽或 `userdata`。
 
 当前 rootfs 只有第 1 世代，旧 7.1.8 EFI 载荷不能作为 7.3.0 的可启动回退项。
