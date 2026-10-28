@@ -508,7 +508,23 @@ standby；EFI 路径实测从 `e0000005/00000001` 变为
 
 下一项独立实验只在 Sheng 的 DISPCC probe 检测到 PLL0 仍运行时跳过这次初始
 重配；其他时钟操作保持不变。实验内核提交为 `106eb1a`，发行版集成提交为
-`1b50d2a`，均在 `codex/exp-dispcc-pll0-handoff` 分支；构建与上机结果待记录。
+`1b50d2a`，均在 `codex/exp-dispcc-pll0-handoff` 分支。
+[EFI 构建](https://github.com/DotRedstone/nixos-sheng/actions/runs/40714440046)
+成功，载荷 manifest 校验通过。上机后内核日志确认 PLL0 在 DISPCC 注册后保持
+运行，但 MDP 根时钟的配置寄存器仍由 `00000105` 变为 `00000000`；目视仍有
+白闪，系统正常进入桌面。
+
+组合对照在同一内核中另外取消 MDP 根时钟初始化时的源切换。实验内核提交为
+`aa0362e`，发行版集成提交为 `a416f93`，均在
+`codex/exp-dispcc-pll0-mdp-handoff` 分支。
+[EFI 构建](https://github.com/DotRedstone/nixos-sheng/actions/runs/40716161881)
+成功，载荷 manifest 校验通过。连续两次从 EFI 菜单启动，第 1 世代均进入
+NixOS 桌面，目视均未见原先的一帧白闪；DISPCC 注册后 PLL0 的
+`MODE/OPMODE` 保持 `e0000005/00000001`，MDP 根时钟配置保持
+`00000105`。这组 A/B 支持显示时钟交接是白闪的原因，但还需用限定于 Sheng
+的最终补丁重建、复测，并检查充电及恢复键路径。测试后删除两个临时 EFI
+条目及载荷，恢复原 `loader.conf` 并确认 `boot_b` 的 SHA-256 未变；未刷写
+`boot_b` 或 `linux` 镜像。
 
 当前 rootfs 只有第 1 世代，旧 7.1.8 EFI 载荷不能作为 7.3.0 的可启动回退项。
 `sheng-efi rollback` 已增加写入前的版本/闭包核对，会拒绝这种跨内核回退。新载荷验证
