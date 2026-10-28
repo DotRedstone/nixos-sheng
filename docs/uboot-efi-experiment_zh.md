@@ -438,6 +438,9 @@ CTL active/START 均为零，DSI status 为零、config 为 `0x00800000`；两�
 `initcall_blacklist=msm_drm_register` 禁用 Linux DRM，内核日志确认 initcall
 被跳过，设备经 ADB 进入 systemd；屏幕未进入正常桌面，使用者认为似乎仍有
 白闪，但同样无法清楚辨认，不能据此排除或确认 DRM 接管的影响。
+该次启动的 `clk_disable_unused()` 还报告 `disp_cc_mdss_mdp_clk status stuck at
+'on'`；正常 DRM 启动没有这条告警。它提示显示时钟存在固件到内核的接管差异，
+尚不能证明告警与单帧白闪有直接因果关系。
 测试后恢复原默认条目；设备随后重新进入原第 1 世代，DRM、背光和显示
 管理器恢复，临时 ESP 条目与载荷已删除。下轮将末色改为深蓝再做对照；
 上述阶段色只用于诊断，不属于发布镜像。
