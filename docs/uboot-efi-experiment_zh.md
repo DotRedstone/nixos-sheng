@@ -468,6 +468,19 @@ SM8550 的 `disp_cc_mdss_mdp_clk_src` 改用
 条目和载荷；EFI 管理器及第 1 世代条目校验值不变，未刷写 `boot_b`、`linux`、
 A 槽、`userdata` 或设备校准分区。
 
+使用同一深蓝基线载荷，仅在临时 EFI 条目追加
+`initcall_blacklist=msm_drm_register sheng.boot-ui=0`：设备进入 stage-2，
+内核日志确认 DRM 初始化入口已禁用，且没有 `/dev/dri/card0`；使用者仍看到
+深蓝色结束后的单帧白闪。因此 Linux DRM probe 不是白闪出现的必要条件。
+随后追加 `disp_cc_sm8550_driver_init` 到禁用列表的对照未能完成：现场未辨清
+闪烁，设备最终黑屏且 ADB 不可用，不能从这次结果判断 DISPCC 与白闪的关系。
+通过 ABL Fastboot 将已验证的普通 NixOS `boot_b` 备份临时启动到内存，恢复
+原 `loader.conf` 并删除两个临时条目和载荷；再由原 U-Boot `boot_b` 重启，
+`bootctl` 确认第 1 世代启动、显示管理器运行。设备 `boot_b`、ESP 默认配置、
+EFI 管理器和第 1 世代条目的 SHA-256 均与测试前备份一致；没有写入
+`boot_b`、`linux`、A 槽、`userdata` 或设备校准分区。该组合禁用显示时钟驱动
+可能导致不可见的启动状态，不应再用于目视白闪对照。
+
 当前 rootfs 只有第 1 世代，旧 7.1.8 EFI 载荷不能作为 7.3.0 的可启动回退项。
 `sheng-efi rollback` 已增加写入前的版本/闭包核对，会拒绝这种跨内核回退。新载荷验证
 失败时，应使用原有 `boot_b` 返回现用系统，再从备份恢复 ESP 元数据；
