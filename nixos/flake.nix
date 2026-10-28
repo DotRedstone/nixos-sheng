@@ -18,7 +18,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     shengKernelSrc = {
-      url = "git+https://github.com/DotRedstone/linux-sheng?ref=codex/exp-efi-stub-phase-colors&rev=1a66cb8122b5cf71f5719f9fe0f718376efc44a8&shallow=1";
+      url = "git+https://github.com/DotRedstone/linux-sheng?ref=codex/exp-dispcc-mdp-no-init-park&rev=4e00cb5757aba867d68768911f1f1c29a13bd0e6&shallow=1";
       flake = false;
     };
     shengFirmware = {
