@@ -101,17 +101,17 @@
     "shengKernelSrc": {
       "flake": false,
       "locked": {
-        "lastModified": 1793200242,
-        "narHash": "sha256-5xoiX/5GxpiO2vkJM3JfLAcVmoFRNaFQAaSkmKdbJDI=",
-        "ref": "codex/exp-dispcc-pll0-handoff",
-        "rev": "106eb1a56ec0f0ceb9ac509b464cb48e01c137c6",
+        "lastModified": 1793200981,
+        "narHash": "sha256-cM0EbGsuYCxrdJKkhJcFwK0dgMFzhLuC9eI1QdGY6l4=",
+        "ref": "codex/exp-dispcc-pll0-mdp-handoff",
+        "rev": "aa0362e5c128ff0b0413ba7bb80d12aa82f67eb9",
         "shallow": true,
         "type": "git",
         "url": "https://github.com/DotRedstone/linux-sheng"
       },
       "original": {
-        "ref": "codex/exp-dispcc-pll0-handoff",
-        "rev": "106eb1a56ec0f0ceb9ac509b464cb48e01c137c6",
+        "ref": "codex/exp-dispcc-pll0-mdp-handoff",
+        "rev": "aa0362e5c128ff0b0413ba7bb80d12aa82f67eb9",
         "shallow": true,
         "type": "git",
         "url": "https://github.com/DotRedstone/linux-sheng"
