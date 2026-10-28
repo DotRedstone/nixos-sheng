@@ -453,6 +453,21 @@ ESP 的 `loader.conf` 与 EFI 管理器 SHA-256 分别恢复为
 第 1 世代重新启动，两个临时条目及新载荷均已删除。未写 `linux`、A 槽、
 `userdata` 或设备校准分区。
 
+随后将 EFI stub 最后一色改为深蓝色，保留三色各约 2 秒的时序；另一个内核仅将
+SM8550 的 `disp_cc_mdss_mdp_clk_src` 改用
+`clk_rcg2_shared_no_init_park_ops`，避免驱动注册时停放该时钟源。
+[深蓝基线构建](https://github.com/DotRedstone/nixos-sheng/actions/runs/40667674195)与
+[时钟对照构建](https://github.com/DotRedstone/nixos-sheng/actions/runs/40669468400)
+均成功；两个 ESP 附件均完成解包，来源提交、manifest 和设备端载荷哈希均已
+核对，时钟对照附件另通过 ZIP CRC 校验。
+两次均从各自的临时 EFI 条目进入第 1 世代桌面，使用者均观察到深蓝色结束后
+仍有一帧白闪。基线内核仍报告
+`disp_cc_mdss_mdp_clk_src: rcg didn't update its configuration.`，
+时钟对照内核没有这条告警，但白闪未消失。因此该告警不构成白闪的充分解释，
+不能将时钟对照补丁作为修复合并。测试后恢复原 `loader.conf`，删除两个临时
+条目和载荷；EFI 管理器及第 1 世代条目校验值不变，未刷写 `boot_b`、`linux`、
+A 槽、`userdata` 或设备校准分区。
+
 当前 rootfs 只有第 1 世代，旧 7.1.8 EFI 载荷不能作为 7.3.0 的可启动回退项。
 `sheng-efi rollback` 已增加写入前的版本/闭包核对，会拒绝这种跨内核回退。新载荷验证
 失败时，应使用原有 `boot_b` 返回现用系统，再从备份恢复 ESP 元数据；
