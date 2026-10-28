@@ -18,7 +18,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     shengKernelSrc = {
-      url = "git+https://github.com/DotRedstone/linux-sheng?ref=codex/exp-dispcc-mdp-no-init-park&rev=4e00cb5757aba867d68768911f1f1c29a13bd0e6&shallow=1";
+      url = "git+https://github.com/DotRedstone/linux-sheng?ref=codex/exp-dispcc-register-trace&rev=ce522ae0e907ac2fcd1e1b3fa05982e736de58ff&shallow=1";
       flake = false;
     };
     shengFirmware = {
