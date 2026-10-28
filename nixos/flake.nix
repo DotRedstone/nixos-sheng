@@ -18,7 +18,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     shengKernelSrc = {
-      url = "git+https://github.com/DotRedstone/linux-sheng?ref=codex/exp-dispcc-register-trace&rev=ce522ae0e907ac2fcd1e1b3fa05982e736de58ff&shallow=1";
+      url = "git+https://github.com/DotRedstone/linux-sheng?ref=codex/exp-dispcc-pll0-handoff&rev=106eb1a56ec0f0ceb9ac509b464cb48e01c137c6&shallow=1";
       flake = false;
     };
     shengFirmware = {
