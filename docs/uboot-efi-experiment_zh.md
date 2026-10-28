@@ -481,6 +481,20 @@ EFI 管理器和第 1 世代条目的 SHA-256 均与测试前备份一致；没�
 `boot_b`、`linux`、A 槽、`userdata` 或设备校准分区。该组合禁用显示时钟驱动
 可能导致不可见的启动状态，不应再用于目视白闪对照。
 
+下一轮改为只读记录 `disp_cc_sm8550_probe()` 中 PLL、MDP 与 DSI 字节时钟
+相关寄存器，在 EFI 与普通 Android boot 入口使用同一内核比较各阶段数值。
+诊断内核提交为 `ce522ae`，没有改变时钟或显示配置。
+[EFI 载荷构建](https://github.com/DotRedstone/nixos-sheng/actions/runs/40687470708)
+成功且 manifest 全部通过；
+[普通 boot 构建](https://github.com/DotRedstone/nixos-sheng/actions/runs/40687431253)
+已成功上传 boot 镜像，但工作流随后在打包匹配模块时因
+`FPC1552 fingerprint resource driver is not built in` 失败，不能把整条工作流
+记为通过。普通 boot 镜像的 SHA-256 与附件校验文件一致，解压后的内核、
+附加 DTB 和 initrd 分别与 EFI 载荷逐字节相同。
+在构建期间，读取 DISPCC 的 debugfs 完整寄存器表使读取进程长时间占用 CPU，
+随后设备从主机 USB 消失；两者的因果关系尚未确定。该完整表读取方式不再使用。
+截至记录时，本轮诊断镜像尚未写入 ESP 或 `boot_b`，因此没有新的实机对照结论。
+
 当前 rootfs 只有第 1 世代，旧 7.1.8 EFI 载荷不能作为 7.3.0 的可启动回退项。
 `sheng-efi rollback` 已增加写入前的版本/闭包核对，会拒绝这种跨内核回退。新载荷验证
 失败时，应使用原有 `boot_b` 返回现用系统，再从备份恢复 ESP 元数据；
