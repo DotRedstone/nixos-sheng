@@ -422,9 +422,13 @@ framebuffer 内容保留和 `fbcon=map:` 的说明，用原 EFI 内核及载荷�
 本机 EFI 启动后 `efifb` 在约 0.12 秒注册、msm DRM 在约 0.62 秒初始化；
 `/proc/iomem` 将 ABL framebuffer 的 `0xb8000000` 区域列为 reserved。
 运行后的 DSI encoder underrun 计数为零，但这不能排除 IRQ 注册前的瞬时异常。
-下一步应在同一内核上分别记录 EFI 与普通 `boot_b` 路径进入 DPU 初始化前的
-CTL/INTF 扫描配置及早期 underflow 事件，再决定是否调整显示交接；目前不应
-直接清除全部 CTL 或改变面板时序。
+随后用同一诊断内核（`70cef9e`）分别从 EFI 与普通 `boot_b` 启动，记录
+DPU 资源管理器初始化前后的六组 CTL 和两组 DSI 寄存器。两条路径的采样值相同：
+CTL active/START 均为零，DSI status 为零、config 为 `0x00800000`；两次均
+进入 NixOS。EFI 载荷与普通 boot 镜像的解压后内核、initrd 哈希分别一致。
+这排除了采样时仍有 EFI 专属旧 CTL 扫描的情况，但采样前的瞬时状态仍未知。
+两次白闪的现场目视反馈均为“没看清”，不能据此比较这两个诊断镜像的显示结果。
+目前不应直接清除全部 CTL 或改变面板时序。
 
 两项测试结束后，原 `boot_b` 整分区 SHA-256 为
 `b9024c1599b6b06795ae4c59c990940573e924b6e1374988f157b603d198eea5`，
