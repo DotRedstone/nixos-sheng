@@ -18,7 +18,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     shengKernelSrc = {
-      url = "git+https://github.com/DotRedstone/linux-sheng?ref=codex/exp-dispcc-pll0-mdp-handoff&rev=aa0362e5c128ff0b0413ba7bb80d12aa82f67eb9&shallow=1";
+      url = "git+https://github.com/DotRedstone/linux-sheng?ref=codex/exp-dispcc-pll0-mdp-handoff&rev=1880406f84d432b9928a07b9e4b77134326edb3d&shallow=1";
       flake = false;
     };
     shengFirmware = {
