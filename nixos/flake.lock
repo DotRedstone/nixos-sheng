@@ -101,17 +101,17 @@
     "shengKernelSrc": {
       "flake": false,
       "locked": {
-        "lastModified": 1793174352,
-        "narHash": "sha256-/KaPzxxHc2IhvYShMD0464tVTicEkQvtsC3qZKrG+hg=",
+        "lastModified": 1793175245,
+        "narHash": "sha256-6TriL/5L9q5DE3VIS4jycM8NRzQsjv9Ul9Ez2oHpr60=",
         "ref": "codex/exp-efi-stub-phase-colors",
-        "rev": "e458bc0d76c1cb8443d54e6fb8354235edbf9e9d",
+        "rev": "52dc003e18e48e7685a15763fd034c38dfe70bc2",
         "shallow": true,
         "type": "git",
         "url": "https://github.com/DotRedstone/linux-sheng"
       },
       "original": {
         "ref": "codex/exp-efi-stub-phase-colors",
-        "rev": "e458bc0d76c1cb8443d54e6fb8354235edbf9e9d",
+        "rev": "52dc003e18e48e7685a15763fd034c38dfe70bc2",
         "shallow": true,
         "type": "git",
         "url": "https://github.com/DotRedstone/linux-sheng"

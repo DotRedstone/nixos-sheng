@@ -18,7 +18,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     shengKernelSrc = {
-      url = "git+https://github.com/DotRedstone/linux-sheng?ref=codex/exp-efi-stub-phase-colors&rev=e458bc0d76c1cb8443d54e6fb8354235edbf9e9d&shallow=1";
+      url = "git+https://github.com/DotRedstone/linux-sheng?ref=codex/exp-efi-stub-phase-colors&rev=52dc003e18e48e7685a15763fd034c38dfe70bc2&shallow=1";
       flake = false;
     };
     shengFirmware = {
