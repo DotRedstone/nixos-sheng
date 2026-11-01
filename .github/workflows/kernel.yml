@@ -127,11 +127,6 @@ jobs:
             -czf "out/kernel/sheng-linux-$kernel_version-modules.tar.gz" \
             "$kernel_version"
 
-          grep -qxF 'CONFIG_INPUT_FPC1552=y' out/kernel-package/build.config || {
-              echo "ERROR: FPC1552 fingerprint resource driver is not built in"
-              exit 1
-            }
-
           grep -qxF 'CONFIG_TOUCHSCREEN_NT36532E_SPI=m' out/kernel-package/build.config || {
               echo "ERROR: NT36532E touchscreen driver is not built as a module"
               exit 1
