@@ -38,7 +38,7 @@ Android A 槽有 v4 格式的 `boot_a`、`vendor_boot_a`、`init_boot_a`，以�
 | Debian 13 | 官方 arm64 最小用户态的独立 ext4 rootfs 已以 PID 1 运行，随后返回 NixOS | 验证完整服务、交互、设备支持及长期安装 |
 | 更多 Linux 发行版 | 尚未实机启动；不能把另一个 NixOS 世代算作独立系统 | 使用单独 rootfs 与适配 Sheng 的内核/DTB/initrd 完成可回退启动 |
 | Android A 槽 | Android 16 启动完成，ADB 回到 fastboot 后已切回 B 槽 NixOS | 继续验证可从统一菜单直接选择 Android，且返回机制可靠 |
-| Android 统一菜单入口 | RAM 探针已读入启动镜像并到达 `bootm go`，Android 尚未启动 | 定位内核交接后的重启原因，再验证菜单启动与返回机制 |
+| Android 统一菜单入口 | RAM 探针已装载 A 槽镜像并到达 `booti` 交接，随后复位回 NixOS；Android 尚未启动 | 取得早期内核或固件日志，定位复位原因，再验证菜单启动与返回机制 |
 | Windows on Arm | 未评估这台设备的 Windows 启动与驱动 | 先审计 UEFI 服务、ACPI 表、启动存储和 Arm64 驱动，再考虑 Windows PE 启动探针 |
 | 原版 iOS / iPadOS | 不列为 Sheng 可交付系统 | Apple 的启动信任链和系统设计依赖 Apple 硬件；不以菜单图标暗示支持 |
 
@@ -50,10 +50,14 @@ Android A 槽有 v4 格式的 `boot_a`、`vendor_boot_a`、`init_boot_a`，以�
 
 2026-11-01 的只读 RAM 探针已从 UFS 读到 A 槽 `boot`、`vendor_boot`、`init_boot` 和 `dtbo`，前两者的头部与备份逐字节一致；U-Boot 完成 DTB 6 与 DTBO 47 的准备，阶段标记到达 `bootm go`。设备随后重新进入 B 槽 NixOS，未观察到 Android 启动完成。对齐内核入口、保留原厂 DTB `/chosen/bootargs` 的两项对照均未改变结果；后者导出的最终 `bootargs` 已确认含原厂 DTB 与 `vendor_boot` 参数。实验没有写入 `boot_b`、A 槽或 `userdata`；`boot_b` 整分区摘要保持不变。当前应检查传给 Android 内核的最终 FDT、ramdisk/bootconfig 和内存布局，不能把 `bootm go` 视为 Android 启动成功。
 
+同日后续探针核对了 v4 镜像的 vendor ramdisk、`init_boot` 通用 ramdisk 与 bootconfig 拼接结果，并发现 ABL 传入的启动参数超过 U-Boot 原有的 512 字节命令缓冲区；实验版已将其增至 4096 字节。一次测试的默认 `bootcmd` 误设为只启动 NixOS，相关回退结果不作为 Android 交接证据。修正后，带 ABL 动态参数的 A 槽启动到达 `booti`，导出的参数含 `init=/init`、`rootwait` 与修正后的 `_a` 槽位；分别使用 A 槽 DTBO 和已保存的原生 Recovery 交接树仍复位回 NixOS。原生 Recovery 树有 `/hypervisor` 节点，B 槽 ABL 交给 U-Boot 的树没有，但目前不能据此断定复位原因。实验只刷写过 `boot_b`，随后已恢复测试前的完整镜像，整分区 SHA-256 与备份一致；A 槽、`linux` 和 `userdata` 未刷写。下一步需要取得早期内核或固件日志，并核对 ABL 在两种启动路径下的交接状态，不能继续仅凭返回 NixOS 推断故障位置。
+
+再将 ABL 动态参数与 `vendor_boot_a` 的 DTB 6、`dtbo_a` 覆盖层 47 组合，由可复现的 Nix RAM 镜像启动，阶段仍到 `booti_go` 后返回 NixOS。`rawdump` 有一份旧 TWRP panic；重跑探针前后其前 1 MiB 哈希相同，不能用作本轮故障日志。B 槽 `vendor_boot_b` 的 v4 头部与 A 槽一致，但将 U-Boot 临时封装成 v4 `boot.img` 后，`fastboot boot` 返回成功而设备停在 ABL fastboot，未到 U-Boot 阶段；随后重启回 B 槽 NixOS，`boot_b` 整分区哈希仍与备份一致。
+
 近期验收顺序：
 
 1. 从显示交接修复构建内核和匹配模块，建立可回退的持久无白闪基线，并目视复测。
-2. 在 RAM 探针中记录最终交接输入，定位 Android 内核启动后重启的环节。
+2. 为 RAM 探针取得早期内核或固件日志，并比较原生 A 槽与 B 槽 U-Boot 的交接状态；确认复位点后再修改装载路径。
 3. Android 直接进入桌面且下次仍回统一菜单后，再加入正式菜单项；最后回归 NixOS、充电和 TWRP 路径。
 
 ### 其他 Linux 与 Windows on Arm
