@@ -52,7 +52,7 @@ Android A 槽有 v4 格式的 `boot_a`、`vendor_boot_a`、`init_boot_a`，以�
 
 同日后续探针核对了 v4 镜像的 vendor ramdisk、`init_boot` 通用 ramdisk 与 bootconfig 拼接结果，并发现 ABL 传入的启动参数超过 U-Boot 原有的 512 字节命令缓冲区；实验版已将其增至 4096 字节。一次测试的默认 `bootcmd` 误设为只启动 NixOS，相关回退结果不作为 Android 交接证据。修正后，带 ABL 动态参数的 A 槽启动到达 `booti`，导出的参数含 `init=/init`、`rootwait` 与修正后的 `_a` 槽位；分别使用 A 槽 DTBO 和已保存的原生 Recovery 交接树仍复位回 NixOS。原生 Recovery 树有 `/hypervisor` 节点，B 槽 ABL 交给 U-Boot 的树没有，但目前不能据此断定复位原因。实验只刷写过 `boot_b`，随后已恢复测试前的完整镜像，整分区 SHA-256 与备份一致；A 槽、`linux` 和 `userdata` 未刷写。下一步需要取得早期内核或固件日志，并核对 ABL 在两种启动路径下的交接状态，不能继续仅凭返回 NixOS 推断故障位置。
 
-再将 ABL 动态参数与 `vendor_boot_a` 的 DTB 6、`dtbo_a` 覆盖层 47 组合，由可复现的 Nix RAM 镜像启动，阶段仍到 `booti_go` 后返回 NixOS。`rawdump` 有一份旧 TWRP panic；重跑探针前后其前 1 MiB 哈希相同，不能用作本轮故障日志。B 槽 `vendor_boot_b` 的 v4 头部与 A 槽一致，但将 U-Boot 临时封装成 v4 `boot.img` 后，`fastboot boot` 返回成功而设备停在 ABL fastboot，未到 U-Boot 阶段；随后重启回 B 槽 NixOS，`boot_b` 整分区哈希仍与备份一致。
+再将 ABL 动态参数与 `vendor_boot_a` 的 DTB 6、`dtbo_a` 覆盖层 47 组合，由可复现的 Nix RAM 镜像启动，阶段仍到 `booti_go` 后返回 NixOS。`rawdump` 有一份旧 TWRP panic；重跑探针前后其前 1 MiB 哈希相同，不能用作本轮故障日志。B 槽 `vendor_boot_b` 的 v4 头部与 A 槽一致，但将 U-Boot 临时封装成 v4 `boot.img` 后，`fastboot boot` 返回成功而设备停在 ABL fastboot，未到 U-Boot 阶段。ABL UEFI 日志报告 `kernel image does not have appended DTB` 和 `Device Tree blob not found`；直接附加 DTB 6、先补齐 U-Boot ARM64 Image 声明的 `image_size` 再附加，两项对照仍得到同样错误。设备随后重启回 B 槽 NixOS，`boot_b` 整分区哈希仍与备份一致。v4 镜像格式与 ABL 的 DTB 定位规则需要单独分析，不能把 fastboot 的 `Booting OKAY` 视为 U-Boot 已执行。
 
 近期验收顺序：
 
