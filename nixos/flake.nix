@@ -104,6 +104,9 @@
           androidDirectProbe = true;
           inherit shengUbootSrc;
         };
+        sheng-uboot-android-direct-v4-probe-bootimg = final.callPackage ./packages/sheng-uboot-android-direct-v4-bootimg.nix {
+          directProbe = final.sheng-uboot-android-direct-probe-bootimg;
+        };
         sheng-uboot-fastboot-probe-bootimg = final.callPackage ./packages/sheng-uboot-android-bootimg.nix {
           autoFastboot = true;
           inherit shengUbootSrc;
@@ -172,6 +175,11 @@
           androidDirectProbe = true;
           buildUBoot = buildPkgs.pkgsCross.aarch64-multiplatform.buildUBoot;
           inherit shengUbootSrc;
+        };
+      ubootAndroidDirectV4ProbeFor = buildSystem:
+        let buildPkgs = import nixpkgs { system = buildSystem; };
+        in buildPkgs.callPackage ./packages/sheng-uboot-android-direct-v4-bootimg.nix {
+          directProbe = ubootAndroidDirectProbeFor buildSystem;
         };
       ubootFastbootProbeFor = buildSystem:
         let buildPkgs = import nixpkgs { system = buildSystem; };
@@ -308,6 +316,8 @@
         # Reads A-slot Android images from U-Boot without changing the active slot.
         # Experimental RAM probe only; do not publish as an Android boot release.
         shengUbootAndroidDirectProbeBootimg = pkgs.sheng-uboot-android-direct-probe-bootimg;
+        # Persistent v4 boot_b wrapper for the backed-up B-slot experiment.
+        shengUbootAndroidDirectV4ProbeBootimg = pkgs.sheng-uboot-android-direct-v4-probe-bootimg;
         # USB-only RAM probe: U-Boot must re-enumerate as fastboot before
         # storage, display, or an EFI payload is brought into the experiment.
         shengUbootFastbootProbeBootimg = pkgs.sheng-uboot-fastboot-probe-bootimg;
@@ -346,6 +356,7 @@
       packages.x86_64-linux.shengUbootEfiShengDtsPreflight = ubootShengDtsPreflightFor "x86_64-linux";
       packages.x86_64-linux.shengUbootAndroidBootimg = ubootAndroidBootimgFor "x86_64-linux";
       packages.x86_64-linux.shengUbootAndroidDirectProbeBootimg = ubootAndroidDirectProbeFor "x86_64-linux";
+      packages.x86_64-linux.shengUbootAndroidDirectV4ProbeBootimg = ubootAndroidDirectV4ProbeFor "x86_64-linux";
       packages.x86_64-linux.shengUbootFastbootProbeBootimg = ubootFastbootProbeFor "x86_64-linux";
       packages.x86_64-linux.shengUbootRawFastbootProbeBootimg = ubootRawFastbootProbeFor "x86_64-linux";
       packages.x86_64-linux.shengUbootUpstreamFastbootProbeBootimg = ubootUpstreamFastbootProbeFor "x86_64-linux";
