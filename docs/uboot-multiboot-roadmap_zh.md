@@ -48,7 +48,7 @@ Android A 槽有 v4 格式的 `boot_a`、`vendor_boot_a`、`init_boot_a`，以�
 
 真正一致的每次开机界面需要从 B 槽 U-Boot 直接交接 Android，或证明等价的安全返回机制。该设备的 Android v4 启动链使用独立的 `vendor_boot`、`init_boot`、DTB/DTBO、bootconfig 和 AVB；还要处理恢复模式与 Android 更新后镜像的变化。U-Boot 通用 Android boot image 支持不足以证明这些设备专属输入已正确组合。该路径必须独立实现、先 RAM 验证，再进行有备份的实机验收。[Android 启动分区说明](https://source.android.com/docs/core/architecture/partitions/generic-boot)、[U-Boot Android 启动镜像](https://docs.u-boot.org/en/stable/android/boot-image.html)
 
-2026-11-01 的只读 RAM 探针已从 UFS 读到 A 槽 `boot`、`vendor_boot`、`init_boot` 和 `dtbo`，前两者的头部与备份逐字节一致；U-Boot 完成 DTB 6 与 DTBO 47 的准备，阶段标记到达 `bootm go`。设备随后重新进入 B 槽 NixOS，未观察到 Android 启动完成。对齐内核入口的单项对照也未改变结果。实验没有写入 `boot_b`、A 槽或 `userdata`；`boot_b` 整分区摘要保持不变。当前应检查传给 Android 内核的最终 FDT、ramdisk/bootconfig、启动参数和内存布局，不能把 `bootm go` 视为 Android 启动成功。
+2026-11-01 的只读 RAM 探针已从 UFS 读到 A 槽 `boot`、`vendor_boot`、`init_boot` 和 `dtbo`，前两者的头部与备份逐字节一致；U-Boot 完成 DTB 6 与 DTBO 47 的准备，阶段标记到达 `bootm go`。设备随后重新进入 B 槽 NixOS，未观察到 Android 启动完成。对齐内核入口、保留原厂 DTB `/chosen/bootargs` 的两项对照均未改变结果；后者导出的最终 `bootargs` 已确认含原厂 DTB 与 `vendor_boot` 参数。实验没有写入 `boot_b`、A 槽或 `userdata`；`boot_b` 整分区摘要保持不变。当前应检查传给 Android 内核的最终 FDT、ramdisk/bootconfig 和内存布局，不能把 `bootm go` 视为 Android 启动成功。
 
 近期验收顺序：
 
