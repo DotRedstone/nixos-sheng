@@ -54,6 +54,8 @@ Android A 槽有 v4 格式的 `boot_a`、`vendor_boot_a`、`init_boot_a`，以�
 
 再将 ABL 动态参数与 `vendor_boot_a` 的 DTB 6、`dtbo_a` 覆盖层 47 组合，由可复现的 Nix RAM 镜像启动，阶段仍到 `booti_go` 后返回 NixOS。`rawdump` 有一份旧 TWRP panic；重跑探针前后其前 1 MiB 哈希相同，不能用作本轮故障日志。B 槽 `vendor_boot_b` 的 v4 头部与 A 槽一致，但将 U-Boot 临时封装成 v4 `boot.img` 后，`fastboot boot` 返回成功而设备停在 ABL fastboot，未到 U-Boot 阶段。ABL UEFI 日志报告 `kernel image does not have appended DTB` 和 `Device Tree blob not found`；直接附加 DTB 6、先补齐 U-Boot ARM64 Image 声明的 `image_size` 再附加，两项对照仍得到同样错误。设备随后重启回 B 槽 NixOS，`boot_b` 整分区哈希仍与备份一致。v4 镜像格式与 ABL 的 DTB 定位规则需要单独分析，不能把 fastboot 的 `Booting OKAY` 视为 U-Boot 已执行。
 
+B 槽 `vendor_boot_b` 与 A 槽完整镜像哈希一致，但 `dtbo_b` 的 24 MiB 分区全为零，且 B 槽 ABL 日志报告 DTBO 应用失败。因此未将 v4 镜像刷入 `boot_b` 作正常启动对照，也未触碰 `dtbo_b`。另一项 RAM 计时探针在 `booti` 返回后设有 90 秒等待；主机在第 64 秒已重新连上 NixOS ADB，阶段仍为 `booti_go`，`rawdump` 未更新。这排除了普通的命令返回后执行回退流程，但不能单独证明 Android 内核已运行。当前需要更早的串口或固件日志来确认复位点。
+
 近期验收顺序：
 
 1. 从显示交接修复构建内核和匹配模块，建立可回退的持久无白闪基线，并目视复测。
