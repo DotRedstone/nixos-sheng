@@ -25,8 +25,9 @@ TWRP, and restoration of the original B-slot image with a full partition hash
 check. The current candidate no longer shows the U-Boot logo, but briefly
 flashes white before the battery UI. A scoped Linux display clock fix removed
 the EFI handoff flash in one clean-payload device run; full validation remains.
-Android boots through slot A; Alpine and Debian have only passed short EFI
-PID 1 probes. This is development evidence,
+U-Boot has directly booted the installed Android A image to a usable desktop
+while slot B remained active; Android USB/ADB remains unverified. Alpine and
+Debian have only passed short EFI PID 1 probes. This is development evidence,
 not a flashable U-Boot release. See the [EFI experiment record](docs/uboot-efi-experiment_zh.md)
 and [multiboot roadmap](docs/uboot-multiboot-roadmap_zh.md).
 
