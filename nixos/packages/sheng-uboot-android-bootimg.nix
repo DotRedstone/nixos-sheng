@@ -52,7 +52,12 @@ let
       ../patches/u-boot/sheng-baseline/sheng/0004-efi-abl-boot-reason.patch
       ../patches/u-boot/sheng-baseline/sheng/0005-charger-hide-efi-menu.patch
     ];
-    filesToInstall = [
+    filesToInstall = if androidDirectProbe then [
+      "u-boot.bin"
+      "u-boot-nodtb.bin"
+      "dts/dt.dtb"
+      ".config"
+    ] else [
       "u-boot-nodtb.bin"
       "u-boot.dtb"
       ".config"
@@ -88,6 +93,10 @@ let
       CONFIG_CMD_ABOOTIMG=y
       CONFIG_CMD_ADTIMG=y
       CONFIG_OF_LIBFDT_OVERLAY=y
+      CONFIG_OF_EMBED=y
+      # ABL passes over 1 KiB of bootargs; allow the test shell to retain them.
+      CONFIG_SYS_CBSIZE=4096
+      CONFIG_SYS_MAXARGS=128
       ''}
       CONFIG_CMD_FAT=y
       CONFIG_FS_FAT=y
@@ -133,14 +142,16 @@ let
       grep -Fq 'qcom,pm8550b-eusb2-repeater' drivers/phy/qcom/phy-pm8550b-eusb2.c
     '';
   });
+  firmwareImage = if androidDirectProbe then "${firmware}/u-boot.bin" else "${firmware}/u-boot-nodtb.bin";
+  firmwareDtb = if androidDirectProbe then "${firmware}/dt.dtb" else "${firmware}/u-boot.dtb";
   payload = runCommand "sheng-uboot-android-bootimg-${if rawPayload then "raw" else "gzip"}-payload" {
     nativeBuildInputs = [ buildPackages.gzip ];
   } ''
     mkdir -p "$out"
     ${if rawPayload then
-      "cp ${firmware}/u-boot-nodtb.bin \"$out/u-boot.bin\""
+      "cp ${firmwareImage} \"$out/u-boot.bin\""
     else
-      "gzip -n -c ${firmware}/u-boot-nodtb.bin > \"$out/u-boot.gz\""}
+      "gzip -n -c ${firmwareImage} > \"$out/u-boot.gz\""}
     printf 'unused' | gzip -n > "$out/ramdisk.gz"
   '';
 in
@@ -168,8 +179,8 @@ else
       "efi";
   };
 } ''
-  test -s ${firmware}/u-boot-nodtb.bin
-  test -s ${firmware}/u-boot.dtb
+  test -s ${firmwareImage}
+  test -s ${firmwareDtb}
   grep -Fx 'CONFIG_DEFAULT_DEVICE_TREE="qcom/sm8550-xiaomi-sheng"' ${firmware}/.config
   grep -Fx 'CONFIG_TEXT_BASE=0x80000000' ${firmware}/.config
   grep -Fx 'CONFIG_PHY_QCOM_PM8550B_EUSB2=y' ${firmware}/.config
@@ -179,28 +190,31 @@ else
     grep -Fx 'CONFIG_CMD_ABOOTIMG=y' ${firmware}/.config
     grep -Fx 'CONFIG_CMD_ADTIMG=y' ${firmware}/.config
     grep -Fx 'CONFIG_OF_LIBFDT_OVERLAY=y' ${firmware}/.config
+    grep -Fx 'CONFIG_OF_EMBED=y' ${firmware}/.config
+    grep -Fx 'CONFIG_SYS_CBSIZE=4096' ${firmware}/.config
+    grep -Fx 'CONFIG_SYS_MAXARGS=128' ${firmware}/.config
     grep -Fx 'CONFIG_ENV_DEFAULT_ENV_TEXT_FILE="board/qualcomm/sheng-android-direct.env"' ${firmware}/.config
   ''}
   grep -Fx '# CONFIG_VIDEO_LOGO is not set' ${firmware}/.config
-  strings ${firmware}/u-boot-nodtb.bin | grep -Fq 'qcom,pm8550b-eusb2-repeater'
-  test "$(fdtget -t s ${firmware}/u-boot.dtb /soc@0/usb@a600000 dr_mode)" = 'peripheral'
-  fdtget ${firmware}/u-boot.dtb /soc@0/usb@a600000 qcom,select-utmi-as-pipe-clk >/dev/null
-  test "$(fdtget -t s ${firmware}/u-boot.dtb /chosen/framebuffer@b8000000 format)" = 'a8r8g8b8'
+  strings ${firmwareImage} | grep -Fq 'qcom,pm8550b-eusb2-repeater'
+  test "$(fdtget -t s ${firmwareDtb} /soc@0/usb@a600000 dr_mode)" = 'peripheral'
+  fdtget ${firmwareDtb} /soc@0/usb@a600000 qcom,select-utmi-as-pipe-clk >/dev/null
+  test "$(fdtget -t s ${firmwareDtb} /chosen/framebuffer@b8000000 format)" = 'a8r8g8b8'
   ${lib.optionalString autoFastboot ''
     grep -Fx 'CONFIG_ENV_DEFAULT_ENV_TEXT_FILE="board/qualcomm/sheng-ram-fastboot.env"' ${firmware}/.config
     grep -Fx '# CONFIG_FASTBOOT_FLASH is not set' ${firmware}/.config
-    strings ${firmware}/u-boot-nodtb.bin | grep -Fqx 'bootcmd=run fastboot'
+    strings ${firmwareImage} | grep -Fqx 'bootcmd=run fastboot'
   ''}
   grep -Fx 'CONFIG_EFI_LOADER=y' ${firmware}/.config
   grep -Fx 'CONFIG_EFI_BOOTMGR=y' ${firmware}/.config
   grep -Fx 'CONFIG_UFS_QCOM=y' ${firmware}/.config
   grep -Fx 'CONFIG_CMD_SCSI=y' ${firmware}/.config
   grep -Fx 'CONFIG_FS_FAT=y' ${firmware}/.config
-  test "$(fdtget -t s ${firmware}/u-boot.dtb / model)" = 'Xiaomi Pad 6S Pro 12.4'
-  fdtget -t s ${firmware}/u-boot.dtb / compatible | grep -Fqx 'xiaomi,sheng qcom,sm8550'
+  test "$(fdtget -t s ${firmwareDtb} / model)" = 'Xiaomi Pad 6S Pro 12.4'
+  fdtget -t s ${firmwareDtb} / compatible | grep -Fqx 'xiaomi,sheng qcom,sm8550'
 
   kernel_image="$TMPDIR/kernel-with-dtb"
-  cat ${payload}/u-boot.${if rawPayload then "bin" else "gz"} ${firmware}/u-boot.dtb > "$kernel_image"
+  cat ${payload}/u-boot.${if rawPayload then "bin" else "gz"} ${firmwareDtb} > "$kernel_image"
   mkbootimg \
     --header_version 0 \
     --kernel "$kernel_image" \
@@ -221,7 +235,7 @@ else
     exit 1
   }
 
-  python3 - "$out" ${firmware}/u-boot-nodtb.bin ${firmware}/u-boot.dtb ${payload}/u-boot.${if rawPayload then "bin" else "gz"} ${if upstreamAndroidLayout then "/dev/null" else "${payload}/ramdisk.gz"} <<'PY'
+  python3 - "$out" ${firmwareImage} ${firmwareDtb} ${payload}/u-boot.${if rawPayload then "bin" else "gz"} ${if upstreamAndroidLayout then "/dev/null" else "${payload}/ramdisk.gz"} <<'PY'
 import pathlib
 import struct
 import sys
