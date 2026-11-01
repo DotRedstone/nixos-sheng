@@ -526,6 +526,24 @@ NixOS 桌面，目视均未见原先的一帧白闪；DISPCC 注册后 PLL0 的
 条目及载荷，恢复原 `loader.conf` 并确认 `boot_b` 的 SHA-256 未变；未刷写
 `boot_b` 或 `linux` 镜像。
 
+限定于 Sheng 的最终内核补丁为 `linux-sheng` 提交 `125eb0c`，发行版固定提交
+`e0a74cd`。[干净版 EFI 构建](https://github.com/DotRedstone/nixos-sheng/actions/runs/40736879680)
+通过，下载附件的外层摘要、ESP manifest 和全部载荷哈希一致。测试载荷只写入
+`linux-boot` ESP 的独立目录与临时条目；两次从 EFI 菜单进入 7.3.0，第 1 次目视
+无白闪并进入桌面，第 2 次进入桌面但白闪未看清。两次均恢复原 `loader.conf`
+哈希 `1414ba8826bbbdc8fa8d828ac94edd467f5e20f4071adb08164b98cbefddc4b8`；
+`boot_b` 完整哈希仍为
+`b9024c1599b6b06795ae4c59c990940573e924b6e1374988f157b603d198eea5`。
+两个测试条目及其载荷随后已从 ESP 删除，EFI 管理器哈希未变。
+本次没有更新 rootfs 中的匹配内核模块，不能作为持久部署验收。对应的
+[普通 boot 工作流](https://github.com/DotRedstone/nixos-sheng/actions/runs/40736898828)
+虽已生成 boot 镜像，却在模块打包阶段因缺少 FPC1552 驱动而失败。
+
+U-Boot 镜像源码另在 `a7298b8` 移除定位用的三色停顿补丁；本地重建的镜像前段
+SHA-256 为 `a843e13dae29a0972b97c712d9165a8e051c34a890013817cc1c3a3d3293af73`，
+与设备当前 `boot_b` 前段一致，因此没有重刷 B 槽。关机充电、恢复键、匹配模块
+与长期运行仍需在完整发布候选上验收。
+
 当前 rootfs 只有第 1 世代，旧 7.1.8 EFI 载荷不能作为 7.3.0 的可启动回退项。
 `sheng-efi rollback` 已增加写入前的版本/闭包核对，会拒绝这种跨内核回退。新载荷验证
 失败时，应使用原有 `boot_b` 返回现用系统，再从备份恢复 ESP 元数据；

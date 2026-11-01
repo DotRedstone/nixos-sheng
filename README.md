@@ -23,8 +23,10 @@ the current rootfs has passed persistent boot, warm reboot, disconnected cold
 boot, powered-off charger insertion into the battery UI, Volume Up + Power into
 TWRP, and restoration of the original B-slot image with a full partition hash
 check. The current candidate no longer shows the U-Boot logo, but briefly
-flashes white before the battery UI and after EFI selection. Android and other
-Linux systems have not booted from this EFI menu. This is development evidence,
+flashes white before the battery UI. A scoped Linux display clock fix removed
+the EFI handoff flash in one clean-payload device run; full validation remains.
+Android boots through slot A; Alpine and Debian have only passed short EFI
+PID 1 probes. This is development evidence,
 not a flashable U-Boot release. See the [EFI experiment record](docs/uboot-efi-experiment_zh.md)
 and [multiboot roadmap](docs/uboot-multiboot-roadmap_zh.md).
 
