@@ -100,6 +100,10 @@
         sheng-uboot-android-bootimg = final.callPackage ./packages/sheng-uboot-android-bootimg.nix {
           inherit shengUbootSrc;
         };
+        sheng-uboot-android-direct-probe-bootimg = final.callPackage ./packages/sheng-uboot-android-bootimg.nix {
+          androidDirectProbe = true;
+          inherit shengUbootSrc;
+        };
         sheng-uboot-fastboot-probe-bootimg = final.callPackage ./packages/sheng-uboot-android-bootimg.nix {
           autoFastboot = true;
           inherit shengUbootSrc;
@@ -159,6 +163,13 @@
       ubootAndroidBootimgFor = buildSystem:
         let buildPkgs = import nixpkgs { system = buildSystem; };
         in buildPkgs.callPackage ./packages/sheng-uboot-android-bootimg.nix {
+          buildUBoot = buildPkgs.pkgsCross.aarch64-multiplatform.buildUBoot;
+          inherit shengUbootSrc;
+        };
+      ubootAndroidDirectProbeFor = buildSystem:
+        let buildPkgs = import nixpkgs { system = buildSystem; };
+        in buildPkgs.callPackage ./packages/sheng-uboot-android-bootimg.nix {
+          androidDirectProbe = true;
           buildUBoot = buildPkgs.pkgsCross.aarch64-multiplatform.buildUBoot;
           inherit shengUbootSrc;
         };
@@ -294,6 +305,9 @@
         # Experimental Android v0 envelope for a RAM-boot test. It is separate
         # from mobileAndroidBootimg and must not be flashed before device proof.
         shengUbootAndroidBootimg = pkgs.sheng-uboot-android-bootimg;
+        # Reads A-slot Android images from U-Boot without changing the active slot.
+        # Experimental RAM probe only; do not publish as an Android boot release.
+        shengUbootAndroidDirectProbeBootimg = pkgs.sheng-uboot-android-direct-probe-bootimg;
         # USB-only RAM probe: U-Boot must re-enumerate as fastboot before
         # storage, display, or an EFI payload is brought into the experiment.
         shengUbootFastbootProbeBootimg = pkgs.sheng-uboot-fastboot-probe-bootimg;
@@ -331,6 +345,7 @@
       packages.x86_64-linux.shengUbootEfiPreflight = ubootPreflightFor "x86_64-linux";
       packages.x86_64-linux.shengUbootEfiShengDtsPreflight = ubootShengDtsPreflightFor "x86_64-linux";
       packages.x86_64-linux.shengUbootAndroidBootimg = ubootAndroidBootimgFor "x86_64-linux";
+      packages.x86_64-linux.shengUbootAndroidDirectProbeBootimg = ubootAndroidDirectProbeFor "x86_64-linux";
       packages.x86_64-linux.shengUbootFastbootProbeBootimg = ubootFastbootProbeFor "x86_64-linux";
       packages.x86_64-linux.shengUbootRawFastbootProbeBootimg = ubootRawFastbootProbeFor "x86_64-linux";
       packages.x86_64-linux.shengUbootUpstreamFastbootProbeBootimg = ubootUpstreamFastbootProbeFor "x86_64-linux";

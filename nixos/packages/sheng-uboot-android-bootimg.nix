@@ -8,6 +8,7 @@
 # ---
 {
   autoFastboot ? false,
+  androidDirectProbe ? false,
   # Keep the raw form as a separate ABL-entry experiment.  The normal
   # candidate stays gzip, matching the known-good Mobile NixOS boot image.
   rawPayload ? false,
@@ -23,7 +24,8 @@
 }:
 let
   firmware = (buildUBoot {
-    pname = if autoFastboot then
+    pname = if androidDirectProbe then
+      "sheng-uboot-android-direct-probe-firmware" else if autoFastboot then
       if upstreamAndroidLayout then "sheng-uboot-upstream-fastboot-probe-firmware" else
       if rawPayload then "sheng-uboot-raw-fastboot-probe-firmware" else "sheng-uboot-fastboot-probe-firmware"
     else
@@ -61,6 +63,9 @@ let
       make qcom_defconfig
       scripts/kconfig/merge_config.sh -m .config board/qualcomm/qcom-phone.config
       cp ${./sheng-uboot.env} board/qualcomm/sheng.env
+      ${lib.optionalString androidDirectProbe ''
+        cp ${./sheng-uboot-android-direct.env} board/qualcomm/sheng-android-direct.env
+      ''}
       ${lib.optionalString autoFastboot ''
         cat > board/qualcomm/sheng-ram-fastboot.env <<'ENV'
         # Deliberately do not scan storage: this is a no-display RAM-boot probe.
@@ -79,6 +84,11 @@ let
       CONFIG_EFI_LOADER=y
       CONFIG_CMD_BOOTEFI=y
       CONFIG_CMD_PART=y
+      ${lib.optionalString androidDirectProbe ''
+      CONFIG_CMD_ABOOTIMG=y
+      CONFIG_CMD_ADTIMG=y
+      CONFIG_OF_LIBFDT_OVERLAY=y
+      ''}
       CONFIG_CMD_FAT=y
       CONFIG_FS_FAT=y
       CONFIG_FS_FAT_HANDLE_SECTOR_SIZE_MISMATCH=y
@@ -91,7 +101,7 @@ let
       # CONFIG_EFI_CAPSULE_ON_DISK is not set
       # CONFIG_EFI_CAPSULE_FIRMWARE_RAW is not set
       # CONFIG_FASTBOOT_FLASH is not set
-      CONFIG_ENV_DEFAULT_ENV_TEXT_FILE="${if autoFastboot then "board/qualcomm/sheng-ram-fastboot.env" else "board/qualcomm/sheng.env"}"
+      CONFIG_ENV_DEFAULT_ENV_TEXT_FILE="${if androidDirectProbe then "board/qualcomm/sheng-android-direct.env" else if autoFastboot then "board/qualcomm/sheng-ram-fastboot.env" else "board/qualcomm/sheng.env"}"
       ${lib.optionalString autoFastboot ''
       # The USB probe must never expose a partition-writing fastboot command.
       # CONFIG_FASTBOOT_FLASH is not set
@@ -102,7 +112,8 @@ let
       runHook postConfigure
     '';
     extraMeta = {
-      description = if autoFastboot then
+      description = if androidDirectProbe then
+        "Experimental Sheng U-Boot direct Android A-slot RAM-boot probe" else if autoFastboot then
         "Experimental Sheng U-Boot USB fastboot RAM-boot probe" else
         "Experimental Sheng U-Boot EFI firmware for an Android v0 RAM-boot candidate";
       homepage = "https://source.denx.de/u-boot/u-boot";
@@ -133,7 +144,8 @@ let
     printf 'unused' | gzip -n > "$out/ramdisk.gz"
   '';
 in
-runCommand (if autoFastboot then
+runCommand (if androidDirectProbe then
+  "sheng-u-boot-android-direct-probe.img" else if autoFastboot then
   if upstreamAndroidLayout then "sheng-u-boot-upstream-fastboot-probe.img" else
   if rawPayload then "sheng-u-boot-raw-fastboot-probe.img" else "sheng-u-boot-fastboot-probe.img"
 else
@@ -149,7 +161,7 @@ else
     inherit firmware payload;
     flashPartition = "boot_b";
     maximumBytes = 201326592;
-    mode = if autoFastboot then
+    mode = if androidDirectProbe then "android-direct-probe" else if autoFastboot then
       if upstreamAndroidLayout then "upstream-fastboot-probe" else
       if rawPayload then "raw-fastboot-probe" else "fastboot-probe"
     else
@@ -163,6 +175,12 @@ else
   grep -Fx 'CONFIG_PHY_QCOM_PM8550B_EUSB2=y' ${firmware}/.config
   grep -Fx 'CONFIG_FS_FAT_HANDLE_SECTOR_SIZE_MISMATCH=y' ${firmware}/.config
   grep -Fx 'CONFIG_NO_FB_CLEAR=y' ${firmware}/.config
+  ${lib.optionalString androidDirectProbe ''
+    grep -Fx 'CONFIG_CMD_ABOOTIMG=y' ${firmware}/.config
+    grep -Fx 'CONFIG_CMD_ADTIMG=y' ${firmware}/.config
+    grep -Fx 'CONFIG_OF_LIBFDT_OVERLAY=y' ${firmware}/.config
+    grep -Fx 'CONFIG_ENV_DEFAULT_ENV_TEXT_FILE="board/qualcomm/sheng-android-direct.env"' ${firmware}/.config
+  ''}
   grep -Fx '# CONFIG_VIDEO_LOGO is not set' ${firmware}/.config
   strings ${firmware}/u-boot-nodtb.bin | grep -Fq 'qcom,pm8550b-eusb2-repeater'
   test "$(fdtget -t s ${firmware}/u-boot.dtb /soc@0/usb@a600000 dr_mode)" = 'peripheral'
