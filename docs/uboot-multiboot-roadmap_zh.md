@@ -27,6 +27,8 @@ Android ABL / B 槽
 
 Android A 槽有 v4 格式的 `boot_a`、`vendor_boot_a`、`init_boot_a`，以及 `dtbo_a` 和 `vbmeta_a`。2026-10-26 从 B 槽经 ABL fastboot 切至 A 槽后，ADB 报告 Android 16、`_a` 槽、`sys.boot_completed=1`，图形服务运行；随后从 Android ADB 返回 ABL fastboot、切回 B 槽，重新进入非 EFI 的 NixOS 7.3.0。B 槽完整哈希与测试前备份一致，A 槽关键启动分区也与私有备份一致；未刷写 A 槽、`linux` 或 `userdata`。本次证明槽位切换可用，不证明 Android 能从 B 槽 U-Boot 菜单直接启动。
 
+显示交接修复已固定在 `linux-sheng` 提交 `125eb0c`，本仓库内核输入也固定到该提交。组合诊断版连续两次未见白闪；最终干净版一次未见白闪、一次未看清。当前默认 EFI 内核的哈希与干净版测试载荷不同，因此当前设备默认项尚不能作为无白闪发布基线。干净版载荷与 manifest 保存在本机备份中；持久使用前须同时提供匹配的 rootfs 内核模块，并复测正常启动、充电与恢复键路径。
+
 ## 系统适配边界
 
 | 目标 | 当前状态 | 下一项可验证结果 |
@@ -36,7 +38,7 @@ Android A 槽有 v4 格式的 `boot_a`、`vendor_boot_a`、`init_boot_a`，以�
 | Debian 13 | 官方 arm64 最小用户态的独立 ext4 rootfs 已以 PID 1 运行，随后返回 NixOS | 验证完整服务、交互、设备支持及长期安装 |
 | 更多 Linux 发行版 | 尚未实机启动；不能把另一个 NixOS 世代算作独立系统 | 使用单独 rootfs 与适配 Sheng 的内核/DTB/initrd 完成可回退启动 |
 | Android A 槽 | Android 16 启动完成，ADB 回到 fastboot 后已切回 B 槽 NixOS | 继续验证可从统一菜单直接选择 Android，且返回机制可靠 |
-| Android 统一菜单入口 | 未实现 | 单独证明从菜单选择后正确装载 Android v4 启动链，且下次开机仍能返回统一界面 |
+| Android 统一菜单入口 | RAM 探针已读入启动镜像并到达 `bootm go`，Android 尚未启动 | 定位内核交接后的重启原因，再验证菜单启动与返回机制 |
 | Windows on Arm | 未评估这台设备的 Windows 启动与驱动 | 先审计 UEFI 服务、ACPI 表、启动存储和 Arm64 驱动，再考虑 Windows PE 启动探针 |
 | 原版 iOS / iPadOS | 不列为 Sheng 可交付系统 | Apple 的启动信任链和系统设计依赖 Apple 硬件；不以菜单图标暗示支持 |
 
@@ -45,6 +47,14 @@ Android A 槽有 v4 格式的 `boot_a`、`vendor_boot_a`、`init_boot_a`，以�
 已验证的 Android 入口是 ABL A/B 槽位切换：A 槽进入 Android，B 槽进入 NixOS，实验时也可进入 U-Boot。切到 A 后，ABL 直接启动 Android，B 槽的统一界面不会出现；因此这只是过渡路径。Android 的 A/B 元数据还承担更新与失败回退，`set_active` 会改变成功和重试状态，不能把槽位切换伪装为无副作用的一次性菜单选择。本次已实测 A 槽启动与经 ABL fastboot 返回 B 槽；未验证 Android 启动失败时的自动回退。[Android A/B 实现说明](https://source.android.com/docs/core/ota/ab/ab_implement)
 
 真正一致的每次开机界面需要从 B 槽 U-Boot 直接交接 Android，或证明等价的安全返回机制。该设备的 Android v4 启动链使用独立的 `vendor_boot`、`init_boot`、DTB/DTBO、bootconfig 和 AVB；还要处理恢复模式与 Android 更新后镜像的变化。U-Boot 通用 Android boot image 支持不足以证明这些设备专属输入已正确组合。该路径必须独立实现、先 RAM 验证，再进行有备份的实机验收。[Android 启动分区说明](https://source.android.com/docs/core/architecture/partitions/generic-boot)、[U-Boot Android 启动镜像](https://docs.u-boot.org/en/stable/android/boot-image.html)
+
+2026-11-01 的只读 RAM 探针已从 UFS 读到 A 槽 `boot`、`vendor_boot`、`init_boot` 和 `dtbo`，前两者的头部与备份逐字节一致；U-Boot 完成 DTB 6 与 DTBO 47 的准备，阶段标记到达 `bootm go`。设备随后重新进入 B 槽 NixOS，未观察到 Android 启动完成。对齐内核入口的单项对照也未改变结果。实验没有写入 `boot_b`、A 槽或 `userdata`；`boot_b` 整分区摘要保持不变。当前应检查传给 Android 内核的最终 FDT、ramdisk/bootconfig、启动参数和内存布局，不能把 `bootm go` 视为 Android 启动成功。
+
+近期验收顺序：
+
+1. 从显示交接修复构建内核和匹配模块，建立可回退的持久无白闪基线，并目视复测。
+2. 在 RAM 探针中记录最终交接输入，定位 Android 内核启动后重启的环节。
+3. Android 直接进入桌面且下次仍回统一菜单后，再加入正式菜单项；最后回归 NixOS、充电和 TWRP 路径。
 
 ### 其他 Linux 与 Windows on Arm
 
