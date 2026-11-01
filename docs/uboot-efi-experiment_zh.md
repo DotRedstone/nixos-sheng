@@ -539,9 +539,29 @@ NixOS 桌面，目视均未见原先的一帧白闪；DISPCC 注册后 PLL0 的
 [普通 boot 工作流](https://github.com/DotRedstone/nixos-sheng/actions/runs/40736898828)
 虽已生成 boot 镜像，却在模块打包阶段因缺少 FPC1552 驱动而失败。
 
+2026-11-02 将同一干净版载荷重新校验后安装到 `linux-boot` 的独立目录，
+并将它设为当前设备的 EFI 默认项；原条目与载荷保留供回退。
+设备启动后 `/proc/cmdline` 指向该载荷，`kernel.store-path` 为
+`/nix/store/asisvqr1mwna6044aah4nwpdvs8rh61p-linux-7.3.0`，
+内核文件 SHA-256 为
+`b019100f48f96ec54c50376d3ef980f7511ef6d229cc8e9b114b533f6c315c32`。
+使用者目视确认 EFI 菜单后的启动无白闪并进入 NixOS 桌面。
+[普通 boot 工作流](https://github.com/DotRedstone/nixos-sheng/actions/runs/41332638968)
+随后成功构建 boot 镜像与同一内核的模块包；修正过时的 FPC1552 门禁后，
+模块包校验通过。设备备份旧模块树后，将 867 个匹配模块安装到
+`/lib/modules/7.3.0`，并生成 `modules.dep`。现有 system generation 仍指向
+旧 Nix store 模块树，设备暂以 systemd 管理器的
+`MODPROBE_OPTIONS=-d /` 使服务从 `/lib/modules` 加载模块。
+重启后 EFI 载荷哈希、模块目录和 manifest 均核对通过，触摸、Wi-Fi、
+相机模块已加载；使用者再次目视确认无白闪并进入桌面。`boot_b` 未重刷，
+整分区 SHA-256 为
+`4dd025170c9af76a013da2a32ee7c9616d94a089c4f20a5a63e190f6a6a54bd1`。
+此项完成当前设备的正常启动验收；完整 rootfs 发布仍须构建新 system
+generation，消除设备上的临时模块路径配置并验证更新与回退。
+
 U-Boot 镜像源码另在 `a7298b8` 移除定位用的三色停顿补丁；本地重建的镜像前段
 SHA-256 为 `a843e13dae29a0972b97c712d9165a8e051c34a890013817cc1c3a3d3293af73`，
-与设备当前 `boot_b` 前段一致，因此没有重刷 B 槽。关机充电、恢复键、匹配模块
+与设备当前 `boot_b` 前段一致，因此没有重刷 B 槽。关机充电、恢复键
 与长期运行仍需在完整发布候选上验收。
 
 当前 rootfs 只有第 1 世代，旧 7.1.8 EFI 载荷不能作为 7.3.0 的可启动回退项。

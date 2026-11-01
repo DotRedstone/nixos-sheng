@@ -27,7 +27,7 @@ Android ABL / B 槽
 
 Android A 槽有 v4 格式的 `boot_a`、`vendor_boot_a`、`init_boot_a`，以及 `dtbo_a` 和 `vbmeta_a`。2026-10-26 从 B 槽经 ABL fastboot 切至 A 槽后，ADB 报告 Android 16、`_a` 槽、`sys.boot_completed=1`，图形服务运行；随后从 Android ADB 返回 ABL fastboot、切回 B 槽，重新进入非 EFI 的 NixOS 7.3.0。B 槽完整哈希与测试前备份一致，A 槽关键启动分区也与私有备份一致；未刷写 A 槽、`linux` 或 `userdata`。本次证明槽位切换可用，不证明 Android 能从 B 槽 U-Boot 菜单直接启动。
 
-显示交接修复已固定在 `linux-sheng` 提交 `125eb0c`，本仓库内核输入也固定到该提交。组合诊断版连续两次未见白闪；最终干净版一次未见白闪、一次未看清。当前默认 EFI 内核的哈希与干净版测试载荷不同，因此当前设备默认项尚不能作为无白闪发布基线。干净版载荷与 manifest 保存在本机备份中；持久使用前须同时提供匹配的 rootfs 内核模块，并复测正常启动、充电与恢复键路径。
+显示交接修复已固定在 `linux-sheng` 提交 `125eb0c`，本仓库内核输入也固定到该提交。组合诊断版连续两次未见白闪；最终干净版首次测试一次未见白闪、一次未看清。2026-11-02 将干净版载荷设为设备的独立 EFI 默认项并安装同内核模块后，使用者在安装前后各确认一次无白闪并进入 NixOS 桌面，原条目与旧模块树均保留供回退。现有 system generation 仍属于旧内核，设备暂以 systemd 环境变量指定新模块目录；完整发布前须重建 rootfs，并复测充电、恢复键与回退路径。详见 [EFI 实验记录](uboot-efi-experiment_zh.md)。
 
 ## 系统适配边界
 
