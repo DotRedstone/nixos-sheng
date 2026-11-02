@@ -31,7 +31,7 @@ python3 scripts/sheng-android-rom-config.py install --profile /tmp/sheng-android
 先在 NixOS 下显式运行：
 
 ```sh
-python3 scripts/sheng-android-rom-config.py prepare-dtbo-b --backup-dir /tmp/sheng-dtbo-backup
+python3 scripts/sheng-android-rom-config.py prepare-dtbo-b --backup-dir ~/sheng-dtbo-backup
 ```
 
 此命令先把 A/B 两份 DTBO 完整备份到新目录，仅在两分区大小相同、A 有有效
