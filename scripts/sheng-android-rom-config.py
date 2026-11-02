@@ -246,6 +246,11 @@ def prepare_dtbo_b(args):
             output.write(data)
             output.flush()
             os.fsync(output.fileno())
+    with (backup_dir / "sha256sums.txt").open("x", encoding="ascii") as checksums:
+        checksums.write(f"{hashlib.sha256(dtbo_a).hexdigest()}  dtbo_a.img\n")
+        checksums.write(f"{hashlib.sha256(dtbo_b).hexdigest()}  dtbo_b.before.img\n")
+        checksums.flush()
+        os.fsync(checksums.fileno())
     adb_shell_script(
         args.serial,
         "set -eu; dd if=/dev/disk/by-partlabel/dtbo_a "
