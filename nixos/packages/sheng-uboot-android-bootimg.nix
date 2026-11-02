@@ -92,6 +92,8 @@ let
       ${lib.optionalString androidDirectProbe ''
       CONFIG_CMD_ABOOTIMG=y
       CONFIG_CMD_ADTIMG=y
+      CONFIG_CMD_IMPORTENV=y
+      CONFIG_CMD_ITEST=y
       CONFIG_OF_LIBFDT_OVERLAY=y
       CONFIG_OF_EMBED=y
       # ABL passes over 1 KiB of bootargs; allow the test shell to retain them.
@@ -189,11 +191,16 @@ else
   ${lib.optionalString androidDirectProbe ''
     grep -Fx 'CONFIG_CMD_ABOOTIMG=y' ${firmware}/.config
     grep -Fx 'CONFIG_CMD_ADTIMG=y' ${firmware}/.config
+    grep -Fx 'CONFIG_CMD_IMPORTENV=y' ${firmware}/.config
+    grep -Fx 'CONFIG_CMD_ITEST=y' ${firmware}/.config
     grep -Fx 'CONFIG_OF_LIBFDT_OVERLAY=y' ${firmware}/.config
     grep -Fx 'CONFIG_OF_EMBED=y' ${firmware}/.config
     grep -Fx 'CONFIG_SYS_CBSIZE=4096' ${firmware}/.config
     grep -Fx 'CONFIG_SYS_MAXARGS=128' ${firmware}/.config
     grep -Fx 'CONFIG_ENV_DEFAULT_ENV_TEXT_FILE="board/qualcomm/sheng-android-direct.env"' ${firmware}/.config
+    strings ${firmwareImage} | grep -Fq '/SHENG/ANDROID.ENV'
+    strings ${firmwareImage} | grep -Fq 'android_profile_version'
+    ! strings ${firmwareImage} | grep -Fq 'androidboot.boot_devices=soc/1d84000.ufshc'
   ''}
   grep -Fx '# CONFIG_VIDEO_LOGO is not set' ${firmware}/.config
   strings ${firmwareImage} | grep -Fq 'qcom,pm8550b-eusb2-repeater'
