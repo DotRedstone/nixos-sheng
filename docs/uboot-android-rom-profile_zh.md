@@ -6,6 +6,8 @@ ROM 的启动设备、fstab 后缀及 AVB 状态须从该 ROM 实际启动时采
 配置文件存放在 `linux-boot` ESP 的 `/SHENG/ANDROID.ENV`，不进入公共镜像。
 持久 `boot_b` 测试须使用 `shengUbootAndroidDirectV4ProbeBootimg` 的 v4 产物；
 `shengUbootAndroidDirectProbeBootimg` 是 RAM 探针，不作为刷写镜像。
+从 CI 下载测试镜像时，先在镜像及 `.sha256` 文件所在目录运行
+`sha256sum -c sheng-u-boot-android-direct-v4-boot_b.img.sha256`。
 
 ## 采集与安装
 
