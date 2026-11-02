@@ -24,7 +24,7 @@ boot, powered-off charger insertion into the battery UI, Volume Up + Power into
 TWRP, and restoration of the original B-slot image with a full partition hash
 check. The current candidate no longer shows the U-Boot logo, but briefly
 flashes white before the battery UI. A scoped Linux display clock fix removed
-the EFI handoff flash in one clean-payload device run; full validation remains.
+the EFI handoff flash in repeated device runs; release validation remains.
 U-Boot directly booted the installed Android A image; ADB reported
 `sys.boot_completed=1` and Fastboot still reported slot B. Alpine and Debian
 have only passed short EFI PID 1 probes. This is development evidence,
@@ -168,7 +168,7 @@ are summarized above. See
 [`docs/uboot-efi-experiment_zh.md`](docs/uboot-efi-experiment_zh.md)
 for the architecture, checks, and rollback procedure.
 The [multiboot roadmap](docs/uboot-multiboot-roadmap_zh.md) distinguishes the
-Android A-slot path from unverified direct Android and other-Linux boot options.
+tested Android A-slot handoff from wider ROM compatibility and other-Linux boot options.
 
 ## Repository Layout
 

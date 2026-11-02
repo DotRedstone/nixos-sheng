@@ -37,8 +37,8 @@ Android A 槽有 v4 格式的 `boot_a`、`vendor_boot_a`、`init_boot_a`，以�
 | Alpine 3.24.3 | 独立 ext4 rootfs 的 `/init` 在平板以 PID 1 运行，随后返回 NixOS | 验证完整服务、交互、设备支持及长期安装 |
 | Debian 13 | 官方 arm64 最小用户态的独立 ext4 rootfs 已以 PID 1 运行，随后返回 NixOS | 验证完整服务、交互、设备支持及长期安装 |
 | 更多 Linux 发行版 | 尚未实机启动；不能把另一个 NixOS 世代算作独立系统 | 使用单独 rootfs 与适配 Sheng 的内核/DTB/initrd 完成可回退启动 |
-| Android A 槽 | Android 16 启动完成，ADB 回到 fastboot 后已切回 B 槽 NixOS | 继续验证可从统一菜单直接选择 Android，且返回机制可靠 |
-| Android 统一菜单入口 | RAM 探针已装载 A 槽镜像并到达 `booti` 交接，随后复位回 NixOS；Android 尚未启动 | 取得早期内核或固件日志，定位复位原因，再验证菜单启动与返回机制 |
+| Android A 槽 | Android 16 启动完成，ADB 回到 fastboot 后已切回 B 槽 NixOS | 验证 Android 更新后的槽位状态与返回路径 |
+| Android 统一菜单入口 | U-Boot 菜单已直启本机 Android A 槽并完成 ADB 验证；该次测试使用本机固定参数 | 实测 ROM 配置采集版，并在其他 ROM 上验证启动、返回与更新 |
 | Windows on Arm | 未评估这台设备的 Windows 启动与驱动 | 先审计 UEFI 服务、ACPI 表、启动存储和 Arm64 驱动，再考虑 Windows PE 启动探针 |
 | 原版 iOS / iPadOS | 不列为 Sheng 可交付系统 | Apple 的启动信任链和系统设计依赖 Apple 硬件；不以菜单图标暗示支持 |
 
@@ -55,6 +55,11 @@ Android A 槽有 v4 格式的 `boot_a`、`vendor_boot_a`、`init_boot_a`，以�
 再将 ABL 动态参数与 `vendor_boot_a` 的 DTB 6、`dtbo_a` 覆盖层 47 组合，由可复现的 Nix RAM 镜像启动，阶段仍到 `booti_go` 后返回 NixOS。`rawdump` 有一份旧 TWRP panic；重跑探针前后其前 1 MiB 哈希相同，不能用作本轮故障日志。B 槽 `vendor_boot_b` 的 v4 头部与 A 槽一致，但将 U-Boot 临时封装成 v4 `boot.img` 后，`fastboot boot` 返回成功而设备停在 ABL fastboot，未到 U-Boot 阶段。ABL UEFI 日志报告 `kernel image does not have appended DTB` 和 `Device Tree blob not found`；直接附加 DTB 6、先补齐 U-Boot ARM64 Image 声明的 `image_size` 再附加，两项对照仍得到同样错误。设备随后重启回 B 槽 NixOS，`boot_b` 整分区哈希仍与备份一致。v4 镜像格式与 ABL 的 DTB 定位规则需要单独分析，不能把 fastboot 的 `Booting OKAY` 视为 U-Boot 已执行。
 
 B 槽 `vendor_boot_b` 与 A 槽完整镜像哈希一致，而原 `dtbo_b` 全为零。备份两处分区后，临时将 A 槽 DTBO 写入 `dtbo_b`，并将 U-Boot 封装为 v4 镜像写入 `boot_b`；该组合已正常启动 NixOS。早期直接交接 Android 的探针到达 `booti_go` 后，ABL 耗尽 B 槽重试并自动切到 A 槽；Android ADB 随后出现只证明原生 A 槽启动。`rawdump` 记录了逐项修复的 Android 第一阶段故障：重复 `androidboot.hardware` 导致 bootconfig 解析失败；去掉重复项后缺少启动设备参数，找不到 `/dev/block/by-name/super`；补齐启动设备后，AVB 状态缺失导致 `/system` 挂载失败。当前探针沿用 ABL 交给 U-Boot 的设备树及 `/hypervisor`，并补入本机的启动设备、分区和验证状态参数。一次自动直启测试中，屏幕进入 Android；随后 Fastboot 报告当前槽仍为 B，未发生此前的 A 槽回退。双系统 U-Boot 菜单已分别进入 NixOS 与可操作的 Android 桌面；菜单直启 Android 后 Fastboot 再次报告 B 槽，排除了 A 槽回退。原厂 `vendor_boot_a` 的 bootconfig 已含 USB 控制器参数；重复传入的对照镜像由 `rawdump` 确认出现 bootconfig 重定义错误，已撤销。U-Boot 的 ARM64 跳转清理不会停止 ACM gadget；在 Android 交接前从所有控制台移除 `usbacm` 后，Android ADB 成功枚举并报告 `sys.boot_completed=1`，远程进入 Fastboot 后活动槽位仍为 B。当前 `boot_b` 为 5 秒菜单、默认 NixOS；重启后 NixOS ADB 正常，分区前缀哈希与构建镜像一致。其他 Android 设备功能、OTA 与长期稳定性仍待核验。`dtbo_b` 和硬编码启动参数均属临时测试配置，不能作为公开刷机包。
+
+本实验分支已将 ROM 相关启动参数改为从实际运行的 Android A 槽采集，再安装到
+ESP；U-Boot 在菜单选择后检查配置，并按分区表读取镜像。缺配置或超出已验证
+内存上限时拒绝直启。此项仍待本机及其他 ROM 实测，步骤见
+[Android ROM 配置采集](uboot-android-rom-profile_zh.md)。
 
 近期验收顺序：
 
