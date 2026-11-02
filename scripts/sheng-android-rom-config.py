@@ -197,12 +197,12 @@ def capture(args):
 def install(args):
     read_profile(args.profile)
     require_nixos_root(args.serial)
-    for partition in ("dtbo_a", "dtbo_b"):
-        header = adb_command(
-            args.serial, "exec-out", "dd", f"if=/dev/disk/by-partlabel/{partition}",
-            "bs=4", "count=1"
-        )
-        check_dtbo_header(header, partition)
+    dtbo_a = read_partition(args.serial, "dtbo_a")
+    dtbo_b = read_partition(args.serial, "dtbo_b")
+    check_dtbo_header(dtbo_a[:4], "dtbo_a")
+    check_dtbo_header(dtbo_b[:4], "dtbo_b")
+    if dtbo_a != dtbo_b:
+        raise RuntimeError("A/B DTBO 内容不同，需人工核对后再安装 ROM 配置")
     remote_check = (
         "set -eu; "
         "test -b /dev/disk/by-partlabel/linux-boot; "
