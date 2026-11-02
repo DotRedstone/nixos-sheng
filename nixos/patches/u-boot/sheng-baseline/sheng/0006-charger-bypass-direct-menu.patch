@@ -1,0 +1,57 @@
+From: DotRedstone <noreply@github.com>
+Subject: [PATCH] sheng: bypass direct menu on charger boot
+
+The Android direct-boot candidate presents its U-Boot menu before it enters
+systemd-boot. The existing EFI-only charger timeout cannot prevent that menu
+from delaying an off-mode charging start. Export the same unambiguous ABL
+charger reason during board late init so the candidate environment can hand
+off to EFI immediately. The value remains volatile and explicit normal-boot
+requests continue to win.
+
+--- a/arch/arm/mach-snapdragon/board.c
++++ b/arch/arm/mach-snapdragon/board.c
+@@ -415,0 +416,42 @@
++static void sheng_set_charger_boot_mode(void)
++{
++	static const char *const keys[] = {
++		"bootinfo.pureason=",
++		"androidboot.mode=",
++	};
++	const char *cmdline, *start, *end;
++	char value[64];
++	size_t len, i;
++
++	/* The direct-boot menu must not delay an off-mode charger start. */
++	if (!of_machine_is_compatible("xiaomi,sheng"))
++		return;
++
++	env_set("sheng_charger_boot", NULL);
++	cmdline = get_cmdline();
++	if (!cmdline || sheng_cmdline_has(cmdline, "androidboot.force_normal_boot=1"))
++		return;
++
++	for (i = 0; i < ARRAY_SIZE(keys); i++) {
++		start = cmdline;
++		while ((start = strstr(start, keys[i]))) {
++			if (start == cmdline || start[-1] == ' ')
++				break;
++			start++;
++		}
++		if (!start)
++			continue;
++		start += strlen(keys[i]);
++		end = strchr(start, ' ');
++		len = end ? end - start : strlen(start);
++		if (!len || len >= sizeof(value))
++			continue;
++		memcpy(value, start, len);
++		value[len] = '\0';
++		if (sheng_charger_reason(keys[i], value)) {
++			env_set("sheng_charger_boot", "1");
++			return;
++		}
++	}
++}
++
+@@ -606,0 +649 @@
++	sheng_set_charger_boot_mode();

@@ -51,7 +51,8 @@ let
       ../patches/u-boot/sheng-baseline/sheng/0003-sheng-abl-framebuffer.patch
       ../patches/u-boot/sheng-baseline/sheng/0004-efi-abl-boot-reason.patch
       ../patches/u-boot/sheng-baseline/sheng/0005-charger-hide-efi-menu.patch
-    ];
+    ] ++ lib.optional androidDirectProbe
+      ../patches/u-boot/sheng-baseline/sheng/0006-charger-bypass-direct-menu.patch;
     filesToInstall = if androidDirectProbe then [
       "u-boot.bin"
       "u-boot-nodtb.bin"
@@ -200,6 +201,7 @@ else
     grep -Fx 'CONFIG_ENV_DEFAULT_ENV_TEXT_FILE="board/qualcomm/sheng-android-direct.env"' ${firmware}/.config
     strings ${firmwareImage} | grep -Fq '/SHENG/ANDROID.ENV'
     strings ${firmwareImage} | grep -Fq 'android_profile_version'
+    strings ${firmwareImage} | grep -Fq 'sheng_charger_boot'
     ! strings ${firmwareImage} | grep -Fq 'androidboot.boot_devices=soc/1d84000.ufshc'
   ''}
   grep -Fx '# CONFIG_VIDEO_LOGO is not set' ${firmware}/.config
