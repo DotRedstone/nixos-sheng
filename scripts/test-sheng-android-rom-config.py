@@ -48,6 +48,11 @@ class RomConfigTests(unittest.TestCase):
         )
         self.assertEqual(profile["android_bootdevice"], "1d84000.ufshc")
 
+    def test_vendor_device_identifies_custom_rom(self):
+        self.props["ro.product.device"] = "custom-sheng-rom"
+        self.props["ro.product.vendor.device"] = "sheng"
+        self.assertEqual(MODULE.profile_from_android(self.props, {}, {})["android_profile_board"], "sheng")
+
     def test_missing_boot_parameter_is_rejected(self):
         del self.props["ro.boot.fstab_suffix"]
         with self.assertRaisesRegex(ValueError, "android_fstab_suffix"):

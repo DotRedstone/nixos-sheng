@@ -123,9 +123,7 @@ def validate_profile(profile):
 
 
 def profile_from_android(props, bootconfig, cmdline):
-    device = (props.get("ro.product.device") or
-              props.get("ro.product.vendor.device") or "")
-    if device != "sheng":
+    if "sheng" not in (props.get("ro.product.device"), props.get("ro.product.vendor.device")):
         raise ValueError("Android 报告的设备不是 sheng")
     boot_devices = value_from_android(props, bootconfig, cmdline, "boot_devices")
     bootdevice = value_from_android(props, bootconfig, cmdline, "bootdevice")
