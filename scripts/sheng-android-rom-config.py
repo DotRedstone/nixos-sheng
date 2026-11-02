@@ -6,6 +6,7 @@ import hashlib
 import os
 from pathlib import Path
 import re
+import struct
 import subprocess
 import sys
 
@@ -25,6 +26,12 @@ GETPROP_PATTERN = re.compile(r"^\[([^]]+)\]: \[(.*)\]$")
 REMOTE_STAGE = "/data/local/tmp/sheng-android-profile.tmp"
 REMOTE_PROFILE = "/boot/SHENG/ANDROID.ENV"
 DTBO_MAGIC = bytes.fromhex("d7b7ab1e")
+READ_WINDOWS = {
+    "boot_a": 64 * 1024 * 1024,
+    "vendor_boot_a": 48 * 1024 * 1024,
+    "init_boot_a": 8 * 1024 * 1024,
+    "dtbo_a": 16 * 1024 * 1024,
+}
 
 
 def adb_command(serial, *args, input_data=None):
@@ -39,7 +46,8 @@ def adb_command(serial, *args, input_data=None):
 
 
 def adb_shell_script(serial, script):
-    return adb_command(serial, "shell", "-T", "sh", input_data=(script + "\n").encode())
+    # 设备的 NixOS adbd 只支持 PTY，不能使用 adb shell -T 的标准输入。
+    return adb_command(serial, "shell", script)
 
 
 def require_nixos_root(serial):
@@ -56,10 +64,71 @@ def read_partition(serial, partition):
     size = int(adb_command(serial, "shell", "blockdev", "--getsize64", path).decode().strip())
     if size <= 0 or size > 64 * 1024 * 1024:
         raise RuntimeError(f"{partition} 大小超出预期")
-    data = adb_command(serial, "exec-out", "dd", f"if={path}", "bs=1M")
+    # adb exec-out 会把远端 dd 的 stderr 统计信息并入二进制流。
+    data = adb_command(serial, "exec-out", "dd", f"if={path}", "bs=1M", "status=none")
     if len(data) != size:
         raise RuntimeError(f"{partition} 读取长度不一致")
     return data
+
+
+def partition_size(serial, partition):
+    path = f"/dev/disk/by-partlabel/{partition}"
+    return int(adb_command(serial, "shell", "blockdev", "--getsize64", path).decode().strip())
+
+
+def read_partition_header(serial, partition):
+    path = f"/dev/disk/by-partlabel/{partition}"
+    header = adb_command(serial, "exec-out", "dd", f"if={path}", "bs=4096", "count=1", "status=none")
+    if len(header) != 4096:
+        raise ValueError(f"{partition} 镜像头读取不完整")
+    return header
+
+
+def aligned(size, page_size):
+    return (size + page_size - 1) // page_size * page_size
+
+
+def u32(header, offset, byte_order="<"):
+    return struct.unpack_from(f"{byte_order}I", header, offset)[0]
+
+
+def v4_image_lengths(boot, vendor, init, dtbo):
+    # AOSP bootimg.h：boot/init_boot v4 固定 4096 字节页；vendor_boot
+    # v4 的页大小由镜像头给出；DTBO 的 total_size 使用大端序。
+    for name, header in (("boot_a", boot), ("init_boot_a", init)):
+        if header[:8] != b"ANDROID!" or u32(header, 40) != 4 or u32(header, 20) != 1584:
+            raise ValueError(f"{name} 不是受支持的 Android boot v4 镜像")
+    if boot[:8] != b"ANDROID!" or not u32(boot, 8) or not u32(init, 12):
+        raise ValueError("boot_a 内核或 init_boot_a ramdisk 为空")
+    if vendor[:8] != b"VNDRBOOT" or u32(vendor, 8) != 4 or u32(vendor, 2096) != 2128:
+        raise ValueError("vendor_boot_a 不是受支持的 Android vendor_boot v4 镜像")
+    page_size = u32(vendor, 12)
+    if page_size < 4096 or page_size > 65536 or page_size & (page_size - 1):
+        raise ValueError("vendor_boot_a 页大小不受支持")
+    if not u32(vendor, 24) or not u32(vendor, 2100):
+        raise ValueError("vendor_boot_a ramdisk 或 DTB 为空")
+    table_size = u32(vendor, 2112)
+    if table_size != u32(vendor, 2116) * u32(vendor, 2120):
+        raise ValueError("vendor_boot_a ramdisk 表大小不一致")
+    check_dtbo_header(dtbo[:4], "dtbo_a")
+    dtbo_size = u32(dtbo, 4, ">")
+    if dtbo_size < 32 or u32(dtbo, 8, ">") != 32:
+        raise ValueError("dtbo_a 镜像头大小无效")
+    return {
+        "boot_a": 4096 + sum(aligned(u32(boot, offset), 4096) for offset in (8, 12, 1580)),
+        "vendor_boot_a": sum(aligned(size, page_size) for size in (
+            2128, u32(vendor, 24), u32(vendor, 2100), table_size, u32(vendor, 2124))),
+        "init_boot_a": 4096 + sum(aligned(u32(init, offset), 4096) for offset in (8, 12, 1580)),
+        "dtbo_a": dtbo_size,
+    }
+
+
+def check_read_windows(image_lengths, partition_sizes):
+    for name, window in READ_WINDOWS.items():
+        if partition_sizes[name] < window:
+            raise ValueError(f"{name} 分区小于 U-Boot 固定读取窗口")
+        if image_lengths[name] > window:
+            raise ValueError(f"{name} 镜像有效长度超出 U-Boot 固定读取窗口")
 
 
 def parse_getprop(data):
@@ -129,6 +198,8 @@ def profile_from_android(props, bootconfig, cmdline):
     bootdevice = value_from_android(props, bootconfig, cmdline, "bootdevice")
     if not bootdevice and boot_devices.startswith("soc/") and "," not in boot_devices:
         bootdevice = boot_devices.removeprefix("soc/")
+    # 原生 A 槽可能通过 AVB 验证而报告 green；U-Boot 直启未执行 AVB
+    # 验证，交接时必须报告 orange，不能沿用原生启动的验证结论。
     profile = {
         "android_profile_version": "1",
         "android_profile_board": "sheng",
@@ -137,7 +208,7 @@ def profile_from_android(props, bootconfig, cmdline):
         "android_bootdevice": bootdevice,
         "android_fstab_suffix": value_from_android(props, bootconfig, cmdline, "fstab_suffix"),
         "android_dynamic_partitions": value_from_android(props, bootconfig, cmdline, "dynamic_partitions"),
-        "android_verifiedbootstate": value_from_android(props, bootconfig, cmdline, "verifiedbootstate"),
+        "android_verifiedbootstate": "orange",
     }
     return validate_profile(profile)
 
@@ -203,10 +274,18 @@ def install(args):
     check_dtbo_header(dtbo_b[:4], "dtbo_b")
     if dtbo_a != dtbo_b:
         raise RuntimeError("A/B DTBO 内容不同，需人工核对后再安装 ROM 配置")
+    image_lengths = v4_image_lengths(
+        read_partition_header(args.serial, "boot_a"),
+        read_partition_header(args.serial, "vendor_boot_a"),
+        read_partition_header(args.serial, "init_boot_a"), dtbo_a[:4096]
+    )
+    partition_sizes = {name: partition_size(args.serial, name) for name in READ_WINDOWS}
+    check_read_windows(image_lengths, partition_sizes)
     remote_check = (
         "set -eu; "
         "test -b /dev/disk/by-partlabel/linux-boot; "
-        "source=$(findmnt -n -o SOURCE --mountpoint /boot); "
+        "ls /boot >/dev/null; "
+        "source=$(findmnt -n -o SOURCE -t vfat --mountpoint /boot); "
         "test \"$(readlink -f \"$source\")\" = "
         "\"$(readlink -f /dev/disk/by-partlabel/linux-boot)\""
     )
@@ -229,7 +308,7 @@ def install(args):
     expected = hashlib.sha256(Path(args.profile).read_bytes()).hexdigest()
     if digest != expected:
         raise RuntimeError("ESP 配置哈希不一致")
-    print("Android ROM 配置已安装到 linux-boot；原配置保留为 ANDROID.ENV.previous。")
+    print("Android ROM 配置已安装到 linux-boot；如有旧配置，已保留为 ANDROID.ENV.previous。")
 
 
 def prepare_dtbo_b(args):

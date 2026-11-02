@@ -3,6 +3,7 @@
 
 import importlib.util
 from pathlib import Path
+import struct
 import tempfile
 import unittest
 
@@ -58,14 +59,16 @@ class RomConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "android_fstab_suffix"):
             MODULE.profile_from_android(self.props, {}, {})
 
-    def test_wrong_slot_or_locked_state_is_rejected(self):
+    def test_wrong_slot_is_rejected_and_native_green_becomes_unverified_handoff(self):
         self.props["ro.boot.slot_suffix"] = "_b"
         with self.assertRaisesRegex(ValueError, "A 槽"):
             MODULE.profile_from_android(self.props, {}, {})
         self.props["ro.boot.slot_suffix"] = "_a"
         self.props["ro.boot.verifiedbootstate"] = "green"
-        with self.assertRaisesRegex(ValueError, "orange"):
-            MODULE.profile_from_android(self.props, {}, {})
+        self.assertEqual(
+            MODULE.profile_from_android(self.props, {}, {})["android_verifiedbootstate"],
+            "orange",
+        )
 
     def test_shell_metacharacters_and_extra_fields_are_rejected(self):
         self.props["ro.boot.boot_devices"] = "soc/ufs;reset"
@@ -92,6 +95,41 @@ class RomConfigTests(unittest.TestCase):
             MODULE.dtbo_copy_needed(image, b"\0")
         with self.assertRaisesRegex(ValueError, "人工核对"):
             MODULE.dtbo_copy_needed(image, MODULE.DTBO_MAGIC + b"changed")
+
+    def test_v4_image_sizes_fit_windows_even_when_partitions_are_larger(self):
+        boot = bytearray(4096)
+        init = bytearray(4096)
+        vendor = bytearray(4096)
+        dtbo = bytearray(4096)
+        for header in (boot, init):
+            header[:8] = b"ANDROID!"
+            struct.pack_into("<II", header, 20, 1584, 0)
+            struct.pack_into("<I", header, 40, 4)
+        struct.pack_into("<I", boot, 8, 47 * 1024 * 1024)
+        struct.pack_into("<I", init, 12, 2 * 1024 * 1024)
+        vendor[:8] = b"VNDRBOOT"
+        for offset, value in ((8, 4), (12, 4096), (24, 30 * 1024 * 1024),
+                              (2096, 2128), (2100, 4 * 1024 * 1024),
+                              (2112, 108), (2116, 1), (2120, 108), (2124, 128)):
+            struct.pack_into("<I", vendor, offset, value)
+        dtbo[:4] = MODULE.DTBO_MAGIC
+        struct.pack_into(">II", dtbo, 4, 14 * 1024 * 1024, 32)
+        headers = (boot, vendor, init, dtbo)
+        sizes = MODULE.v4_image_lengths(*headers)
+        MODULE.check_read_windows(sizes, {
+            "boot_a": 192 * 1024 * 1024,
+            "vendor_boot_a": 96 * 1024 * 1024,
+            "init_boot_a": 8 * 1024 * 1024,
+            "dtbo_a": 24 * 1024 * 1024,
+        })
+        struct.pack_into("<I", boot, 8, 65 * 1024 * 1024)
+        with self.assertRaisesRegex(ValueError, "boot_a 镜像有效长度"):
+            MODULE.check_read_windows(MODULE.v4_image_lengths(*headers), {
+                name: 192 * 1024 * 1024 for name in MODULE.READ_WINDOWS
+            })
+        struct.pack_into("<I", boot, 40, 3)
+        with self.assertRaisesRegex(ValueError, "boot_a 不是"):
+            MODULE.v4_image_lengths(*headers)
 
 
 if __name__ == "__main__":
