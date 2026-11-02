@@ -72,6 +72,9 @@ Android 更新可能改变启动链、内存布局、ramdisk 或 AVB 行为；�
 
 2026-11-02 在本机原生 Android A 槽完成一次直启往返：Android 桌面可操作，
 ADB 的 `sys.boot_completed=1`、`ro.boot.slot_suffix=_a`，Fastboot 活动槽仍为 B，
-重启后进入 NixOS。该 ROM 的运行时 `ro.boot.verifiedbootstate` 仍报告 `green`；
-U-Boot 本身没有验证 A 槽镜像，因此不能据此将直启路径视为已通过 AVB 验证。
-此状态来源尚待定位，发布给其他 ROM 使用时应列为已知限制。
+重启后进入 NixOS。2026-11-02 的 CI 附件版再次完成同一闭环；重新采集的
+配置与原文件逐字节一致。该 ROM 刚接入 ADB 时报告 `orange`，待
+`sys.boot_completed=1` 后报告 `green`，设备上同时运行着
+`resetprop-rs` 属性修改进程。这支持启动后有用户空间属性改写，但尚未确认
+具体模块。U-Boot 本身没有验证 A 槽镜像，因此不能据最终 `green` 将直启路径
+视为已通过 AVB 验证；其他 ROM 也须单独核对。

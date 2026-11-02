@@ -65,8 +65,9 @@ ESP；U-Boot 在菜单选择后检查配置，并按分区表读取镜像。缺�
 内存上限时拒绝直启。2026-11-02，本机配置版及 CI 附件版均从 B 槽菜单进入
 可操作的 Android 桌面，ADB 报告启动完成；回到 Fastboot 后活动槽仍为 B，
 再经默认菜单进入 NixOS。菜单等待时间现为 15 秒。直启后 Android 最终报告
-`green/locked`，但 U-Boot 没有验证 A 槽镜像，该状态来源尚未定位，不能据此
-宣称 AVB 有效。其他 ROM 尚未实机验证。步骤和边界见
+`green/locked`，但启动早期曾报告 `orange`，且 Android 中有
+`resetprop-rs` 进程；具体改写模块尚未确认。U-Boot 没有验证 A 槽镜像，
+不能据最终属性宣称 AVB 有效。其他 ROM 尚未实机验证。步骤和边界见
 [Android ROM 配置采集](uboot-android-rom-profile_zh.md)。
 
 近期验收顺序：
