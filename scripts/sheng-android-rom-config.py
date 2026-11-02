@@ -255,7 +255,10 @@ def capture(args):
         bootconfig = parse_bootconfig(adb_command(args.serial, "exec-out", "cat", "/proc/bootconfig"))
     except RuntimeError:
         bootconfig = {}
-    cmdline = parse_cmdline(adb_command(args.serial, "exec-out", "cat", "/proc/cmdline"))
+    try:
+        cmdline = parse_cmdline(adb_command(args.serial, "exec-out", "cat", "/proc/cmdline"))
+    except RuntimeError:
+        cmdline = {}
     profile = profile_from_android(props, bootconfig, cmdline)
     output = Path(args.output)
     if output.exists():

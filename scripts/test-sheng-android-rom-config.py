@@ -5,7 +5,9 @@ import importlib.util
 from pathlib import Path
 import struct
 import tempfile
+from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 
 SOURCE = Path(__file__).with_name("sheng-android-rom-config.py")
@@ -48,6 +50,20 @@ class RomConfigTests(unittest.TestCase):
             self.props, {"androidboot.boot_devices": "soc/1d84000.ufshc"}, {}
         )
         self.assertEqual(profile["android_bootdevice"], "1d84000.ufshc")
+
+    def test_capture_uses_properties_when_proc_files_are_unreadable(self):
+        properties = "".join(f"[{key}]: [{value}]\n" for key, value in self.props.items()).encode()
+
+        def adb_result(_serial, *args):
+            if args == ("shell", "getprop"):
+                return properties
+            raise RuntimeError("/proc 访问被 Android 拒绝")
+
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "ANDROID.ENV"
+            with patch.object(MODULE, "adb_command", side_effect=adb_result):
+                MODULE.capture(SimpleNamespace(serial=None, output=output))
+            self.assertEqual(MODULE.read_profile(output)["android_profile_slot"], "_a")
 
     def test_vendor_device_identifies_custom_rom(self):
         self.props["ro.product.device"] = "custom-sheng-rom"
