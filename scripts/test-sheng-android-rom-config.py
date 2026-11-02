@@ -65,6 +65,18 @@ class RomConfigTests(unittest.TestCase):
                 MODULE.capture(SimpleNamespace(serial=None, output=output))
             self.assertEqual(MODULE.read_profile(output)["android_profile_slot"], "_a")
 
+    def test_install_rejects_wrong_nixos_device(self):
+        def adb_result(_serial, *args):
+            return {
+                ("shell", "id", "-u"): b"0\r\n",
+                ("exec-out", "cat", "/etc/os-release"): b"ID=nixos\n",
+                ("exec-out", "cat", "/proc/device-tree/compatible"): b"other,tablet\0qcom,sm8550\0",
+            }[args]
+
+        with patch.object(MODULE, "adb_command", side_effect=adb_result):
+            with self.assertRaisesRegex(RuntimeError, "不是 Xiaomi Pad 6S Pro"):
+                MODULE.require_nixos_root(None)
+
     def test_vendor_device_identifies_custom_rom(self):
         self.props["ro.product.device"] = "custom-sheng-rom"
         self.props["ro.product.vendor.device"] = "sheng"

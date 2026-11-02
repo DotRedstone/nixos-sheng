@@ -57,6 +57,9 @@ def require_nixos_root(serial):
     release = adb_command(serial, "exec-out", "cat", "/etc/os-release").decode("utf-8", "replace")
     if not re.search(r"^ID=nixos$", release, re.MULTILINE):
         raise RuntimeError("请先返回 NixOS")
+    compatible = adb_command(serial, "exec-out", "cat", "/proc/device-tree/compatible")
+    if b"xiaomi,sheng" not in compatible.split(b"\0"):
+        raise RuntimeError("目标设备树不是 Xiaomi Pad 6S Pro (sheng)")
 
 
 def read_partition(serial, partition):
