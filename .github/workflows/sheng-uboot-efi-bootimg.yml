@@ -8,6 +8,7 @@ on:
       - nixos/flake.nix
       - nixos/packages/sheng-uboot-android-bootimg.nix
       - nixos/packages/sheng-uboot.env
+      - nixos/packages/sheng-uboot-android-direct.env
       - nixos/patches/u-boot/**
       - .github/workflows/sheng-uboot-efi-bootimg.yml
   pull_request:
@@ -15,6 +16,7 @@ on:
       - nixos/flake.nix
       - nixos/packages/sheng-uboot-android-bootimg.nix
       - nixos/packages/sheng-uboot.env
+      - nixos/packages/sheng-uboot-android-direct.env
       - nixos/patches/u-boot/**
       - .github/workflows/sheng-uboot-efi-bootimg.yml
   workflow_dispatch:
@@ -39,6 +41,14 @@ jobs:
           file out/sheng-u-boot-experimental-boot_b.img
           sha256sum out/sheng-u-boot-experimental-boot_b.img > out/sheng-u-boot-experimental-boot_b.img.sha256
           printf '%s\n' "$GITHUB_SHA" > out/sheng-u-boot-experimental-boot_b.img.source-revision
+      - name: Build Android A direct-entry test image
+        run: |
+          nix build ./nixos#shengUbootAndroidDirectV4ProbeBootimg \
+            --print-build-logs \
+            --out-link out/sheng-u-boot-android-direct-v4-boot_b.img
+          file out/sheng-u-boot-android-direct-v4-boot_b.img
+          sha256sum out/sheng-u-boot-android-direct-v4-boot_b.img > out/sheng-u-boot-android-direct-v4-boot_b.img.sha256
+          printf '%s\n' "$GITHUB_SHA" > out/sheng-u-boot-android-direct-v4-boot_b.img.source-revision
       - name: Upload experimental boot image
         uses: actions/upload-artifact@v4
         with:
@@ -47,4 +57,13 @@ jobs:
             out/sheng-u-boot-experimental-boot_b.img
             out/sheng-u-boot-experimental-boot_b.img.sha256
             out/sheng-u-boot-experimental-boot_b.img.source-revision
+          if-no-files-found: error
+      - name: Upload Android A direct-entry test image
+        uses: actions/upload-artifact@v4
+        with:
+          name: sheng-u-boot-android-direct-v4-boot_b-experimental
+          path: |
+            out/sheng-u-boot-android-direct-v4-boot_b.img
+            out/sheng-u-boot-android-direct-v4-boot_b.img.sha256
+            out/sheng-u-boot-android-direct-v4-boot_b.img.source-revision
           if-no-files-found: error
