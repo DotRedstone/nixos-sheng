@@ -21,6 +21,8 @@ python3 scripts/sheng-android-rom-config.py capture --output /tmp/sheng-android.
 
 脚本只提取启动所需的非个人参数，并要求 Android 报告设备为 `sheng`、
 槽位为 `_a`。缺少参数或发现危险字符时会拒绝生成。
+部分 ROM 限制 ADB 读取 `/proc/bootconfig` 或 `/proc/cmdline`；脚本会继续
+使用 `getprop` 中的启动属性，所需字段仍缺失时才拒绝生成。
 不要将生成文件提交到 Git。ROM 更新后应重新采集。
 
 返回 B 槽 NixOS，确认它已经启动且电脑 ADB 可用，再安装配置：
@@ -60,6 +62,8 @@ Android 直启入口；U-Boot 菜单中的 NixOS 路径仍可用。
 安装脚本已在写入配置前检查实际镜像长度；U-Boot 交接时再确认 boot header
 属于 v4。当前交接继续使用 ABL 传入的设备树，未采用固定的
 DTB/DTBO 索引。
+菜单默认选择 NixOS，等待 15 秒后自动启动；可用音量键选择 Android A，
+电源键确认。
 
 配置采集解决了启动参数随 ROM 变化的问题，但**尚不构成跨 ROM 实机验收**。
 Android 更新可能改变启动链、内存布局、ramdisk 或 AVB 行为；更新后必须
