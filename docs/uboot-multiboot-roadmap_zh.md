@@ -11,7 +11,7 @@ Android ABL / B 槽
     └── U-Boot UEFI → 统一界面
                      ├── NixOS 世代 → EFI Linux + DTB + initrd → linux rootfs
                      ├── 其他 Linux → 各自的 EFI 内核/引导器 → 独立 rootfs
-                     ├── Android → 待实现的设备专属交接
+                     ├── Android A → 实验性设备专属直启
                      └── Windows on Arm → 待验证的 UEFI/ACPI/驱动栈
 
 音量加 + 电源键 → 设备现有 TWRP；ABL fastboot → 原 boot_b 备份恢复
@@ -23,7 +23,11 @@ Android ABL / B 槽
 
 设备由 Android ABL 选择 A/B 槽。A 槽保留 Android 启动分区，B 槽的稳定路径是 Mobile NixOS；实验 U-Boot 可替换 B 槽的 boot 镜像，读取独立的 `linux-boot` ESP，再通过 systemd-boot 选择 NixOS 世代。当前 7.3.0 候选已通过 B 槽持久启动、普通重启、关机插墙充、断开电源冷启动、音量加加电源键进入 TWRP 及刷回稳定镜像的实机验证。插墙充时不再显示 U-Boot 图标或日志，短暂白屏后进入电池画面；当前仍只有 NixOS EFI 条目。
 
-现用 `sheng-uboot.env` 在正常路径先加载 systemd-boot，U-Boot 自带 `bootmenu` 仅在 EFI 启动失败后提供诊断与恢复命令，因此当前还不是一个覆盖所有系统的顶层界面。U-Boot 的 `bootmenu` 使用 ANSI 终端菜单；若最终界面采用图形方式，应先验证本机 EFI 图形输出与实体键输入，再选择或实现统一的 EFI 前端，而不是仅给诊断菜单增加系统名称。[U-Boot bootmenu 说明](https://docs.u-boot.org/en/stable/usage/cmd/bootmenu.html)
+稳定路径的 `sheng-uboot.env` 先加载 systemd-boot，U-Boot 自带 `bootmenu`
+仅在 EFI 启动失败后提供诊断与恢复命令。本实验分支把 U-Boot `bootmenu`
+置于 NixOS 与 Android 之前，NixOS 世代选择仍由下一层 systemd-boot 处理。
+`bootmenu` 使用 ANSI 终端菜单；一致的图形界面仍需验证本机 EFI 图形输出
+与实体键输入，再选择或实现统一的 EFI 前端。[U-Boot bootmenu 说明](https://docs.u-boot.org/en/stable/usage/cmd/bootmenu.html)
 
 Android A 槽有 v4 格式的 `boot_a`、`vendor_boot_a`、`init_boot_a`，以及 `dtbo_a` 和 `vbmeta_a`。2026-10-26 从 B 槽经 ABL fastboot 切至 A 槽后，ADB 报告 Android 16、`_a` 槽、`sys.boot_completed=1`，图形服务运行；随后从 Android ADB 返回 ABL fastboot、切回 B 槽，重新进入非 EFI 的 NixOS 7.3.0。B 槽完整哈希与测试前备份一致，A 槽关键启动分区也与私有备份一致；未刷写 A 槽、`linux` 或 `userdata`。本次证明槽位切换可用，不证明 Android 能从 B 槽 U-Boot 菜单直接启动。
 
@@ -38,7 +42,7 @@ Android A 槽有 v4 格式的 `boot_a`、`vendor_boot_a`、`init_boot_a`，以�
 | Debian 13 | 官方 arm64 最小用户态的独立 ext4 rootfs 已以 PID 1 运行，随后返回 NixOS | 验证完整服务、交互、设备支持及长期安装 |
 | 更多 Linux 发行版 | 尚未实机启动；不能把另一个 NixOS 世代算作独立系统 | 使用单独 rootfs 与适配 Sheng 的内核/DTB/initrd 完成可回退启动 |
 | Android A 槽 | Android 16 启动完成，ADB 回到 fastboot 后已切回 B 槽 NixOS | 验证 Android 更新后的槽位状态与返回路径 |
-| Android 统一菜单入口 | U-Boot 菜单已直启本机 Android A 槽并完成 ADB 验证；该次测试使用本机固定参数 | 实测 ROM 配置采集版，并在其他 ROM 上验证启动、返回与更新 |
+| Android 统一菜单入口 | ROM 配置采集版已从 B 槽 U-Boot 直启本机 Android A，并返回 NixOS | 在其他 ROM 上验证采集、启动、返回与更新；定位 AVB 状态报告不一致 |
 | Windows on Arm | 未评估这台设备的 Windows 启动与驱动 | 先审计 UEFI 服务、ACPI 表、启动存储和 Arm64 驱动，再考虑 Windows PE 启动探针 |
 | 原版 iOS / iPadOS | 不列为 Sheng 可交付系统 | Apple 的启动信任链和系统设计依赖 Apple 硬件；不以菜单图标暗示支持 |
 
@@ -54,18 +58,22 @@ Android A 槽有 v4 格式的 `boot_a`、`vendor_boot_a`、`init_boot_a`，以�
 
 再将 ABL 动态参数与 `vendor_boot_a` 的 DTB 6、`dtbo_a` 覆盖层 47 组合，由可复现的 Nix RAM 镜像启动，阶段仍到 `booti_go` 后返回 NixOS。`rawdump` 有一份旧 TWRP panic；重跑探针前后其前 1 MiB 哈希相同，不能用作本轮故障日志。B 槽 `vendor_boot_b` 的 v4 头部与 A 槽一致，但将 U-Boot 临时封装成 v4 `boot.img` 后，`fastboot boot` 返回成功而设备停在 ABL fastboot，未到 U-Boot 阶段。ABL UEFI 日志报告 `kernel image does not have appended DTB` 和 `Device Tree blob not found`；直接附加 DTB 6、先补齐 U-Boot ARM64 Image 声明的 `image_size` 再附加，两项对照仍得到同样错误。设备随后重启回 B 槽 NixOS，`boot_b` 整分区哈希仍与备份一致。v4 镜像格式与 ABL 的 DTB 定位规则需要单独分析，不能把 fastboot 的 `Booting OKAY` 视为 U-Boot 已执行。
 
-B 槽 `vendor_boot_b` 与 A 槽完整镜像哈希一致，而原 `dtbo_b` 全为零。备份两处分区后，临时将 A 槽 DTBO 写入 `dtbo_b`，并将 U-Boot 封装为 v4 镜像写入 `boot_b`；该组合已正常启动 NixOS。早期直接交接 Android 的探针到达 `booti_go` 后，ABL 耗尽 B 槽重试并自动切到 A 槽；Android ADB 随后出现只证明原生 A 槽启动。`rawdump` 记录了逐项修复的 Android 第一阶段故障：重复 `androidboot.hardware` 导致 bootconfig 解析失败；去掉重复项后缺少启动设备参数，找不到 `/dev/block/by-name/super`；补齐启动设备后，AVB 状态缺失导致 `/system` 挂载失败。当前探针沿用 ABL 交给 U-Boot 的设备树及 `/hypervisor`，并补入本机的启动设备、分区和验证状态参数。一次自动直启测试中，屏幕进入 Android；随后 Fastboot 报告当前槽仍为 B，未发生此前的 A 槽回退。双系统 U-Boot 菜单已分别进入 NixOS 与可操作的 Android 桌面；菜单直启 Android 后 Fastboot 再次报告 B 槽，排除了 A 槽回退。原厂 `vendor_boot_a` 的 bootconfig 已含 USB 控制器参数；重复传入的对照镜像由 `rawdump` 确认出现 bootconfig 重定义错误，已撤销。U-Boot 的 ARM64 跳转清理不会停止 ACM gadget；在 Android 交接前从所有控制台移除 `usbacm` 后，Android ADB 成功枚举并报告 `sys.boot_completed=1`，远程进入 Fastboot 后活动槽位仍为 B。当前 `boot_b` 为 5 秒菜单、默认 NixOS；重启后 NixOS ADB 正常，分区前缀哈希与构建镜像一致。其他 Android 设备功能、OTA 与长期稳定性仍待核验。`dtbo_b` 和硬编码启动参数均属临时测试配置，不能作为公开刷机包。
+B 槽 `vendor_boot_b` 与 A 槽完整镜像哈希一致，而原 `dtbo_b` 全为零。备份两处分区后，临时将 A 槽 DTBO 写入 `dtbo_b`，并将 U-Boot 封装为 v4 镜像写入 `boot_b`；该组合已正常启动 NixOS。早期直接交接 Android 的探针到达 `booti_go` 后，ABL 耗尽 B 槽重试并自动切到 A 槽；Android ADB 随后出现只证明原生 A 槽启动。`rawdump` 记录了逐项修复的 Android 第一阶段故障：重复 `androidboot.hardware` 导致 bootconfig 解析失败；去掉重复项后缺少启动设备参数，找不到 `/dev/block/by-name/super`；补齐启动设备后，AVB 状态缺失导致 `/system` 挂载失败。当前探针沿用 ABL 交给 U-Boot 的设备树及 `/hypervisor`，并补入本机的启动设备、分区和验证状态参数。一次自动直启测试中，屏幕进入 Android；随后 Fastboot 报告当前槽仍为 B，未发生此前的 A 槽回退。双系统 U-Boot 菜单已分别进入 NixOS 与可操作的 Android 桌面；菜单直启 Android 后 Fastboot 再次报告 B 槽，排除了 A 槽回退。原厂 `vendor_boot_a` 的 bootconfig 已含 USB 控制器参数；重复传入的对照镜像由 `rawdump` 确认出现 bootconfig 重定义错误，已撤销。U-Boot 的 ARM64 跳转清理不会停止 ACM gadget；在 Android 交接前从所有控制台移除 `usbacm` 后，Android ADB 成功枚举并报告 `sys.boot_completed=1`，远程进入 Fastboot 后活动槽位仍为 B。该轮 `boot_b` 为 5 秒菜单、默认 NixOS；重启后 NixOS ADB 正常，分区前缀哈希与构建镜像一致。其他 Android 设备功能、OTA 与长期稳定性仍待核验。`dtbo_b` 和硬编码启动参数均属临时测试配置，不能作为公开刷机包。
 
 本实验分支已将 ROM 相关启动参数改为从实际运行的 Android A 槽采集，再安装到
 ESP；U-Boot 在菜单选择后检查配置，并按分区表读取镜像。缺配置或超出已验证
-内存上限时拒绝直启。此项仍待本机及其他 ROM 实测，步骤见
+内存上限时拒绝直启。2026-11-02，本机配置版及 CI 附件版均从 B 槽菜单进入
+可操作的 Android 桌面，ADB 报告启动完成；回到 Fastboot 后活动槽仍为 B，
+再经默认菜单进入 NixOS。菜单等待时间现为 15 秒。直启后 Android 最终报告
+`green/locked`，但 U-Boot 没有验证 A 槽镜像，该状态来源尚未定位，不能据此
+宣称 AVB 有效。其他 ROM 尚未实机验证。步骤和边界见
 [Android ROM 配置采集](uboot-android-rom-profile_zh.md)。
 
 近期验收顺序：
 
-1. 从显示交接修复构建内核和匹配模块，建立可回退的持久无白闪基线，并目视复测。
-2. 为 RAM 探针取得早期内核或固件日志，并比较原生 A 槽与 B 槽 U-Boot 的交接状态；确认复位点后再修改装载路径。
-3. Android 直接进入桌面且下次仍回统一菜单后，再加入正式菜单项；最后回归 NixOS、充电和 TWRP 路径。
+1. 保持已验收的 NixOS 无白闪内核与匹配模块，复测冷启动、离线充电、TWRP 和备份回退。
+2. 定位 Android 直启后 `green/locked` 的来源，确保不把未验证的 A 槽报告成已通过 AVB。
+3. 在其他 ROM 上重复配置采集、A 槽直启、ADB、B 槽保持与返回 NixOS 的闭环，再决定公开刷机包范围。
 
 ### 其他 Linux 与 Windows on Arm
 
@@ -90,7 +98,7 @@ Windows on Arm 对固件的要求超出“能运行一个 EFI 程序”：需检
 1. 维持当前 NixOS EFI 启动、离线充电、冷启动、TWRP 与 `boot_b` 回退路径；定位充电和 EFI 交接时的短暂白屏。
 2. 定义统一界面的条目清单和启动适配器边界，实机验证 U-Boot 的图形输出、实体键输入及失败返回；选择或实现一个 EFI 前端。界面仅列已验证条目。
 3. 在已完成 Alpine 和 Debian 独立 rootfs 短时启动后，继续验证完整服务、设备支持、更新、断电冷启动及回退，形成可长期使用的跨发行版条目。
-4. 保持 B 槽稳定镜像和主机备份可用，在已验证 A 槽 Android 启动与手动返回后，单独开发可从统一界面选择的 Android 交接。
+4. 保持 B 槽稳定镜像和主机备份可用，继续验证 Android 直启的 AVB 状态、ROM 更新和跨 ROM 兼容性。
 5. 对 Windows on Arm 先做固件/ACPI/驱动差距审计和可回退的 Windows PE 探针，再决定是否有完整安装条件。
 
 每一步分别记录：源码预期、构建结果、设备画面、进入的系统、失败时的实际恢复路径。新系统通过这些检查后才成为默认可见菜单项；任何阶段都不刷 `userdata`。
