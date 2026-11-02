@@ -31,7 +31,8 @@ python3 scripts/sheng-android-rom-config.py capture --output /tmp/sheng-android.
 python3 scripts/sheng-android-rom-config.py install --profile /tmp/sheng-android.env
 ```
 
-安装程序要求 root ADB、`/boot` 已挂载到 `linux-boot`，还会只读检查
+安装程序要求 root ADB、设备树标识为 `xiaomi,sheng`、`/boot` 已挂载到
+`linux-boot`，还会只读检查
 `dtbo_a` 和 `dtbo_b` 是否有有效 Android DTBO 头且内容一致。现有
 [双系统安装指南](install-dualboot_zh.md)会清空 `dtbo_b`；如果 B 槽仍为空，
 先在 NixOS 下显式运行：
