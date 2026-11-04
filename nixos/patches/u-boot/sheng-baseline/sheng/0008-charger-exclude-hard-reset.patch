@@ -1,0 +1,40 @@
+From: DotRedstone <noreply@github.com>
+Subject: [PATCH] sheng: exclude warm resets from charger boot
+
+ABL can report HARD_RESET and USB_CHG together (0x800011) after a
+fastboot/adb reboot while USB remains connected. That combination is a
+normal boot request, not charger insertion. Keep it out of the early
+U-Boot charger bypass and do not pass it to the EFI Type #1 stage-1
+charger detector. Honour an explicit force-normal request as well.
+
+--- a/arch/arm/mach-snapdragon/board.c
++++ b/arch/arm/mach-snapdragon/board.c
+@@ -428,7 +428,7 @@
+ 	if (end == value || *end)
+ 		return false;
+ 
+-	/* Match stage-1: USB_CHG may coexist with other non-key PON bits. */
+-	return (reason & BIT(4)) && !(reason & BIT(7));
++	/* ABL treats HARD_RESET as a normal fastboot/adb reboot. */
++	return (reason & BIT(4)) && !(reason & (BIT(0) | BIT(7)));
+ }
+ 
+@@ -480,6 +480,8 @@
+ 	cmdline = get_cmdline();
+ 	if (!cmdline)
+ 		return;
++	if (sheng_cmdline_has(cmdline, "androidboot.force_normal_boot=1"))
++		return;
+ 
+ 	for (i = 0; i < ARRAY_SIZE(keys); i++) {
+ 		start = cmdline;
+@@ -497,6 +499,9 @@
+ 			continue;
+ 		memcpy(value, start, len);
+ 		value[len] = '\0';
++		/* Type #1 drops ABL bootargs; do not reintroduce a warm reset as charger. */
++		if (i == 0 && (simple_strtoull(value, NULL, 0) & BIT(0)))
++			return;
+ 		if (i == 1 && strcmp(value, "charger"))
+ 			continue;
+ 		snprintf(data, sizeof(data), "%s%s", keys[i], value);

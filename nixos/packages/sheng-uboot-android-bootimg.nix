@@ -54,6 +54,7 @@ let
     ] ++ lib.optionals androidDirectProbe [
       ../patches/u-boot/sheng-baseline/sheng/0006-charger-bypass-direct-menu.patch
       ../patches/u-boot/sheng-baseline/sheng/0007-abl-boot-reason-embedded-dt.patch
+      ../patches/u-boot/sheng-baseline/sheng/0008-charger-exclude-hard-reset.patch
     ];
     filesToInstall = if androidDirectProbe then [
       "u-boot.bin"
