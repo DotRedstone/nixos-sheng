@@ -51,8 +51,10 @@ let
       ../patches/u-boot/sheng-baseline/sheng/0003-sheng-abl-framebuffer.patch
       ../patches/u-boot/sheng-baseline/sheng/0004-efi-abl-boot-reason.patch
       ../patches/u-boot/sheng-baseline/sheng/0005-charger-hide-efi-menu.patch
-    ] ++ lib.optional androidDirectProbe
-      ../patches/u-boot/sheng-baseline/sheng/0006-charger-bypass-direct-menu.patch;
+    ] ++ lib.optionals androidDirectProbe [
+      ../patches/u-boot/sheng-baseline/sheng/0006-charger-bypass-direct-menu.patch
+      ../patches/u-boot/sheng-baseline/sheng/0007-abl-boot-reason-embedded-dt.patch
+    ];
     filesToInstall = if androidDirectProbe then [
       "u-boot.bin"
       "u-boot-nodtb.bin"

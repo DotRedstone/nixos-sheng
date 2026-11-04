@@ -1,0 +1,36 @@
+From: DotRedstone <noreply@github.com>
+Subject: [PATCH] sheng: read ABL boot reason with embedded control DT
+
+The direct Android v4 image uses CONFIG_OF_EMBED. Its control DT does not
+contain ABL's /chosen/bootargs, so both the direct-menu charger bypass and
+the EFI boot-reason variable miss real charger insertions. Read the saved
+previous-bootloader DT for Sheng in this configuration. Apply the same USB
+and power-key PON bit test as the Mobile NixOS stage-1 charger detector.
+
+--- a/arch/arm/mach-snapdragon/board.c
++++ b/arch/arm/mach-snapdragon/board.c
+@@ -358,0 +359,19 @@
++	/* The direct Android image embeds U-Boot's DT. ABL bootargs live in
++	 * the separate previous-bootloader DT, not in the control DT.
++	 */
++	if (IS_ENABLED(CONFIG_OF_EMBED) &&
++	    of_machine_is_compatible("xiaomi,sheng")) {
++		const void *abl_fdt = (void *)get_prev_bl_fdt_addr();
++		int chosen;
++
++		if (abl_fdt && !fdt_check_header(abl_fdt)) {
++			chosen = fdt_path_offset(abl_fdt, "/chosen");
++			if (chosen >= 0) {
++				cmdline = fdt_getprop(abl_fdt, chosen,
++						      "bootargs", NULL);
++				if (cmdline)
++					return cmdline;
++			}
++		}
++	}
++
+@@ -412,2 +431,2 @@
+-	/* Other PON sources may represent a normal reboot while USB is present. */
+-	return (reason & 0xff) == BIT(4);
++	/* Match stage-1: USB_CHG may coexist with other non-key PON bits. */
++	return (reason & BIT(4)) && !(reason & BIT(7));
