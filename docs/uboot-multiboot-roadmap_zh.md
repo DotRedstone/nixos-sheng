@@ -12,6 +12,7 @@ Android ABL / B 槽
                      ├── NixOS 世代 → EFI Linux + DTB + initrd → linux rootfs
                      ├── 其他 Linux → 各自的 EFI 内核/引导器 → 独立 rootfs
                      ├── Android A → 实验性设备专属直启
+                     ├── UniXNU → 待验证的 BootShim / Mu-Silicium 交接 → DarwinBoot → XNU
                      └── Windows on Arm → 待验证的 UEFI/ACPI/驱动栈
 
 音量加 + 电源键 → 设备现有 TWRP；ABL fastboot → 原 boot_b 备份恢复
@@ -44,7 +45,7 @@ Android A 槽有 v4 格式的 `boot_a`、`vendor_boot_a`、`init_boot_a`，以�
 | Android A 槽 | Android 16 启动完成，ADB 回到 fastboot 后已切回 B 槽 NixOS | 验证 Android 更新后的槽位状态与返回路径 |
 | Android 统一菜单入口 | ROM 配置采集版已从 B 槽 U-Boot 直启本机 Android A，并返回 NixOS | 在其他 ROM 上验证采集、启动、返回与更新；定位 AVB 状态报告不一致 |
 | Windows on Arm | 未评估这台设备的 Windows 启动与驱动 | 先审计 UEFI 服务、ACPI 表、启动存储和 Arm64 驱动，再考虑 Windows PE 启动探针 |
-| 原版 iOS / iPadOS | 不列为 Sheng 可交付系统 | Apple 的启动信任链和系统设计依赖 Apple 硬件；不以菜单图标暗示支持 |
+| UniXNU 的 iPadOS 移植 | 上游已有 Sheng 设备移植；本仓库尚未接入或实机验证 | 先验证不写分区的引导交接，再解决与 Android/NixOS 共存的根存储布局 |
 
 ### Android：槽位入口与直接入口
 
@@ -92,7 +93,25 @@ Windows on Arm 对固件的要求超出“能运行一个 EFI 程序”：需检
 
 ### iOS / iPadOS
 
-原版 iOS / iPadOS 的启动链以 Apple SoC 的 Boot ROM 为硬件信任根，并逐级验证 Apple 签名组件；它不是可直接放进这台 Qualcomm 平板 ESP 的通用 EFI 系统。项目不把“在 Sheng 上安装原版 iOS/iPadOS”列为可交付能力，也不在菜单中展示虚假的可启动项。若研究相似的交互体验，应明确使用其他合法可移植系统的名称。[Apple 平台启动安全说明](https://support.apple.com/guide/security/boot-process-for-ipad-and-iphone-devices-secb3000f149/web)、[Apple iOS/iPadOS 软件许可](https://www.apple.com/legal/sla/docs/iOS26_iPadOS26.pdf)
+[UniXNU](https://github.com/UniXNU/UniXNU) 维护了 [Sheng 设备移植](https://github.com/UniXNU/UniXNU-sheng)。
+这条路径使用经过移植的 XNU 与 iPadOS 用户空间，不等同于把 Apple 原版镜像
+直接作为通用 EFI 程序启动。[上游启动说明](https://unixnu.com/guide/boot)
+记录的链路是 ABL 加载 Android boot image，随后 BootShim 启动 Mu-Silicium
+固件，UniXNU 菜单经 DarwinBoot 装载 XNU；设备固件还提供图形、输入、
+文件系统和块设备协议。[固件集成要求](https://unixnu.com/porting/uefi-firmware)
+列出了这些服务。现有 U-Boot 可以作为外层统一菜单的候选入口，但替换
+Mu-Silicium、UniXNU 和 DarwinBoot 需要另做驱动与加载协议移植，尚无验证。
+
+先只读核对 UniXNU 镜像格式、内存地址、FDT/initrd 交接及恢复路径，再考虑
+一次性 RAM 启动探针；通过探针前不新增可见菜单项。根存储是另一项独立工作：
+[上游默认流程](https://unixnu.com/guide/boot)会把根镜像刷入 `userdata`，
+[实验性分区工具](https://unixnu.com/porting/dual-system-partition)
+则要求 `userdata` 是最后一个已占用分区。本机实际为 `userdata` 后接
+`linux` 与 `linux-boot`，不满足该工具前提。直接刷上游根镜像会覆盖 Android
+数据；若要保留三系统，必须先设计单独根分区或等价的存储适配，验证空间、
+GPT、Android 数据及 NixOS 回退。Apple 的平台启动与授权边界仍需按
+[平台安全说明](https://support.apple.com/guide/security/boot-process-for-ipad-and-iphone-devices-secb3000f149/web)
+和[软件许可](https://www.apple.com/legal/sla/docs/iOS26_iPadOS26.pdf)单独核对。
 
 ## 开发与验收顺序
 
@@ -101,5 +120,6 @@ Windows on Arm 对固件的要求超出“能运行一个 EFI 程序”：需检
 3. 在已完成 Alpine 和 Debian 独立 rootfs 短时启动后，继续验证完整服务、设备支持、更新、断电冷启动及回退，形成可长期使用的跨发行版条目。
 4. 保持 B 槽稳定镜像和主机备份可用，继续验证 Android 直启的 AVB 状态、ROM 更新和跨 ROM 兼容性。
 5. 对 Windows on Arm 先做固件/ACPI/驱动差距审计和可回退的 Windows PE 探针，再决定是否有完整安装条件。
+6. Android 直启稳定后，核对 UniXNU 的 BootShim 交接与独立根存储方案；先做不写分区的 RAM 探针，再决定三系统安装。
 
-每一步分别记录：源码预期、构建结果、设备画面、进入的系统、失败时的实际恢复路径。新系统通过这些检查后才成为默认可见菜单项；任何阶段都不刷 `userdata`。
+每一步分别记录：源码预期、构建结果、设备画面、进入的系统、失败时的实际恢复路径。新系统通过这些检查后才成为默认可见菜单项；当前 U-Boot 实验不刷 `userdata`，将来的三系统存储变更须另行评估和验收。
