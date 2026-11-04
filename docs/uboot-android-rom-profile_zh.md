@@ -82,3 +82,14 @@ ADB 的 `sys.boot_completed=1`、`ro.boot.slot_suffix=_a`，Fastboot 活动槽�
 `resetprop-rs` 属性修改进程。这支持启动后有用户空间属性改写，但尚未确认
 具体模块。U-Boot 本身没有验证 A 槽镜像，因此不能据最终 `green` 将直启路径
 视为已通过 AVB 验证；其他 ROM 也须单独核对。
+
+2026-11-04 的 `boot_b` 测试版在本机完成三条启动路径验收：关机后插墙充直接
+进入电池充电界面；连接电脑时从 Fastboot 重启默认进入 NixOS；拔线后按电源
+冷启动依次出现 U-Boot 双系统菜单、NixOS 世代菜单并进入桌面。此前同一功能
+分支的静默版经菜单直启 Android A，桌面可操作，且开机动画前不再显示探针日志。
+ABL 在 USB 连接的硬复位中可同时报告 `HARD_RESET` 与 `USB_CHG`
+（实测 `bootinfo.pureason=0x800011`）；U-Boot 将这类复位排除在离线充电之外，
+也不向 EFI stage-1 传递充电原因。该处理与
+[ABL 的充电启动判定](https://gitlab.com/Codeaurora/abl_tianocore_edk2/-/blob/797918c3bf59e2d65b4acb2acdfd6883a0605ee1/QcomModulePkg/Library/BootLib/UpdateCmdLine.c)
+一致。本次只刷写 `boot_b`；未改动 `linux`、A 槽或 `userdata`。最终镜像的
+Android A 直启尚未在同一轮重新目视验收。

@@ -22,8 +22,8 @@ offers NixOS generations through systemd-boot. A 7.3.0 candidate matched to
 the current rootfs has passed persistent boot, warm reboot, disconnected cold
 boot, powered-off charger insertion into the battery UI, Volume Up + Power into
 TWRP, and restoration of the original B-slot image with a full partition hash
-check. The current candidate no longer shows the U-Boot logo, but briefly
-flashes white before the battery UI. A scoped Linux display clock fix removed
+check. The latest charger test reached the battery UI without showing U-Boot or
+EFI menus. A scoped Linux display clock fix removed
 the EFI handoff flash in repeated device runs; release validation remains.
 U-Boot directly booted the installed Android A image; ADB reported
 `sys.boot_completed=1` and Fastboot still reported slot B. Alpine and Debian

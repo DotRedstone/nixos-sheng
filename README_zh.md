@@ -16,7 +16,7 @@ Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的 Mobile NixOS 移植项目�
 实验性 U-Boot 已能从 B 槽读取独立的 `linux-boot` ESP，经 systemd-boot 选择 NixOS 世代。
 与现用 rootfs 配对的 7.3.0 候选已在实机完成持久启动、普通重启、断开电源冷启动、
 关机插墙充进入电池画面、音量加加电源键进入 TWRP，以及刷回原 B 槽镜像并核对完整分区哈希。
-关机充电仍会短暂白闪；显示时钟修复候选在多次 EFI 正常启动实测中未见白闪，
+最新关机充电测试未出现 U-Boot 或 EFI 菜单，直接进入电池界面；显示时钟修复候选在多次 EFI 正常启动实测中未见白闪，
 完整发布验收尚未完成。U-Boot 已直接加载现有 Android A 镜像；ADB 报告 `sys.boot_completed=1`，Fastboot 仍显示活动槽位 B。Alpine 与 Debian 仅通过短时 EFI PID 1 探针。
 当前成果是开发验证，不是可刷写的 U-Boot release。实现与证据见
 [U-Boot / EFI 实验记录](docs/uboot-efi-experiment_zh.md)，后续多系统范围见
