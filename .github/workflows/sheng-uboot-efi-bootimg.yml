@@ -28,7 +28,8 @@ on:
 jobs:
   build-efi-boot-image:
     name: Build experimental U-Boot boot_b image
-    runs-on: ubuntu-24.04-arm
+    # 固定使用已通过 boot_b 实机验证的 x86_64 交叉构建路径。
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
