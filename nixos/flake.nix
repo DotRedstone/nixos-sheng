@@ -344,6 +344,11 @@
         shengUbootStorageRecoveryBootimg =
           mobileUbootRecoveryEval.outputs.recovery.mobile.outputs.android.android-bootimg;
         shengInstallerBootimg = self.packages.${system}.shengUbootStorageRecoveryBootimg;
+        shengInstallerFit = pkgs.callPackage ./packages/sheng-installer-fit.nix {
+          inherit (mobileUbootRecoveryEval.outputs.recovery.boot) kernelParams;
+          kernel = mobileUbootRecoveryEval.outputs.recovery.system.build.kernel;
+          initrd = mobileUbootRecoveryEval.outputs.recovery.mobile.outputs.initrd;
+        };
         # Compatibility alias for older workflow names. This is the Mobile NixOS
         # generated rootfs, not a separate hand-built filesystem.
         fullRootfsImage = mobileEval.outputs.generatedFilesystems.rootfs;
