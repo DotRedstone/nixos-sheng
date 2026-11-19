@@ -78,6 +78,8 @@ ESP；U-Boot 在菜单选择后检查配置，并按分区表读取镜像。缺�
 
 ### 其他 Linux 与 Windows on Arm
 
+已有 `linux` 和 `linux-boot` 的设备可用 [RAM 安装器](sheng-installer_zh.md)预览目标分区及校验 NixOS 安装包。安装模式在 RAM 环境下更新 rootfs 和 EFI，实机写入与启动仍待验收。
+
 其他 Linux 可复用统一界面的 EFI 入口，但每个系统需要自己的适配 Sheng 的内核、DTB、initrd、模块和固件，规划独立或明确共享的根文件系统，并验证更新及回退。`linux-boot` ESP 目前只承担 EFI 引导载荷；不得把 Android `userdata`、`super` 或固件分区改作 Linux 存储。
 
 社区适配使用[Linux EFI 条目约定](community-linux-efi-entry_zh.md)和只读预检器准备临时条目；长期安装仍须逐发行版验证。
