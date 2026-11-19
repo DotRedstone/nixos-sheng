@@ -343,6 +343,7 @@
         # testing, not a rootfs or a release artifact.
         shengUbootStorageRecoveryBootimg =
           mobileUbootRecoveryEval.outputs.recovery.mobile.outputs.android.android-bootimg;
+        shengInstallerBootimg = self.packages.${system}.shengUbootStorageRecoveryBootimg;
         # Compatibility alias for older workflow names. This is the Mobile NixOS
         # generated rootfs, not a separate hand-built filesystem.
         fullRootfsImage = mobileEval.outputs.generatedFilesystems.rootfs;
@@ -367,6 +368,14 @@
       checks.x86_64-linux.shengUbootFastbootProbeBootimg = ubootFastbootProbeFor "x86_64-linux";
       checks.x86_64-linux.shengUbootRawFastbootProbeBootimg = ubootRawFastbootProbeFor "x86_64-linux";
       checks.x86_64-linux.shengUbootUpstreamFastbootProbeBootimg = ubootUpstreamFastbootProbeFor "x86_64-linux";
+      checks.x86_64-linux.shengStorageInstallerHost =
+        let hostPkgs = import nixpkgs { system = "x86_64-linux"; };
+        in hostPkgs.runCommand "sheng-storage-installer-check" {
+          nativeBuildInputs = with hostPkgs; [ python3 e2fsprogs dosfstools mtools ];
+        } ''
+          python3 ${../scripts}/test-sheng-installer.py
+          touch "$out"
+        '';
 
       checks.${system} = {
         shengUbootEfiPreflight = pkgs.sheng-uboot-efi-preflight;

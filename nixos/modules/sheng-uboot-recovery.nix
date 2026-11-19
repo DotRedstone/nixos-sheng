@@ -18,6 +18,8 @@ let
       end
 
       def run()
+        # 主机安装器以此区分专用 RAM 环境与普通 NixOS 的 ADB。
+        File.write("/run/sheng-storage-installer-v1", "sheng\n")
         $logger.info("Sheng RAM recovery is ready over ADB; SwitchRoot is intentionally blocked.")
         loop { sleep(3600) }
       end
