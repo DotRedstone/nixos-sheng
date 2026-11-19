@@ -1,7 +1,7 @@
 # Sheng RAM 安装器（实验性）
 
 适用于已解锁、已有 `linux` 和 `linux-boot` 的 Xiaomi Pad 6S Pro 12.4（`sheng`）。
-安装器沿用 RAM 恢复环境，可由 ABL Fastboot 临时启动。电脑通过 ADB 传输文件，平板端无需进入 TWRP。
+安装器沿用 Mobile NixOS 的 stage-1 RAM 恢复环境。电脑通过 ADB 传输文件，平板端无需进入 TWRP。
 `plan` 只读。缺少目标分区时会列出未分配空间并停止。本版的写入目标是已有的两个 Linux 分区，
 分区表、Android A 槽、`userdata`、`super` 与设备校准分区均受保护。
 
@@ -26,7 +26,27 @@ sha256sum rootfs.img esp/manifest.sha256 > SHA256SUMS
 python3 scripts/sheng-installer.py plan ./bundle --adb-serial ADB_SERIAL
 ```
 
-从已连接的 ABL Fastboot 开始安装：
+### 从 U-Boot 菜单进入 RAM 环境（实验）
+
+在 ARM64 构建器上运行 `nix build ./nixos#shengInstallerFit`，得到
+`result/sheng-installer.itb`。FIT 包含内核、设备树和 RAM 恢复环境。
+需使用 Sheng U-Boot 仓库的 `installerBootImage` 实验镜像。选择
+**Start RAM installer over USB** 后，用电脑上的 Fastboot 发送文件：
+
+```sh
+fastboot devices
+fastboot stage sheng-installer.itb
+fastboot continue
+```
+
+发送前确认列表只有目标设备。启动成功后，Fastboot 断开，恢复环境重新枚举为 ADB。
+这一步无需 `linux-boot`，也无需预先安装 NixOS。后续的 `plan` 和 `install`
+仍按现有规则检查目标分区。该入口已完成 U-Boot 构建和沙盒 FIT 校验，平板 USB 和 ADB
+交接仍待实机验收。
+
+### 从 ABL Fastboot 进入 RAM 环境（实验）
+
+从已连接的 ABL Fastboot 启动 Android 格式的恢复镜像并执行安装：
 
 ```sh
 python3 scripts/sheng-installer.py install ./bundle \
