@@ -4,6 +4,8 @@
 安装器沿用 Mobile NixOS 的 stage-1 RAM 恢复环境。电脑通过 ADB 传输文件，平板端无需进入 TWRP。
 `plan` 只读。缺少目标分区时会列出未分配空间并停止。本版的写入目标是已有的两个 Linux 分区，
 分区表、Android A 槽、`userdata`、`super` 与设备校准分区均受保护。
+设备已有未分配空间时，可先按 [Sheng U-Boot](https://github.com/DotRedstone/sheng-u-boot)
+仓库的 `docs/usb-install_zh.md`，通过 U-Boot 的 USB 串口执行 `sheng_gpt` 创建目标分区。
 
 ## 准备同一构建的文件
 
