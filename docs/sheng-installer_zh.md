@@ -9,9 +9,10 @@
 
 ## 准备同一构建的文件
 
-用 ARM64 构建器从同一 revision 构建 `shengInstallerBootimg`、`mobileRootfsImage`（或 GNOME 版本）
-与 `shengUbootEfiEsp`。把安装器 boot 镜像单独保存，并将原始 ext4 `rootfs.img` 与 `esp/`
-文件树放入同一目录。在该目录生成 `SHA256SUMS`，或使用发行产物提供的清单：
+用 ARM64 构建器从同一提交构建 `mobileRootfsImage`（或 GNOME 版本）和
+`shengUbootEfiEsp`。U-Boot 菜单使用 `shengInstallerFit`，ABL Fastboot 临时启动使用
+`shengInstallerBootimg`。单独保存选用的启动镜像，将原始 ext4 `rootfs.img` 与
+`esp/` 文件树放入同一目录，并生成 `SHA256SUMS`。
 
 ```sh
 sha256sum rootfs.img esp/manifest.sha256 > SHA256SUMS
@@ -42,6 +43,8 @@ fastboot continue
 ```
 
 发送前确认列表只有目标设备。启动成功后，Fastboot 断开，恢复环境重新枚举为 ADB。
+用 `adb -s ADB_SERIAL exec-out cat /run/sheng-storage-installer-v1` 检查安装器是否就绪。
+看到 `sheng` 后再运行预检。将 `ADB_SERIAL` 替换为 `adb devices` 显示的序列号。
 这一步无需 `linux-boot`，也无需预先安装 NixOS。后续的 `plan` 和 `install`
 仍按现有规则检查目标分区。该入口已完成 U-Boot 构建和沙盒 FIT 校验，平板 USB 和 ADB
 交接仍待实机验收。
@@ -60,6 +63,8 @@ python3 scripts/sheng-installer.py install ./bundle \
 `--replace-linux`。安装器要求在电脑终端输入包含目标 PARTUUID 的确认文本。原 ESP 先备份到电脑，
 新 EFI 文件合入副本并读回校验，现有 Android 配置和其他 EFI 条目保留。随后先写入并校验 rootfs，
 再写入并校验 ESP。发生中断后，重新进入 RAM 安装器检查两分区，保留电脑上的备份。
+看到 **NixOS 与 EFI 载荷写入校验完成** 后，运行 `adb -s ADB_SERIAL reboot`。
+若平板没有响应重启请求，可以在写入校验完成后长按电源键重启。
 
 本版 U-Boot 的安装和启用仍按已适配的 [B 槽流程](uboot-efi-experiment_zh.md) 单独执行。ESP 备份
 只恢复 EFI 文件与配置，原 Linux 文件需从独立备份恢复。对其他发行版的扩展沿用
