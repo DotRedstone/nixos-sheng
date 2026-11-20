@@ -215,6 +215,7 @@
         includeDefaultUser ? false,
         includeHomeManager ? false,
         stage2Only ? false,
+        liveImage ? false,
       }:
         let vars = import ./vars.nix; in
         import "${mobile-nixos}/lib/eval-with-configuration.nix" {
@@ -223,7 +224,8 @@
         configuration = [
           {
             _module.args = {
-              inherit vars stage2Only;
+              inherit vars stage2Only liveImage;
+              rootPartition = if liveImage then "linux-live" else "linux";
               mobileNixosSource = mobile-nixos;
             };
           }
@@ -267,6 +269,11 @@
       mobileUbootRecoveryEval = mobileEvalFor {
         extraModules = [ ./modules/sheng-uboot-recovery.nix ];
       };
+      mobileLiveEval = mobileEvalFor {
+        desktop = "gnome";
+        liveImage = true;
+        extraModules = [ ./profiles/sheng-live.nix ];
+      };
     in
     {
       # Reuse the exact Mobile NixOS evaluations used by the flashable images.
@@ -292,6 +299,7 @@
         sheng = mobileGnomeEval;
         sheng-stage2 = mobileStage2Eval;
         sheng-minimal = mobileEval;
+        sheng-live = mobileLiveEval;
       };
 
       homeConfigurations = let vars = import ./vars.nix; in {
@@ -339,6 +347,7 @@
         mobileFastbootImages = mobileEval.outputs.android.android-fastboot-images;
         mobileRootfsImage = mobileEval.outputs.generatedFilesystems.rootfs;
         mobileRootfsImageGnome = mobileGnomeEval.outputs.generatedFilesystems.rootfs;
+        shengLiveImage = mobileLiveEval.outputs.generatedFilesystems.rootfs;
         # RAM-only storage recovery. It is an Android boot image for boot_b
         # testing, not a rootfs or a release artifact.
         shengUbootStorageRecoveryBootimg =
