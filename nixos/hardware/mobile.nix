@@ -151,7 +151,10 @@ in
       cp ${config.system.build.shengLiveEfi}/* ./boot/sheng-live/
     '';
 
-    additionalCommands = ''
+    additionalCommands = lib.optionalString liveImage ''
+      # The image is flashed to UFS, whose logical sectors are 4 KiB.
+      truncate -s %4096 "$img"
+    '' + ''
       echo ":: Adding hydra-build-products"
       (PS4=" $ "; set -x
       mkdir -p $out_path/nix-support
