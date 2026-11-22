@@ -4,10 +4,10 @@
 # Scope: System
 # ---
 
-{ pkgs, ... }:
+{ pkgs, rootPartition ? "linux", ... }:
 
 let
-  rootDevice = "/dev/disk/by-partlabel/linux";
+  rootDevice = "/dev/disk/by-partlabel/${rootPartition}";
 
   tuneRootfs = pkgs.writeShellScript "sheng-tune-rootfs" ''
     set -eu

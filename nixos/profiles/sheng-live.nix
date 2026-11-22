@@ -15,13 +15,15 @@
   users.users.live = {
     isNormalUser = true;
     description = "Sheng Live";
-    extraGroups = [ "wheel" "networkmanager" ];
+    extraGroups = [ "wheel" "networkmanager" "audio" "video" "input" "render" ];
     # The local session must remain usable after GNOME locks the screen.
     initialHashedPassword = "";
   };
   security.sudo.wheelNeedsPassword = false;
   environment.systemPackages = with pkgs; [
+    curl
     gnome-console
+    iw
     nautilus
   ];
 

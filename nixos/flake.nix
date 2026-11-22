@@ -399,6 +399,21 @@
           touch "$out"
         '';
 
+        shengLiveConfig = pkgs.runCommand "sheng-live-config-check" {} ''
+          test ${if builtins.elem "root=PARTLABEL=linux-live" mobileLiveEval.config.boot.kernelParams then "1" else "0"} = 1
+          test ${if builtins.elem "video" mobileLiveEval.config.users.users.live.extraGroups then "1" else "0"} = 1
+          test ${if builtins.elem "rfkill" mobileLiveEval.config.boot.kernelModules then "1" else "0"} = 1
+          ${pkgs.gnugrep}/bin/grep -Fq '/dev/disk/by-partlabel/linux-live' \
+            ${mobileLiveEval.config.systemd.services.sheng-rootfs-tune.serviceConfig.ExecStart}
+          if ${pkgs.gnugrep}/bin/grep -Eq '/dev/disk/by-partlabel/linux([^a-zA-Z0-9_-]|$)' \
+            ${mobileLiveEval.config.systemd.services.sheng-rootfs-tune.serviceConfig.ExecStart}; then
+            echo 'Live rootfs tune script must target linux-live, not linux' >&2
+            exit 1
+          fi
+          touch "$out"
+        '';
+        shengLiveSystem = mobileLiveEval.config.system.build.toplevel;
+
         shengUbootEfiPreflight = pkgs.sheng-uboot-efi-preflight;
         shengUbootEfiShengDtsPreflight = pkgs.sheng-uboot-efi-sheng-dts-preflight;
         shengUbootAndroidBootimg = pkgs.sheng-uboot-android-bootimg;
