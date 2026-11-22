@@ -167,6 +167,8 @@ in
     after = [ "adsprpcd.service" ];
     before = [ "adsprpcd-sensorspd.service" ];
     path = [ pkgs.zstd pkgs.coreutils pkgs.findutils ];
+    # [Firmware Override]
+    environment.PD_MAPPER_FIRMWARE_DIR = "/run/pd-mapper-firmware";
     serviceConfig = {
       Type = "exec";
       ExecStartPre = pkgs.writeShellScript "pd-mapper-prep" ''
