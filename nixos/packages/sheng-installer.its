@@ -1,0 +1,50 @@
+/dts-v1/;
+
+/ {
+	description = "Xiaomi Pad 6S Pro RAM installer";
+	#address-cells = <1>;
+
+	images {
+		kernel {
+			description = "Sheng Linux Image";
+			data = /incbin/("Image");
+			type = "kernel";
+			arch = "arm64";
+			os = "linux";
+			compression = "none";
+			load = <0xa8000000>;
+			entry = <0xa8000000>;
+			hash-1 { algo = "sha256"; };
+		};
+
+		ramdisk {
+			description = "Mobile NixOS storage recovery initramfs";
+			data = /incbin/("initrd");
+			type = "ramdisk";
+			arch = "arm64";
+			os = "linux";
+			compression = "none";
+			hash-1 { algo = "sha256"; };
+		};
+
+		fdt {
+			description = "Xiaomi Pad 6S Pro device tree";
+			data = /incbin/("sheng.dtb");
+			type = "flat_dt";
+			arch = "arm64";
+			compression = "none";
+			hash-1 { algo = "sha256"; };
+		};
+	};
+
+	configurations {
+		default = "conf-sheng-installer";
+		conf-sheng-installer {
+			description = "USB RAM installer for sheng";
+			compatible = "xiaomi,sheng-installer-v1";
+			kernel = "kernel";
+			ramdisk = "ramdisk";
+			fdt = "fdt";
+		};
+	};
+};

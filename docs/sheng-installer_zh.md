@@ -1,0 +1,79 @@
+# Sheng RAM 安装器（实验性）
+
+适用于已解锁、已有 `linux` 和 `linux-boot` 的 Xiaomi Pad 6S Pro 12.4（`sheng`）。
+安装器沿用 Mobile NixOS 的 stage-1 RAM 恢复环境。电脑通过 ADB 传输文件，平板端无需进入 TWRP。
+`plan` 只读。缺少目标分区时会列出未分配空间并停止。本版的写入目标是已有的两个 Linux 分区，
+分区表、Android A 槽、`userdata`、`super` 与设备校准分区均受保护。
+设备已有未分配空间时，可先按 [Sheng U-Boot](https://github.com/DotRedstone/sheng-u-boot)
+仓库的 `docs/usb-install_zh.md`，通过 U-Boot 的 USB 串口执行 `sheng_gpt` 创建目标分区。
+
+## 准备同一构建的文件
+
+用 ARM64 构建器从同一提交构建 `mobileRootfsImage`（或 GNOME 版本）和
+`shengUbootEfiEsp`。U-Boot 菜单使用 `shengInstallerFit`，ABL Fastboot 临时启动使用
+`shengInstallerBootimg`。单独保存选用的启动镜像，将原始 ext4 `rootfs.img` 与
+`esp/` 文件树放入同一目录（注意：`rootfs.img` 与 `esp/` 必须复制为普通文件，而不是指向 `nix build` `result/` 的符号链接），并生成 `SHA256SUMS`。
+
+```sh
+sha256sum rootfs.img esp/manifest.sha256 > SHA256SUMS
+```
+
+电脑需要 Python 3.11+、ADB、Fastboot、`debugfs`、`dosfstools` 和 `mtools`。
+安装器检查清单、ARM64 EFI 文件、DTB 和 rootfs 中的 NixOS 内核闭包。安装包从可信来源获取。
+
+## 预览与安装
+
+替换命令中的设备序列号。`plan` 可在当前 NixOS 或 RAM 恢复环境运行：
+
+```sh
+python3 scripts/sheng-installer.py plan ./bundle --adb-serial ADB_SERIAL
+```
+
+### 从 U-Boot 菜单进入 RAM 环境（实验）
+
+在 ARM64 构建器上运行 `nix build ./nixos#shengInstallerFit`，得到
+`result/sheng-installer.itb`。FIT 包含内核、设备树和 RAM 恢复环境。
+需使用 Sheng U-Boot 仓库的 `installerBootImage` 实验镜像。选择
+**Start RAM installer over USB** 后，用电脑上的 Fastboot 发送文件：
+
+```sh
+fastboot devices
+fastboot stage sheng-installer.itb
+fastboot continue
+```
+
+发送前确认列表只有目标设备。启动成功后，Fastboot 断开，恢复环境重新枚举为 ADB。
+用 `adb -s ADB_SERIAL exec-out cat /run/sheng-storage-installer-v1` 检查安装器是否就绪。
+看到 `sheng` 后再运行预检。将 `ADB_SERIAL` 替换为 `adb devices` 显示的序列号。
+这一步无需 `linux-boot`，也无需预先安装 NixOS。后续的 `plan` 和 `install`
+仍按现有规则检查目标分区。该入口已完成 U-Boot 构建和沙盒 FIT 校验，平板 USB 和 ADB
+交接仍待实机验收。
+
+### 从 ABL Fastboot 进入 RAM 环境（实验）
+
+从已连接的 ABL Fastboot 启动 Android 格式的恢复镜像并执行安装（注意：Mobile NixOS stage-1 恢复 gadget 默认将其 ADB 序列号设为 `0123456789`，在恢复环境枚举前即可通过 `--adb-serial 0123456789` 指定）：
+
+```sh
+python3 scripts/sheng-installer.py install ./bundle \
+  --adb-serial ADB_SERIAL --fastboot-serial FASTBOOT_SERIAL \
+  --recovery-image ./sheng-installer.img --backup-dir ./sheng-install-backup
+```
+
+已进入专用 RAM 环境时可省去两个 Fastboot 参数。已有 ext4 根分区时先另行备份 Linux 数据，再加
+`--replace-linux`。安装器要求在电脑终端输入包含目标 PARTUUID 的确认文本。原 ESP 先备份到电脑，
+新 EFI 文件合入副本并读回校验，现有 Android 配置和其他 EFI 条目保留。随后先写入并校验 rootfs，
+再写入并校验 ESP。发生中断后，重新进入 RAM 安装器检查两分区，保留电脑上的备份。
+看到 **NixOS 与 EFI 载荷写入校验完成** 后，运行 `adb -s ADB_SERIAL reboot`。
+若平板没有响应重启请求，可以在写入校验完成后长按电源键重启。
+
+本版 U-Boot 的安装和启用仍按已适配的 [B 槽流程](uboot-efi-experiment_zh.md) 单独执行。ESP 备份
+只恢复 EFI 文件与配置，原 Linux 文件需从独立备份恢复。对其他发行版的扩展沿用
+[社区 Linux EFI 条目约定](community-linux-efi-entry_zh.md)。
+
+## 验证范围
+
+```sh
+nix build ./nixos#checks.x86_64-linux.shengStorageInstallerHost
+```
+
+主机检查覆盖目标布局、挂载保护、安装包校验以及 FAT 镜像内现有 Android 配置和其他条目的保留，在 `x86_64-linux` 与 `aarch64-linux` 上均可执行。`Build Sheng U-Boot Storage Recovery` 工作流同时构建 ABL 引导镜像与 `sheng-installer.itb` 并运行主机检查。实机还需完成新 RAM 镜像临时启动、写入与读回校验、U-Boot 启动 NixOS 和中断后恢复。

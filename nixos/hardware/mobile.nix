@@ -4,9 +4,12 @@
 # Scope: System
 # ---
 
-{ config, lib, pkgs, stage2Only ? false, ... }:
+{ config, lib, pkgs, liveImage ? false, rootPartition, stage2Only ? false, ... }:
 
 let
+  rootFilesystemUUID =
+    if liveImage then "8fe20c31-5c24-4cef-a8eb-fbdcd6c98ffa"
+    else "ee8d3593-59b1-480e-a3b6-4fefb17ee7d8";
   headlessStage1Source = pkgs.writeText "sheng-headless-stage1.rb" (
     (builtins.readFile ../patches/stage-1-headless-no-gui.rb)
     + "\n"
@@ -74,12 +77,12 @@ in
   mobile.enable = true;
 
   mobile.generatedFilesystems.rootfs = lib.mkForce {
-    name = "nixos-sheng-rootfs";
+    name = if liveImage then "sheng-live" else "nixos-sheng-rootfs";
     filesystem = "ext4";
-    label = "linux";
-    ext4.partitionID = "ee8d3593-59b1-480e-a3b6-4fefb17ee7d8";
-    location = "/rootfs.img";
-    extraPadding = 1024 * 1024 * 1024;
+    label = rootPartition;
+    ext4.partitionID = rootFilesystemUUID;
+    location = if liveImage then "/sheng-live.img" else "/rootfs.img";
+    extraPadding = (if liveImage then 256 else 1024) * 1024 * 1024;
 
     # Mobile NixOS defaults to Android's legacy make_ext4fs. Use current
     # e2fsprogs so new images carry checksums for directories, inodes, block
@@ -93,8 +96,8 @@ in
           -m 0 \
           -O metadata_csum,64bit,dir_index,extent,flex_bg,huge_file,extra_isize,dir_nlink \
           -E lazy_itable_init=0,lazy_journal_init=0 \
-          -L linux \
-          -U ee8d3593-59b1-480e-a3b6-4fefb17ee7d8 \
+          -L ${lib.escapeShellArg rootPartition} \
+          -U ${lib.escapeShellArg rootFilesystemUUID} \
           -d . \
           "$img"
     '';
@@ -143,9 +146,15 @@ in
       else
         echo "WARNING: sheng kernel modules tree has no lib/modules directory"
       fi
+    '' + lib.optionalString liveImage ''
+      mkdir -p ./boot/sheng-live
+      cp ${config.system.build.shengLiveEfi}/* ./boot/sheng-live/
     '';
 
-    additionalCommands = ''
+    additionalCommands = lib.optionalString liveImage ''
+      # The image is flashed to UFS, whose logical sectors are 4 KiB.
+      truncate -s %4096 "$img"
+    '' + ''
       echo ":: Adding hydra-build-products"
       (PS4=" $ "; set -x
       mkdir -p $out_path/nix-support
@@ -157,7 +166,7 @@ in
   };
 
   fileSystems."/" = lib.mkForce {
-    device = "/dev/disk/by-partlabel/linux";
+    device = "/dev/disk/by-partlabel/${rootPartition}";
     fsType = "ext4";
     neededForBoot = true;
     autoResize = true;

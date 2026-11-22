@@ -42,26 +42,39 @@
 
   boot.kernelModules = [
     "qrtr"
+    # CONFIG_RFKILL=m；wpa_supplicant.service 强依赖 BindPaths=/dev/rfkill，需在 sysinit 阶段先创建节点。
+    "rfkill"
   ];
 
   # WCN7850 occasionally exposes only 2.4 GHz after its first firmware boot.
-  # Prevent PCI modalias autoload so the service below can complete the known
-  # good two-pass initialization before NetworkManager starts scanning.
+  # 保留两阶段探测。udev 暂时阻止 NetworkManager 管理第一轮网卡，桌面可并行启动。
   boot.blacklistedKernelModules = [ "ath12k_wifi7" ];
+  services.udev.extraRules = ''
+    ACTION=="add|change|move", SUBSYSTEM=="net", DRIVERS=="ath12k_wifi7_pci", TEST!="/run/sheng-wifi/ready", ENV{NM_UNMANAGED}!="1|true", ENV{NM_UNMANAGED}="1", ENV{SHENG_WIFI_PROBE}="1"
+    ACTION=="change", SUBSYSTEM=="net", DRIVERS=="ath12k_wifi7_pci", IMPORT{db}="SHENG_WIFI_PROBE", ENV{SHENG_WIFI_PROBE}=="1", TEST=="/run/sheng-wifi/ready", ENV{NM_UNMANAGED}="", ENV{SHENG_WIFI_PROBE}=""
+  '';
 
   systemd.services.sheng-wifi-modules = {
     description = "Load sheng Wi-Fi PCIe/MHI/ath12k modules";
     wantedBy = [ "multi-user.target" ];
     after = [ "systemd-modules-load.service" ];
-    before = [
-      "NetworkManager.service"
-      "wpa_supplicant.service"
-    ];
     serviceConfig = {
-      Type = "oneshot";
+      Type = "exec";
       RemainAfterExit = true;
+      RuntimeDirectory = "sheng-wifi";
+      RuntimeDirectoryPreserve = "yes";
     };
     script = ''
+      rm -f /run/sheng-wifi/ready
+      release_wifi() {
+        touch /run/sheng-wifi/ready
+        for interface in /sys/class/net/wlan0 /sys/class/net/wlp1s0; do
+          if [ -e "$interface" ]; then
+            ${pkgs.systemd}/bin/udevadm trigger --action=change "$interface" || true
+          fi
+        done
+      }
+      trap release_wifi EXIT
       for module in pwrseq_qcom_wcn mhi mhi_pci_generic qrtr_mhi mhi_wwan_ctrl mhi_wwan_mbim mhi_net cfg80211; do
         ${pkgs.kmod}/bin/modprobe "$module" || true
       done
@@ -81,6 +94,8 @@
       ${pkgs.kmod}/bin/modprobe -r ath12k_wifi7 || true
       ${pkgs.kmod}/bin/modprobe -r ath12k || true
       sleep 1
+      release_wifi
+      trap - EXIT
       ${pkgs.kmod}/bin/modprobe ath12k_wifi7
 
       for attempt in $(seq 1 15); do

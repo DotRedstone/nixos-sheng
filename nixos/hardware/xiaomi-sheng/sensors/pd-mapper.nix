@@ -1,6 +1,6 @@
 # ---
 # Module: PD Mapper Sensor
-# Description: Power Delivery mapper configuration
+# Description: Qualcomm Protection Domain mapper package
 # Scope: Host
 # ---
 
@@ -18,10 +18,7 @@ stdenv.mkDerivation rec {
   nativeBuildInputs = [ pkg-config ];
   buildInputs = [ qrtr xz ];
 
-  postPatch = ''
-    substituteInPlace pd-mapper.c \
-      --replace-fail "/lib/firmware/" "/run/pd-mapper-firmware/"
-  '';
+  patches = [ ../../../patches/pd-mapper/0001-firmware-directory-override.patch ];
 
   makeFlags = [ "prefix=$(out)" "servicedir=$(out)/lib/systemd/system" "CC=${stdenv.cc.targetPrefix}cc" ];
 

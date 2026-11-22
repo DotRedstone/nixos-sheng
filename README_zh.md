@@ -22,6 +22,9 @@ Xiaomi Pad 6S Pro 12.4 (`sheng`, Qualcomm SM8550) 的 Mobile NixOS 移植项目�
 [U-Boot / EFI 实验记录](docs/uboot-efi-experiment_zh.md)，后续多系统范围见
 [路线图](docs/uboot-multiboot-roadmap_zh.md)。
 
+图形 Live 构建使用独立的 `linux-live` 分区。参见
+[Sheng Live 构建与启动](docs/sheng-live_zh.md)。
+
 如果这个项目帮到了你，或者你只是想看到 NixOS 在移动设备上变得更真实，
 欢迎给仓库点一个 star。它能帮助更多 sheng 用户找到这个移植项目，也能让深夜
 调试 boot image 的人稍微感受到一点人间温度。

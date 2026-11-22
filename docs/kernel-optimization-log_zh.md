@@ -380,6 +380,32 @@ charger_pd
 - SoundWire TX 报 `dout-ports (0) mismatch with controller (1)`：SM8550 DTS 明确描述 0 个 TX-side DOUT，硬件寄存器报告 1。直接改为 1 会让端口数与现有四组配置数组不一致。录音链路正常，先保留并继续跟踪上游。
 - `Kernel image misaligned at boot`：Android boot 参数当前使用传统 `offset_kernel = 0x8000`。直接改为 2 MiB 对齐可能与 ramdisk 布局重叠或触发 bootloader 兼容问题，必须通过单独的临时启动镜像验证，不能在稳定 boot 上试错。
 
+## 2026-11-19 重启与桌面启动延迟
+
+EFI 路径最近三次进入图形目标耗时 55–57 秒，包含 U-Boot 和 systemd-boot 倒计时。
+`sheng-wifi-modules` 每次约耗时 17 秒，期间 `ath12k` 在第一轮 WLAN 关闭时出现 QMI
+超时。显示管理器经 `network.target` 等待该服务。另一次重启在关机阶段等待
+`iio-sensor-proxy` 退出，90 秒后由 systemd 强制结束。
+
+`pd-mapper` 也因读取内核固件目录中的压缩映射而反复退出。修复后的服务显式读取
+`/run/pd-mapper-firmware` 解压目录，传感器代理的停止超时设为 5 秒。Wi-Fi 保留
+两轮探测，NetworkManager 等第二轮接口就绪后再管理板载 Wi-Fi，桌面可以并行启动；
+同时提前加载 `rfkill` 避免 `wpa_supplicant.service` 因 `BindPaths=/dev/rfkill`
+竞态失败，并保留 `/run/sheng-wifi` 运行时目录、在重跑前清理旧标记，避免异常退出后
+网卡被长期标为 unmanaged。
+
+本次适合通过 [`sheng-stage2` 重建](nixos-rebuild_zh.md)部署。使用以下命令在实机比较
+图形目标、关机和传感器稳定性，并验证 Wi-Fi 能扫描、连接 2.4 GHz 和 5 GHz：
+
+```sh
+systemd-analyze time
+systemd-analyze critical-chain graphical.target
+systemctl show pd-mapper iio-sensor-proxy wpa_supplicant -p Id -p ActiveState -p NRestarts
+journalctl -b -1 -u iio-sensor-proxy --no-pager -o short-monotonic
+nmcli -f DEVICE,TYPE,STATE device status
+nmcli -t -f FREQ device wifi list --rescan yes
+```
+
 ## 刷入后的对比清单
 
 刷入新 boot、rebuild 新 rootfs 后，保持相近电量、充电状态和室温，至少进行三次冷启动：

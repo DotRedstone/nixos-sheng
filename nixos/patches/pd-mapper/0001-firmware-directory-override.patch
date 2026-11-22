@@ -1,0 +1,25 @@
+--- a/pd-mapper.c
++++ b/pd-mapper.c
+@@ -215,8 +215,21 @@ static DIR *opendir_firmware(char *firmware_path, char *out_path_opened, size_t out_path_size)
+ {
+ 	int ret = 0, n;
+ 	DIR *fw_dir = NULL;
+-	int fw_param_path = open(FIRMWARE_PARAM_PATH, O_RDONLY);
++	int fw_param_path;
+ 	char fw_sysfs_path[PATH_MAX];
++	char *override = getenv("PD_MAPPER_FIRMWARE_DIR");
++
++	if (override && *override) {
++		ret = concat_path(override, firmware_path, out_path_opened, out_path_size);
++		if (ret)
++			return NULL;
++		fw_dir = opendir(out_path_opened);
++		if (!fw_dir)
++			warn("Cannot open firmware path: %s", out_path_opened);
++		return fw_dir;
++	}
++
++	fw_param_path = open(FIRMWARE_PARAM_PATH, O_RDONLY);
+ 
+ 	if (fw_param_path < 0) {
+ 		warn("Cannot open sysfs path: %s", FIRMWARE_PARAM_PATH);

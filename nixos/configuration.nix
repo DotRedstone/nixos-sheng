@@ -4,7 +4,7 @@
 # Scope: System
 # ---
 
-{ config, pkgs, lib, ... }:
+{ config, pkgs, lib, rootPartition, ... }:
 
 {
   imports = [
@@ -378,7 +378,7 @@
 
   boot.kernelParams = [
     "console=ttyMSM0,115200n8"
-    "root=PARTLABEL=linux"
+    "root=PARTLABEL=${rootPartition}"
     "rootwait"
     "logo.nologo"
     "loglevel=4"

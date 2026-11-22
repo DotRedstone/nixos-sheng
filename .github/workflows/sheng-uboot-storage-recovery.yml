@@ -1,27 +1,75 @@
 # ---
 # Module: Sheng U-Boot Storage Recovery Build
-# Description: Builds the RAM-only storage recovery image on native AArch64 CI.
+# Description: Builds both the ABL recovery boot image and U-Boot RAM installer FIT plus host tests.
 # Scope: CI
 # ---
 
 name: Build Sheng U-Boot Storage Recovery
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - exp/uboot-efi
+  pull_request:
     paths:
       - .github/workflows/sheng-uboot-storage-recovery.yml
       - nixos/flake.nix
+      - nixos/configuration.nix
+      - nixos/hardware/**
       - nixos/modules/sheng-uboot-recovery.nix
+      - nixos/packages/sheng-installer-fit.nix
+      - nixos/packages/sheng-installer.its
+      - scripts/sheng-installer.py
+      - scripts/test-sheng-installer.py
+      - scripts/sheng-check-linux-efi-entry.py
+  push:
+    branches:
+      - exp/uboot-efi
+      - codex/release-uboot-dualboot-preview
+      - codex/feat-sheng-installer
+    paths:
+      - .github/workflows/sheng-uboot-storage-recovery.yml
+      - nixos/flake.nix
+      - nixos/configuration.nix
+      - nixos/hardware/**
+      - nixos/modules/sheng-uboot-recovery.nix
+      - nixos/packages/sheng-installer-fit.nix
+      - nixos/packages/sheng-installer.its
+      - scripts/sheng-installer.py
+      - scripts/test-sheng-installer.py
+      - scripts/sheng-check-linux-efi-entry.py
 
 permissions:
   contents: read
 
 jobs:
+  host-check:
+    name: Host checks
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Enable Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v13
+
+      - name: Run host check
+        run: |
+          set -euo pipefail
+          nix --extra-experimental-features "nix-command flakes" \
+            build ./nixos#checks.x86_64-linux.shengStorageInstallerHost \
+            --no-link
+
   build:
-    name: Build RAM-only recovery image
+    name: Build RAM-only recovery image and installer FIT
     runs-on: ubuntu-24.04-arm
 
     steps:
@@ -37,23 +85,31 @@ jobs:
       - name: Enable Nix cache
         uses: DeterminateSystems/magic-nix-cache-action@v13
 
-      - name: Build RAM-only recovery image
+      - name: Build RAM-only recovery image and installer FIT
         run: |
           set -euo pipefail
           nix --extra-experimental-features "nix-command flakes" \
-            build ./nixos#shengUbootStorageRecoveryBootimg \
+            build ./nixos#shengInstallerBootimg \
             --out-link out/sheng-u-boot-storage-recovery
-          test -f out/sheng-u-boot-storage-recovery
+          nix --extra-experimental-features "nix-command flakes" \
+            build ./nixos#shengInstallerFit \
+            --out-link out/sheng-installer-fit
+          test -s out/sheng-u-boot-storage-recovery
+          test -s out/sheng-installer-fit/sheng-installer.itb
+          stat -Lc '%s' out/sheng-installer-fit/sheng-installer.itb
+          test "$(stat -Lc '%s' out/sheng-installer-fit/sheng-installer.itb)" -le 117440512
+          cp out/sheng-installer-fit/sheng-installer.itb out/sheng-installer.itb
           (
             cd out
-            sha256sum sheng-u-boot-storage-recovery > sha256sums.txt
+            sha256sum sheng-u-boot-storage-recovery sheng-installer.itb > sha256sums.txt
           )
 
-      - name: Upload recovery image
+      - name: Upload recovery image and installer FIT
         uses: actions/upload-artifact@v7
         with:
           name: sheng-u-boot-storage-recovery
           path: |
             out/sheng-u-boot-storage-recovery
+            out/sheng-installer.itb
             out/sha256sums.txt
           retention-days: 14

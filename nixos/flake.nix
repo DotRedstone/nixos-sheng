@@ -215,6 +215,7 @@
         includeDefaultUser ? false,
         includeHomeManager ? false,
         stage2Only ? false,
+        liveImage ? false,
       }:
         let vars = import ./vars.nix; in
         import "${mobile-nixos}/lib/eval-with-configuration.nix" {
@@ -223,7 +224,8 @@
         configuration = [
           {
             _module.args = {
-              inherit vars stage2Only;
+              inherit vars stage2Only liveImage;
+              rootPartition = if liveImage then "linux-live" else "linux";
               mobileNixosSource = mobile-nixos;
             };
           }
@@ -267,6 +269,11 @@
       mobileUbootRecoveryEval = mobileEvalFor {
         extraModules = [ ./modules/sheng-uboot-recovery.nix ];
       };
+      mobileLiveEval = mobileEvalFor {
+        desktop = "gnome";
+        liveImage = true;
+        extraModules = [ ./profiles/sheng-live.nix ];
+      };
     in
     {
       # Reuse the exact Mobile NixOS evaluations used by the flashable images.
@@ -292,6 +299,7 @@
         sheng = mobileGnomeEval;
         sheng-stage2 = mobileStage2Eval;
         sheng-minimal = mobileEval;
+        sheng-live = mobileLiveEval;
       };
 
       homeConfigurations = let vars = import ./vars.nix; in {
@@ -339,10 +347,17 @@
         mobileFastbootImages = mobileEval.outputs.android.android-fastboot-images;
         mobileRootfsImage = mobileEval.outputs.generatedFilesystems.rootfs;
         mobileRootfsImageGnome = mobileGnomeEval.outputs.generatedFilesystems.rootfs;
+        shengLiveImage = mobileLiveEval.outputs.generatedFilesystems.rootfs;
         # RAM-only storage recovery. It is an Android boot image for boot_b
         # testing, not a rootfs or a release artifact.
         shengUbootStorageRecoveryBootimg =
           mobileUbootRecoveryEval.outputs.recovery.mobile.outputs.android.android-bootimg;
+        shengInstallerBootimg = self.packages.${system}.shengUbootStorageRecoveryBootimg;
+        shengInstallerFit = pkgs.callPackage ./packages/sheng-installer-fit.nix {
+          inherit (mobileUbootRecoveryEval.outputs.recovery.boot) kernelParams;
+          kernel = mobileUbootRecoveryEval.outputs.recovery.system.build.kernel;
+          initrd = mobileUbootRecoveryEval.outputs.recovery.mobile.outputs.initrd;
+        };
         # Compatibility alias for older workflow names. This is the Mobile NixOS
         # generated rootfs, not a separate hand-built filesystem.
         fullRootfsImage = mobileEval.outputs.generatedFilesystems.rootfs;
@@ -367,8 +382,38 @@
       checks.x86_64-linux.shengUbootFastbootProbeBootimg = ubootFastbootProbeFor "x86_64-linux";
       checks.x86_64-linux.shengUbootRawFastbootProbeBootimg = ubootRawFastbootProbeFor "x86_64-linux";
       checks.x86_64-linux.shengUbootUpstreamFastbootProbeBootimg = ubootUpstreamFastbootProbeFor "x86_64-linux";
+      checks.x86_64-linux.shengStorageInstallerHost =
+        let hostPkgs = import nixpkgs { system = "x86_64-linux"; };
+        in hostPkgs.runCommand "sheng-storage-installer-check" {
+          nativeBuildInputs = with hostPkgs; [ python3 e2fsprogs dosfstools mtools ];
+        } ''
+          python3 ${../scripts}/test-sheng-installer.py
+          touch "$out"
+        '';
 
       checks.${system} = {
+        shengStorageInstallerHost = pkgs.runCommand "sheng-storage-installer-check" {
+          nativeBuildInputs = with pkgs; [ python3 e2fsprogs dosfstools mtools ];
+        } ''
+          python3 ${../scripts}/test-sheng-installer.py
+          touch "$out"
+        '';
+
+        shengLiveConfig = pkgs.runCommand "sheng-live-config-check" {} ''
+          test ${if builtins.elem "root=PARTLABEL=linux-live" mobileLiveEval.config.boot.kernelParams then "1" else "0"} = 1
+          test ${if builtins.elem "video" mobileLiveEval.config.users.users.live.extraGroups then "1" else "0"} = 1
+          test ${if builtins.elem "rfkill" mobileLiveEval.config.boot.kernelModules then "1" else "0"} = 1
+          ${pkgs.gnugrep}/bin/grep -Fq '/dev/disk/by-partlabel/linux-live' \
+            ${mobileLiveEval.config.systemd.services.sheng-rootfs-tune.serviceConfig.ExecStart}
+          if ${pkgs.gnugrep}/bin/grep -Eq '/dev/disk/by-partlabel/linux([^a-zA-Z0-9_-]|$)' \
+            ${mobileLiveEval.config.systemd.services.sheng-rootfs-tune.serviceConfig.ExecStart}; then
+            echo 'Live rootfs tune script must target linux-live, not linux' >&2
+            exit 1
+          fi
+          touch "$out"
+        '';
+        shengLiveSystem = mobileLiveEval.config.system.build.toplevel;
+
         shengUbootEfiPreflight = pkgs.sheng-uboot-efi-preflight;
         shengUbootEfiShengDtsPreflight = pkgs.sheng-uboot-efi-sheng-dts-preflight;
         shengUbootAndroidBootimg = pkgs.sheng-uboot-android-bootimg;
