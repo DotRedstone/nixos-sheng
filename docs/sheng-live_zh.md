@@ -2,7 +2,7 @@
 
 Sheng Live 从独立的 `linux-live` 分区启动到 GNOME。内核、设备树、
 initramfs、设备固件和 NixOS 系统都在同一张 ext4 镜像内。桌面使用
-`live` 用户自动登录，提供触屏键盘、GNOME Console、文件管理器和
+`live` 用户自动登录，提供 GNOME 原生触屏键盘、GNOME Console、文件管理器和
 NetworkManager。网络配置、下载和 Nix 构建结果保存在该分区。
 
 ## 构建
@@ -13,8 +13,12 @@ NetworkManager。网络配置、下载和 Nix 构建结果保存在该分区。
 nix build ./nixos#packages.aarch64-linux.shengLiveImage -o out/sheng-live
 stat -Lc '%s bytes' out/sheng-live/sheng-live.img
 zstd -T0 -6 -o out/sheng-live.img.zst out/sheng-live/sheng-live.img
-sha256sum out/sheng-live.img.zst > out/sheng-live.img.zst.sha256
+(cd out && sha256sum sheng-live.img.zst > sheng-live.img.zst.sha256)
 ```
+
+也可在 GitHub Actions 中运行 `Build Sheng Graphical Live` 工作流，在原生 ARM64
+运行器上构建镜像、校验 4096 字节 UFS 对齐、ext4 特性和 EFI 载荷，并直接下载
+`sheng-live.img.zst` 与 `sheng-live.img.zst.sha256`。
 
 `sheng-live.img` 是刷写文件。`.zst` 用于分发。预留空间按解压后的
 镜像大小计算。若平板需要拉取大型包闭包或从源码构建，应另外给
