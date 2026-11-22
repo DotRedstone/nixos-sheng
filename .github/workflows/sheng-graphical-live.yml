@@ -1,0 +1,142 @@
+# ---
+# Module: Sheng Graphical Live Build
+# Description: Builds and verifies the standalone GNOME Live ext4 image on native AArch64 CI.
+# Scope: CI
+# ---
+
+name: Build Sheng Graphical Live
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/sheng-graphical-live.yml
+      - nixos/flake.nix
+      - nixos/flake.lock
+      - nixos/configuration.nix
+      - nixos/hardware/**
+      - nixos/modules/**
+      - nixos/packages/sheng-live-efi.nix
+      - nixos/profiles/gnome-minimal.nix
+      - nixos/profiles/sheng-live.nix
+  push:
+    branches:
+      - codex/feat-sheng-graphical-live
+      - codex/release-uboot-dualboot-preview
+    paths:
+      - .github/workflows/sheng-graphical-live.yml
+      - nixos/flake.nix
+      - nixos/flake.lock
+      - nixos/configuration.nix
+      - nixos/hardware/**
+      - nixos/modules/**
+      - nixos/packages/sheng-live-efi.nix
+      - nixos/profiles/gnome-minimal.nix
+      - nixos/profiles/sheng-live.nix
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and verify GNOME Live image
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Enable Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v13
+
+      - name: Install image verification tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y e2fsprogs zstd device-tree-compiler
+
+      - name: Verify Live configuration check
+        run: |
+          set -euo pipefail
+          nix --extra-experimental-features "nix-command flakes" \
+            build ./nixos#checks.aarch64-linux.shengLiveConfig \
+            --no-link
+
+      - name: Build GNOME Live image
+        run: |
+          set -euo pipefail
+          nix --extra-experimental-features "nix-command flakes" \
+            build ./nixos#packages.aarch64-linux.shengLiveImage \
+            --out-link out/sheng-live
+
+      - name: Verify raw Live ext4 image and EFI payload
+        run: |
+          set -euo pipefail
+          img="out/sheng-live/sheng-live.img"
+          test -s "$img"
+
+          size="$(stat -Lc '%s' "$img")"
+          echo "Live image size: ${size} bytes"
+          test $((size % 4096)) -eq 0
+
+          sudo e2fsck -fn "$img"
+          info="$(sudo dumpe2fs -h "$img")"
+          printf '%s\n' "$info" | grep -Eq '^Filesystem volume name:[[:space:]]+linux-live$'
+          printf '%s\n' "$info" | grep -Eq '^Filesystem UUID:[[:space:]]+8fe20c31-5c24-4cef-a8eb-fbdcd6c98ffa$'
+          printf '%s\n' "$info" | grep -Eq '^Filesystem features:.*metadata_csum'
+
+          sudo mkdir -p /mnt/sheng-live
+          trap 'sudo umount /mnt/sheng-live 2>/dev/null || true' EXIT
+          sudo mount -o loop,ro "$img" /mnt/sheng-live
+
+          test -s /mnt/sheng-live/boot/sheng-live/linux.efi
+          test -s /mnt/sheng-live/boot/sheng-live/initrd
+          test -s /mnt/sheng-live/boot/sheng-live/sheng.dtb
+          test "$(stat -c %s /mnt/sheng-live/boot/sheng-live/linux.efi)" -le $((128 * 1024 * 1024))
+          test "$(stat -c %s /mnt/sheng-live/boot/sheng-live/initrd)" -le $((128 * 1024 * 1024))
+          test "$(stat -c %s /mnt/sheng-live/boot/sheng-live/sheng.dtb)" -le $((2 * 1024 * 1024))
+
+          python3 - /mnt/sheng-live/boot/sheng-live/linux.efi <<'PY'
+          import struct, sys
+          data = open(sys.argv[1], "rb").read()
+          assert data[:2] == b"MZ", "linux.efi missing MZ header"
+          offset = struct.unpack_from("<I", data, 0x3C)[0]
+          assert data[offset:offset + 6] == b"PE\x00\x00\x64\xaa", "linux.efi is not AArch64 PE/COFF"
+          PY
+
+          fdtget /mnt/sheng-live/boot/sheng-live/sheng.dtb /chosen bootargs \
+            | grep -Fq 'root=PARTLABEL=linux-live'
+
+          test -s /mnt/sheng-live/nix-path-registration
+          test -L /mnt/sheng-live/nix/var/nix/profiles/system
+          test -n "$(find /mnt/sheng-live/lib/firmware/qcom/sm8550/sheng -maxdepth 2 -name 'adsp.mbn*' -print -quit)"
+          test -n "$(find /mnt/sheng-live/lib/modules -type f -name '*.ko*' -print -quit)"
+
+          sudo umount /mnt/sheng-live
+          trap - EXIT
+
+      - name: Compress Live image and generate checksum
+        run: |
+          set -euo pipefail
+          zstd -T0 -6 -o out/sheng-live.img.zst out/sheng-live/sheng-live.img
+          (
+            cd out
+            sha256sum sheng-live.img.zst > sheng-live.img.zst.sha256
+          )
+
+      - name: Upload GNOME Live artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: sheng-graphical-live
+          path: |
+            out/sheng-live.img.zst
+            out/sheng-live.img.zst.sha256
+          retention-days: 14
