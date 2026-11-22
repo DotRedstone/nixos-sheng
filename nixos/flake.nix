@@ -383,6 +383,13 @@
         '';
 
       checks.${system} = {
+        shengStorageInstallerHost = pkgs.runCommand "sheng-storage-installer-check" {
+          nativeBuildInputs = with pkgs; [ python3 e2fsprogs dosfstools mtools ];
+        } ''
+          python3 ${../scripts}/test-sheng-installer.py
+          touch "$out"
+        '';
+
         shengUbootEfiPreflight = pkgs.sheng-uboot-efi-preflight;
         shengUbootEfiShengDtsPreflight = pkgs.sheng-uboot-efi-sheng-dts-preflight;
         shengUbootAndroidBootimg = pkgs.sheng-uboot-android-bootimg;

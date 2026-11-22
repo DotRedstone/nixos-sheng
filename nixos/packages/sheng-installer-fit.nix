@@ -24,6 +24,7 @@ runCommand "sheng-installer-fit" {
 
   mkdir -p "$out"
   mkimage -f installer.its "$out/sheng-installer.itb"
+  dumpimage -l "$out/sheng-installer.itb" >/dev/null
   if [ "$(stat -c %s "$out/sheng-installer.itb")" -gt 117440512 ]; then
     echo 'The installer FIT exceeds the 112 MiB U-Boot USB buffer.' >&2
     exit 1

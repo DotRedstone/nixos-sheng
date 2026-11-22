@@ -158,6 +158,62 @@ class InstallerTests(unittest.TestCase):
                 self.assertEqual(struct.unpack("<H", stream.read(2))[0], 4096)
             self.assertEqual(candidate.stat().st_size, 384 * MIB)
 
+    def test_fat_merge_preserves_third_party_empty_and_spaced_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            make_bundle(root)
+            _, _, hashes = VALIDATE(root)
+            previous, candidate = root / "previous.fat", root / "candidate.fat"
+            with previous.open("wb") as stream:
+                stream.truncate(96 * MIB)
+            subprocess.run(["mkfs.fat", "-F", "32", previous], check=True, stdout=subprocess.DEVNULL)
+            for parent in ("EFI", "EFI/custom", "loader", "loader/entries"):
+                subprocess.run(["mmd", "-i", previous, f"::/{parent}"], check=True)
+            empty_file = root / "empty.flag"
+            empty_file.write_bytes(b"")
+            spaced_file = root / "my entry.conf"
+            spaced_file.write_bytes(b"title My Entry\n")
+            subprocess.run(["mcopy", "-i", previous, empty_file, "::/EFI/custom/empty.flag"], check=True)
+            subprocess.run(["mcopy", "-i", previous, spaced_file, "::/loader/entries/my entry.conf"], check=True)
+            PREPARE(previous, candidate, {"fstype": "vfat"}, root, hashes, 512)
+
+            def read(name):
+                return subprocess.check_output(["mtype", "-i", candidate, f"::/{name}"])
+
+            self.assertEqual(read("EFI/custom/empty.flag"), b"")
+            self.assertEqual(read("loader/entries/my entry.conf"), b"title My Entry\n")
+            manifest_content = read("manifest.sha256").decode("utf-8")
+            self.assertIn("EFI/custom/empty.flag", manifest_content)
+            self.assertIn("loader/entries/my entry.conf", manifest_content)
+
+    def test_write_verified_status_handling(self):
+        device = INSTALLER["Device"]("fixture")
+        target = {"partlabel": "linux", "path": "/dev/sdz3"}
+        image = Path(__file__)
+        expected = DIGEST(image)
+        with patch("subprocess.run", return_value=subprocess.CompletedProcess(["adb"], 0)), \
+             patch.object(device, "command", side_effect=["28"]), \
+             patch.object(device, "shell", return_value="No space left"), \
+             patch("time.sleep", side_effect=AssertionError("should not sleep")):
+            with self.assertRaisesRegex(ValueError, "linux 写入失败（退出码 28）：No space left"):
+                device.write_verified(target, image, expected)
+
+        with patch("subprocess.run", return_value=subprocess.CompletedProcess(["adb"], 0)), \
+             patch.object(device, "command", side_effect=["", "0", f"{expected}  -"]), \
+             patch("time.sleep", return_value=None):
+            device.write_verified(target, image, expected)
+
+    def test_boot_recovery_retries_transient_adb_error(self):
+        device = INSTALLER["Device"]("fixture")
+        image = Path(__file__)
+        getvar = subprocess.CompletedProcess(
+            ["fastboot"], 0, stdout="product: sheng\nis-userspace: no\nunlocked: yes\n"
+        )
+        with patch("subprocess.run", return_value=getvar), \
+             patch.object(device, "command", side_effect=[subprocess.CalledProcessError(1, "adb"), "", "sheng"]), \
+             patch("time.sleep", return_value=None):
+            device.boot_recovery("fixture", image)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -133,8 +133,11 @@ class Device:
         run(*fastboot, "boot", image)
         run(*self.adb, "wait-for-device", timeout=90)
         for _ in range(25):
-            if self.command(f"if test -f {MARKER}; then cat {MARKER}; fi") == "sheng":
-                return
+            try:
+                if self.command(f"if test -f {MARKER}; then cat {MARKER}; fi") == "sheng":
+                    return
+            except (subprocess.SubprocessError, ValueError):
+                pass
             time.sleep(1)
         raise ValueError("设备未进入预期的安装器 RAM 恢复环境")
 
@@ -181,13 +184,19 @@ class Device:
     def write_verified(self, target, image, expected):
         label = target["partlabel"]
         print(f"正在写入并校验 {label}，此过程需要等待。", flush=True)
+        status_path = f"{LOCK}/{label}.status"
+        status_file = shlex.quote(status_path)
         with image.open("rb") as stream:
-            marker = shlex.quote(f"{LOCK}/{label}.complete")
             command = shlex.join(["dd", f"of={target['path']}", "bs=4M", "iflag=fullblock", "conv=fsync"])
-            run(*self.adb, "exec-in", f"{command} >{LOCK}/dd.log 2>&1 && touch {marker}", stdin=stream)
-        for _ in range(60):
-            if self.command(f"if test -f {marker}; then echo ready; fi") == "ready":
+            run(*self.adb, "exec-in",
+                f"rm -f {status_file}; ({command} >{LOCK}/dd.log 2>&1; printf '%s\\n' \"$?\" >{status_file})",
+                stdin=stream)
+        for _ in range(300):
+            status = self.command(f"if test -f {status_file}; then cat {status_file}; fi")
+            if status == "0":
                 break
+            if status:
+                raise ValueError(f"{label} 写入失败（退出码 {status}）：{self.shell('cat', f'{LOCK}/dd.log')}")
             time.sleep(1)
         else:
             raise ValueError(f"{label} 未收到写入完成标记：{self.shell('cat', f'{LOCK}/dd.log')}")
@@ -254,7 +263,8 @@ def prepare_esp(previous, candidate, esp, bundle, hashes, sector_size):
         for entry in sorted(root.rglob("*")):
             name = entry.relative_to(root).as_posix()
             if entry.is_file() and name != "loader/random-seed":
-                manifest[name] = file_digest(checked_file(root, name))
+                require(not entry.is_symlink(), f"ESP 文件不可使用符号链接 {name}")
+                manifest[name] = file_digest(entry)
         require(all(manifest.get(name) == digest for name, digest in hashes.items()), "预制 ESP 读回校验失败")
         entry = root / "manifest.sha256"
         entry.write_text("".join(f"{digest}  {name}\n" for name, digest in manifest.items()), encoding="utf-8")
@@ -306,19 +316,27 @@ def main():
     keyword = f"INSTALL {linux['partuuid']}"
     require(input(f"将覆写 {linux['path']}。已备份现有 Linux 数据时输入 {keyword}\n> ").strip() == keyword,
             "安装已取消")
+    write_started = False
     device.shell("mkdir", LOCK)
-    args.backup_dir.mkdir(mode=0o700)
-    previous = args.backup_dir / "linux-boot.before.img"
-    candidate = args.backup_dir / "linux-boot.candidate.img"
-    device.guard(layout)
-    device.back_up(esp, previous)
-    prepare_esp(previous, candidate, esp, args.bundle, files, disk["log-sec"])
-    device.guard(layout)
-    device.write_verified(linux, rootfs, checksum)
-    device.guard(layout)
-    device.write_verified(esp, candidate, file_digest(candidate))
+    try:
+        args.backup_dir.mkdir(mode=0o700)
+        previous = args.backup_dir / "linux-boot.before.img"
+        candidate = args.backup_dir / "linux-boot.candidate.img"
+        device.guard(layout)
+        device.back_up(esp, previous)
+        prepare_esp(previous, candidate, esp, args.bundle, files, disk["log-sec"])
+        device.guard(layout)
+        write_started = True
+        device.write_verified(linux, rootfs, checksum)
+        device.guard(layout)
+        device.write_verified(esp, candidate, file_digest(candidate))
+    except BaseException:
+        if not write_started:
+            subprocess.run((*device.adb, "exec-out", f"rmdir {shlex.quote(LOCK)}"),
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        raise
     # 失败时锁保留到下次 RAM 启动，避免上一次写入尚未退出便再次写盘。
-    device.command(f"rm -f {LOCK}/dd.log {LOCK}/linux.complete {LOCK}/linux-boot.complete; rmdir {LOCK}")
+    device.command(f"rm -f {LOCK}/dd.log {LOCK}/linux.status {LOCK}/linux-boot.status; rmdir {LOCK}")
     print(f"NixOS 与 EFI 载荷写入校验完成。旧 ESP 备份保存在 {previous}。")
 
 
