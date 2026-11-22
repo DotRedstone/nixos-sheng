@@ -42,6 +42,8 @@
 
   boot.kernelModules = [
     "qrtr"
+    # CONFIG_RFKILL=m；wpa_supplicant.service 强依赖 BindPaths=/dev/rfkill，需在 sysinit 阶段先创建节点。
+    "rfkill"
   ];
 
   # WCN7850 occasionally exposes only 2.4 GHz after its first firmware boot.
