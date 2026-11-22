@@ -12,7 +12,7 @@
 用 ARM64 构建器从同一提交构建 `mobileRootfsImage`（或 GNOME 版本）和
 `shengUbootEfiEsp`。U-Boot 菜单使用 `shengInstallerFit`，ABL Fastboot 临时启动使用
 `shengInstallerBootimg`。单独保存选用的启动镜像，将原始 ext4 `rootfs.img` 与
-`esp/` 文件树放入同一目录，并生成 `SHA256SUMS`。
+`esp/` 文件树放入同一目录（注意：`rootfs.img` 与 `esp/` 必须复制为普通文件，而不是指向 `nix build` `result/` 的符号链接），并生成 `SHA256SUMS`。
 
 ```sh
 sha256sum rootfs.img esp/manifest.sha256 > SHA256SUMS
@@ -51,7 +51,7 @@ fastboot continue
 
 ### 从 ABL Fastboot 进入 RAM 环境（实验）
 
-从已连接的 ABL Fastboot 启动 Android 格式的恢复镜像并执行安装：
+从已连接的 ABL Fastboot 启动 Android 格式的恢复镜像并执行安装（注意：Mobile NixOS stage-1 恢复 gadget 默认将其 ADB 序列号设为 `0123456789`，在恢复环境枚举前即可通过 `--adb-serial 0123456789` 指定）：
 
 ```sh
 python3 scripts/sheng-installer.py install ./bundle \
@@ -76,5 +76,4 @@ python3 scripts/sheng-installer.py install ./bundle \
 nix build ./nixos#checks.x86_64-linux.shengStorageInstallerHost
 ```
 
-主机检查覆盖目标布局、挂载保护、安装包校验以及 FAT 镜像内现有 Android 配置和其他条目的保留。
-实机还需完成新 RAM 镜像临时启动、写入与读回校验、U-Boot 启动 NixOS 和中断后恢复。
+主机检查覆盖目标布局、挂载保护、安装包校验以及 FAT 镜像内现有 Android 配置和其他条目的保留，在 `x86_64-linux` 与 `aarch64-linux` 上均可执行。`Build Sheng U-Boot Storage Recovery` 工作流同时构建 ABL 引导镜像与 `sheng-installer.itb` 并运行主机检查。实机还需完成新 RAM 镜像临时启动、写入与读回校验、U-Boot 启动 NixOS 和中断后恢复。
