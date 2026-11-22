@@ -253,6 +253,7 @@ in
       Restart = "on-failure";
       RestartSec = 10;
       TimeoutStartSec = 20;
+      TimeoutStopSec = 5;
     };
   };
 
