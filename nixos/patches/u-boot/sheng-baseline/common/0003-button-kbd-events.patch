@@ -1,0 +1,63 @@
+From: NixOS Android devices contributors <nixos-android-devices@localhost>
+Date: Tue, 29 Sep 2026 00:44:00 +0800
+Subject: [PATCH] input: button-kbd: report presses and queued input correctly
+
+Local fix against U-Boot a06e89ab05eaa2b8344d521319399333cd760ae5:
+https://source.denx.de/u-boot/u-boot/-/blob/a06e89ab05eaa2b8344d521319399333cd760ae5/drivers/input/button_kbd.c
+
+The final input_add_keycode argument means release, but button-kbd passed
+BUTTON_ON directly. This enqueues input on release and retains released keys.
+Pass the correct polarity and return the queued character count so input_tstc
+can see new input immediately, including while flushing before an EFI loader.
+Ignore invalid state/code reads and keep each labelled button's state index
+stable across those errors.
+
+On Asphalt, enabling button-kbd cancelled systemd-boot's countdown without
+user input, including when USB was unconfigured. Removing only button-kbd
+allowed the same EFI loader to count down and boot. The regression test checks
+the actual driver callback with the input API contract and input_tstc.
+---
+--- a/drivers/input/button_kbd.c
++++ b/drivers/input/button_kbd.c
+@@ -72,29 +72,32 @@
+ 	struct button_kbd_priv *priv = dev_get_priv(input->dev);
+ 	struct udevice *button_gpio_devp;
+ 	struct uclass *uc;
+-	int i = 0;
+-	u32 code, state, state_changed = 0;
++	int i = 0, count = 0;
++	int code, state;
+ 
+ 	uclass_id_foreach_dev(UCLASS_BUTTON, button_gpio_devp, uc) {
+ 		struct button_uc_plat *uc_plat = dev_get_uclass_plat(button_gpio_devp);
+ 		/* Ignore the top-level button node */
+ 		if (!uc_plat->label)
+ 			continue;
++		/* Keep the state index stable even if a button read fails. */
++		i++;
+ 		code = button_get_code(button_gpio_devp);
+-		if (!code)
++		if (code <= 0)
+ 			continue;
+ 
+ 		state = button_get_state(button_gpio_devp);
+-		state_changed = state != priv->old_state[i];
++		if (state != BUTTON_OFF && state != BUTTON_ON)
++			continue;
+ 
+-		if (state_changed) {
++		if (state != priv->old_state[i - 1]) {
+ 			debug("%s: %d\n", uc_plat->label, code);
+-			priv->old_state[i] = state;
+-			input_add_keycode(input, code, state);
++			priv->old_state[i - 1] = state;
++			/* input_add_keycode's last argument means release. */
++			count += input_add_keycode(input, code, state == BUTTON_OFF);
+ 		}
+-		i++;
+ 	}
+-	return 0;
++	return count;
+ }
+ 
+ static const struct keyboard_ops button_kbd_ops = {

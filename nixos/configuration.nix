@@ -16,6 +16,7 @@
     ./modules/sheng-fingerprint.nix
     ./modules/sheng-performance.nix
     ./modules/sheng-rootfs-health.nix
+    ./modules/sheng-uboot-efi.nix
     ./modules/xiaomi-mipps-auth.nix
     ./modules/xiaomi-pen-status.nix
     ./modules/xiaomi-sheng-thp.nix
@@ -104,6 +105,7 @@
   services.xiaomi-mipps-auth.enable = true;
   services.xiaomi-pen-status.enable = true;
   services.xiaomi-sheng-thp.enable = true;
+  services.sheng-uboot-efi.enable = true;
   services.sheng-fingerprint.enable = true;
   services.sheng-fingerprint.wakeUnlock = true;
 
@@ -138,6 +140,13 @@
       sync
       systemctl reboot
     '';
+    sheng-reboot-bootloader = pkgs.writeShellApplication {
+      name = "sheng-reboot-bootloader";
+      runtimeInputs = [ pkgs.perl ];
+      text = ''
+        exec perl ${./scripts/sheng-reboot-bootloader.pl}
+      '';
+    };
     sheng-nixos-rebuild = pkgs.writeShellScriptBin "sheng-nixos-rebuild" ''
       set -eu
 
@@ -199,6 +208,7 @@
     sheng-check
     sheng-nixos-rebuild
     sheng-reboot-generation-menu
+    sheng-reboot-bootloader
     sheng-alsa-ucm
     alsa-ucm-conf
     alsa-utils

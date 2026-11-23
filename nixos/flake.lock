@@ -75,7 +75,8 @@
         "mobile-nixos": "mobile-nixos",
         "nixpkgs": "nixpkgs",
         "shengFirmware": "shengFirmware",
-        "shengKernelSrc": "shengKernelSrc"
+        "shengKernelSrc": "shengKernelSrc",
+        "shengUbootSrc": "shengUbootSrc"
       }
     },
     "shengFirmware": {
@@ -111,6 +112,23 @@
         "owner": "DotRedstone",
         "ref": "upgrade/sheng-7.1.8",
         "repo": "linux-sheng",
+        "type": "github"
+      }
+    },
+    "shengUbootSrc": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1790028721,
+        "narHash": "sha256-P8/MBaIueMPC5cuCBcWfYLPKDhyZHVwEcEimoYC3tGE=",
+        "owner": "u-boot",
+        "repo": "u-boot",
+        "rev": "a06e89ab05eaa2b8344d521319399333cd760ae5",
+        "type": "github"
+      },
+      "original": {
+        "owner": "u-boot",
+        "repo": "u-boot",
+        "rev": "a06e89ab05eaa2b8344d521319399333cd760ae5",
         "type": "github"
       }
     }

@@ -1,0 +1,114 @@
+From: NixOS Android devices contributors <nixos-android-devices@localhost>
+Date: Mon, 28 Sep 2026 23:35:00 +0800
+Subject: [PATCH] usb: gadget: acm: let console startup proceed without a host
+
+Local follow-up against U-Boot a06e89ab05eaa2b8344d521319399333cd760ae5:
+https://source.denx.de/u-boot/u-boot/-/blob/a06e89ab05eaa2b8344d521319399333cd760ae5/drivers/usb/gadget/f_acm.c
+
+Our phone environments enable ACM in preboot. Waiting for SET_CONFIGURATION
+inside stdio start stops the subsequent storage scan and EFI boot when no
+USB host is attached. Register the function and return immediately. Poll
+USB events during output as well as input so a late host can enumerate.
+The bounded existing ring buffer retains recent output without waiting.
+
+Clear connection and handshake state before freeing requests on disconnect;
+a poll in the TX path may process that disconnect, so recheck connection
+before accessing the request. Pair with the cancelled-RX completion fix.
+
+Do not wait for an in-flight TX request when the host stops reading. Input
+polling also drains pending output, including diagnostics after a late connect.
+---
+--- a/drivers/usb/gadget/f_acm.c
++++ b/drivers/usb/gadget/f_acm.c
+@@ -455,6 +455,10 @@
+ {
+ 	struct f_acm *f_acm = func_to_acm(f);
+ 
++	f_acm->connected = false;
++	f_acm->handshake_bits = 0;
++	f_acm->tx_on = false;
++
+ 	usb_ep_disable(f_acm->ep_out);
+ 	usb_ep_disable(f_acm->ep_in);
+ 	usb_ep_disable(f_acm->ep_notify);
+@@ -497,11 +501,11 @@
+ 	do {
+ 		dm_usb_gadget_handle_interrupts(f_acm->udc);
+ 
+-		if (!(f_acm->handshake_bits & ACM_CTRL_DTR))
++		if (!f_acm->connected || !(f_acm->handshake_bits & ACM_CTRL_DTR))
+ 			break;
+ 
+ 		if (!f_acm->tx_on)
+-			continue;
++			break;
+ 
+ 		len = buf_pop(&f_acm->tx_buf, f_acm->req_in->buf, REQ_SIZE_MAX);
+ 		if (!len)
+@@ -515,20 +519,8 @@
+ 
+ 		f_acm->tx_on = false;
+ 
+-		/* Do not reset the watchdog, if TX is stuck there is probably
+-		 * a real issue.
+-		 */
++		/* A host may stop reading; leave pending TX for later polls. */
+ 	} while (1);
+-}
+-
+-static bool acm_connected(struct stdio_dev *dev)
+-{
+-	struct f_acm *f_acm = stdio_to_acm(dev);
+-
+-	/* give a chance to process udc irq */
+-	dm_usb_gadget_handle_interrupts(f_acm->udc);
+-
+-	return f_acm->connected;
+ }
+ 
+ static int acm_add(struct usb_configuration *c)
+@@ -578,7 +570,7 @@
+ {
+ 	struct f_acm *f_acm = stdio_to_acm(dev);
+ 
+-	dm_usb_gadget_handle_interrupts(f_acm->udc);
++	__acm_tx(f_acm);
+ 
+ 	return (f_acm->rx_buf.size > 0);
+ }
+@@ -606,9 +598,7 @@
+ 
+ 	buf_push(&f_acm->tx_buf, &c, 1);
+ 
+-	if (!f_acm->connected)
+-		return;
+-
++	/* Poll enumeration even before the host configures the function. */
+ 	__acm_tx(f_acm);
+ }
+ 
+@@ -623,9 +613,7 @@
+ 		buf_push(&f_acm->tx_buf, str++, 1);
+ 	}
+ 
+-	if (!f_acm->connected)
+-		return;
+-
++	/* Poll enumeration even before the host configures the function. */
+ 	__acm_tx(f_acm);
+ }
+ 
+@@ -655,12 +643,7 @@
+ 	else
+ 		return -ENODEV;
+ 
+-	while (!acm_connected(dev)) {
+-		if (ctrlc())
+-			return -ECANCELED;
+-
+-		schedule();
+-	}
++	/* USB diagnostics must not hold up boot when no host is attached. */
+ 
+ 	return 0;
+ }

@@ -1,0 +1,32 @@
+From: dianqk <dianqk@dianqk.net>
+Date: Tue, 29 Sep 2026 07:40:00 +0800
+Subject: [PATCH] clk: qcom: sm8550: provide the USB configuration NoC clock
+
+The flattened SM8550 USB node requests GCC_CFG_NOC_USB3_PRIM_AXI_CLK
+before its other clocks. The missing gate makes controller probing fail
+with "unknown clock ID 11" and -ENOENT, leaving no USB console on Sheng.
+
+Add the gate and enable its master-clock dependency, as for the aggregate
+USB AXI branch. Register and bit follow Linux gcc-sm8550.c:
+https://github.com/ianchb/sm8550-mainline/blob/ad75da348a020f0b7cb541ca2f06ab38cf77004d/drivers/clk/qcom/gcc-sm8550.c
+This is a local U-Boot adaptation, not an imported Linux commit.
+---
+diff --git a/drivers/clk/qcom/clock-sm8550.c b/drivers/clk/qcom/clock-sm8550.c
+--- a/drivers/clk/qcom/clock-sm8550.c
++++ b/drivers/clk/qcom/clock-sm8550.c
+@@ -120,6 +120,7 @@ static const struct gate_clk sm8550_clks[] = {
+ 	GATE_CLK(GCC_AGGRE_UFS_PHY_AXI_CLK,		0x770e4, BIT(0)),
+ 	GATE_CLK(GCC_AGGRE_UFS_PHY_AXI_HW_CTL_CLK,	0x770e4, BIT(1)),
+ 	GATE_CLK(GCC_AGGRE_USB3_PRIM_AXI_CLK,		0x3908c, BIT(0)),
++	GATE_CLK(GCC_CFG_NOC_USB3_PRIM_AXI_CLK,		0x39088, BIT(0)),
+ 	GATE_CLK(GCC_CNOC_PCIE_SF_AXI_CLK,		0x52008, BIT(6)),
+ 	GATE_CLK(GCC_DDRSS_GPU_AXI_CLK,			0x71154, BIT(0)),
+ 	GATE_CLK(GCC_DDRSS_PCIE_SF_QTB_CLK,		0x52000, BIT(19)),
+@@ -203,6 +204,7 @@ static int sm8550_enable(struct clk *clk)
+ 	struct msm_clk_priv *priv = dev_get_priv(clk->dev);
+ 
+ 	switch (clk->id) {
++	case GCC_CFG_NOC_USB3_PRIM_AXI_CLK:
+ 	case GCC_AGGRE_USB3_PRIM_AXI_CLK:
+ 		qcom_gate_clk_en(priv, GCC_USB30_PRIM_MASTER_CLK);
+ 		fallthrough;

@@ -1,0 +1,102 @@
+From: DotRedstone <noreply@github.com>
+Subject: [PATCH] sheng: pass ABL charger reason through EFI variables
+
+The EFI loader command line generated from Type #1 entries hides ABL's
+bootinfo.pureason from Linux. Preserve only the boot reason as a volatile,
+runtime-visible EFI variable so Mobile NixOS stage-1 can distinguish charger
+insertion from a power-key boot.
+
+--- a/lib/efi_loader/efi_setup.c
++++ b/lib/efi_loader/efi_setup.c
+@@ -17,6 +17,11 @@
+ #define OBJ_LIST_NOT_INITIALIZED 1
+ 
+ efi_status_t efi_obj_list_initialized = OBJ_LIST_NOT_INITIALIZED;
++
++/* A board may publish a short ABL boot reason after EFI variables exist. */
++void __weak efi_platform_set_boot_reason(void)
++{
++}
+ 
+ const efi_guid_t efi_debug_image_info_table_guid =
+ 	EFI_DEBUG_IMAGE_INFO_TABLE_GUID;
+@@ -259,6 +264,8 @@
+ 	if (ret != EFI_SUCCESS)
+ 		goto out;
+ 
++	efi_platform_set_boot_reason();
++
+ 	if (IS_ENABLED(CONFIG_CMD_BOOTEFI_BOOTMGR)) {
+ 		/* update boot option after variable service initialized */
+ 		ret = efi_bootmgr_update_media_device_boot_option();
+--- a/arch/arm/mach-snapdragon/board.c
++++ b/arch/arm/mach-snapdragon/board.c
+@@ -20,6 +20,8 @@
+ #include <dm/read.h>
+ #include <power/regulator.h>
+ #include <env.h>
++#include <efi_loader.h>
++#include <efi_variable.h>
+ #include <fdt_support.h>
+ #include <init.h>
+ #include <linux/arm-smccc.h>
+@@ -376,6 +378,59 @@
+ 	get_cmdline_option(cmdline, "androidboot.serialno=", serial, sizeof(serial));
+ 	if (serial[0] != '\0')
+ 		env_set("serial#", serial);
++}
++
++/*
++ * ABL supplies bootinfo.pureason in its /chosen bootargs, but a systemd-boot
++ * Type #1 entry replaces the Linux command line. Publish only this one boot
++ * reason (or charger mode) as a volatile EFI variable for Sheng stage-1.
++ */
++void efi_platform_set_boot_reason(void)
++{
++	static const efi_guid_t guid =
++		EFI_GUID(0xf14997e2, 0x2327, 0x432f, 0x9f, 0x1c,
++			 0x11, 0x53, 0x99, 0xfb, 0xe7, 0xa7);
++	static const char *const keys[] = {
++		"bootinfo.pureason=",
++		"androidboot.mode=",
++	};
++	const char *cmdline, *start, *end;
++	char value[64], data[96];
++	size_t len, i;
++
++	if (!of_machine_is_compatible("xiaomi,sheng"))
++		return;
++
++	cmdline = get_cmdline();
++	if (!cmdline)
++		return;
++
++	for (i = 0; i < ARRAY_SIZE(keys); i++) {
++		start = cmdline;
++		while ((start = strstr(start, keys[i]))) {
++			if (start == cmdline || start[-1] == ' ')
++				break;
++			start++;
++		}
++		if (!start)
++			continue;
++		start += strlen(keys[i]);
++		end = strchr(start, ' ');
++		len = end ? end - start : strlen(start);
++		if (!len || len >= sizeof(value))
++			continue;
++		memcpy(value, start, len);
++		value[len] = '\0';
++		if (i == 1 && strcmp(value, "charger"))
++			continue;
++		snprintf(data, sizeof(data), "%s%s", keys[i], value);
++		if (efi_set_variable_int(u"ShengBootReason", &guid,
++					 EFI_VARIABLE_BOOTSERVICE_ACCESS |
++					 EFI_VARIABLE_RUNTIME_ACCESS,
++					 strlen(data) + 1, data, false) != EFI_SUCCESS)
++			log_warning("Could not publish Sheng EFI boot reason\n");
++		return;
++	}
+ }
+ 
+ /* Sets up the "board", and "soc" environment variables as well as constructing the devicetree

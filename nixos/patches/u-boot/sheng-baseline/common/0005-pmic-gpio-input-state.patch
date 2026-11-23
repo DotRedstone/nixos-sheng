@@ -1,0 +1,102 @@
+From: NixOS Android devices contributors <nixos-android-devices@localhost>
+Date: Tue, 29 Sep 2026 00:53:00 +0800
+Subject: [PATCH] gpio: qcom-pmic: retain and configure input bias and supply
+
+Local fix against U-Boot a06e89ab05eaa2b8344d521319399333cd760ae5:
+https://source.denx.de/u-boot/u-boot/-/blob/a06e89ab05eaa2b8344d521319399333cd760ae5/drivers/gpio/qcom_pmic_gpio.c
+
+Support the input-enable, bias-pull-up, bias-disable and power-source pinctrl
+properties used by phone keys. Keep input bias/VIN when gpio_request_by_name
+subsequently sets direction; previously that request overwrote bias with no
+pull. Propagate direction write errors and retain the LV/MV classification
+already selected for VIN2/VIN3 subtypes.
+
+Asphalt's Linux GPIO6 state uses input-enable, bias-pull-up and power-source=1.
+After U-Boot cleared that state, the volume-up key produced unsolicited input.
+Setting VIN=1 and PULL=0 with single-byte transactions let the same firmware
+complete its EFI countdown with button-kbd enabled.
+
+Reference for register values: Linux v7.3-rc4 pinctrl-spmi-gpio.c:
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c?h=v7.3-rc4
+---
+--- a/drivers/gpio/qcom_pmic_gpio.c
++++ b/drivers/gpio/qcom_pmic_gpio.c
+@@ -125,16 +125,16 @@
+ 	if (ret < 0)
+ 		return ret;
+ 
+-	_qcom_gpio_set_direction(dev, offset, input, value);
+-
+-	/* Set the right pull (no pull) */
+-	ret = pmic_reg_write(plat->pmic, gpio_base + REG_DIG_PULL_CTL,
+-			     REG_DIG_PULL_NO_PU);
++	ret = _qcom_gpio_set_direction(dev, offset, input, value);
+ 	if (ret < 0)
+ 		return ret;
+ 
+-	/* Configure output pin drivers if needed */
++	/* Input bias and VIN belong to the board's pinctrl state. */
+ 	if (!input) {
++		ret = pmic_reg_write(plat->pmic, gpio_base + REG_DIG_PULL_CTL,
++				     REG_DIG_PULL_NO_PU);
++		if (ret < 0)
++			return ret;
+ 		/* Select the VIN - VIN0, pin is input so it doesn't matter */
+ 		ret = pmic_reg_write(plat->pmic, gpio_base + REG_DIG_VIN_CTL,
+ 				     REG_DIG_VIN_VIN0);
+@@ -321,9 +321,6 @@
+ 		return log_msg_ret("bad subtype", -ENXIO);
+ 	}
+ 
+-	plat->lv_mv_type = val == REG_SUBTYPE_GPIO_LV ||
+-			   val == REG_SUBTYPE_GPIO_MV;
+-
+ 	/*
+ 	 * Parse basic GPIO count specified via the gpio-ranges property
+ 	 * as specified in upstream devicetrees
+@@ -364,6 +361,10 @@
+ static const struct pinconf_param qcom_pmic_pinctrl_conf_params[] = {
+ 	{ "output-high", PIN_CONFIG_OUTPUT_ENABLE, 1 },
+ 	{ "output-low", PIN_CONFIG_OUTPUT, 0 },
++	{ "input-enable", PIN_CONFIG_INPUT_ENABLE, 1 },
++	{ "bias-pull-up", PIN_CONFIG_BIAS_PULL_UP, 0 },
++	{ "bias-disable", PIN_CONFIG_BIAS_DISABLE, REG_DIG_PULL_NO_PU },
++	{ "power-source", PIN_CONFIG_POWER_SOURCE, 0 },
+ };
+ 
+ static int qcom_pmic_pinctrl_get_pins_count(struct udevice *dev)
+@@ -386,9 +387,31 @@
+ static int qcom_pmic_pinctrl_pinconf_set(struct udevice *dev, unsigned int selector,
+ 					 unsigned int param, unsigned int arg)
+ {
+-	/* We only support configuring the pin as an output, either low or high */
+-	return _qcom_gpio_set_direction(dev, selector, false,
+-					param == PIN_CONFIG_OUTPUT_ENABLE);
++	struct qcom_pmic_gpio_data *plat = dev_get_plat(dev);
++	u32 gpio_base = plat->pid + REG_OFFSET(selector);
++
++	switch (param) {
++	case PIN_CONFIG_OUTPUT_ENABLE:
++	case PIN_CONFIG_OUTPUT:
++		return _qcom_gpio_set_direction(dev, selector, false,
++						param == PIN_CONFIG_OUTPUT_ENABLE);
++	case PIN_CONFIG_INPUT_ENABLE:
++		if (!arg)
++			return -EINVAL;
++		return _qcom_gpio_set_direction(dev, selector, true, 0);
++	case PIN_CONFIG_BIAS_PULL_UP:
++		/* Match Linux's default 30 uA pull-up. */
++		return pmic_reg_write(plat->pmic, gpio_base + REG_DIG_PULL_CTL, 0);
++	case PIN_CONFIG_BIAS_DISABLE:
++		return pmic_reg_write(plat->pmic, gpio_base + REG_DIG_PULL_CTL,
++				     REG_DIG_PULL_NO_PU);
++	case PIN_CONFIG_POWER_SOURCE:
++		if (arg > 7)
++			return -EINVAL;
++		return pmic_reg_write(plat->pmic, gpio_base + REG_DIG_VIN_CTL, arg);
++	default:
++		return -ENOTSUPP;
++	}
+ }
+ 
+ static const char *qcom_pmic_pinctrl_get_function_name(struct udevice *dev, unsigned int selector)

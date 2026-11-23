@@ -1,0 +1,22 @@
+From: dianqk <dianqk@dianqk.net>
+Date: Tue, 29 Sep 2026 07:15:00 +0800
+Subject: [PATCH] arm: dts: sheng: select UTMI as the USB2-only PIPE clock
+
+Sheng's boot DT deliberately enables only the eUSB2 PHY. U-Boot's
+dwc3_qcom_glue_configure() in v2026.10-rc5 selects the UTMI clock in place
+of the unavailable SuperSpeed PIPE clock only when this property exists.
+Match that contract rather than relying on ABL's controller state.
+
+This changes only the U-Boot DT; Linux retains its full USB3/DP setup.
+---
+diff --git a/dts/upstream/src/arm64/qcom/sm8550-xiaomi-sheng.dts b/dts/upstream/src/arm64/qcom/sm8550-xiaomi-sheng.dts
+--- a/dts/upstream/src/arm64/qcom/sm8550-xiaomi-sheng.dts
++++ b/dts/upstream/src/arm64/qcom/sm8550-xiaomi-sheng.dts
+@@ -128,6 +128,7 @@
+ 	phys = <&usb_1_hsphy>;
+ 	phy-names = "usb2-phy";
+ 	dr_mode = "peripheral";
++	qcom,select-utmi-as-pipe-clk;
+ 	maximum-speed = "high-speed";
+ 	status = "okay";
+ };

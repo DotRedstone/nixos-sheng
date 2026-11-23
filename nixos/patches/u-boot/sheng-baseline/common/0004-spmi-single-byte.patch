@@ -1,0 +1,33 @@
+From: NixOS Android devices contributors <nixos-android-devices@localhost>
+Date: Tue, 29 Sep 2026 00:53:00 +0800
+Subject: [PATCH] spmi: msm: encode one byte as a zero byte count
+
+Local fix against U-Boot a06e89ab05eaa2b8344d521319399333cd760ae5:
+https://source.denx.de/u-boot/u-boot/-/blob/a06e89ab05eaa2b8344d521319399333cd760ae5/drivers/spmi/spmi-msm.c
+
+The SPMI arbiter command encodes length minus one. Both callbacks transfer
+one byte, so byte count must be zero. The previous value one requests two
+bytes and a write clears the adjacent register from the zero upper WDATA byte.
+
+Reference: Linux v7.3-rc4 drivers/spmi/spmi-pmic-arb.c sets bc = len - 1:
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/drivers/spmi/spmi-pmic-arb.c?h=v7.3-rc4
+On Asphalt this affects adjacent PMIC GPIO MODE/VIN/PULL registers and reboot
+reason writes. The native test checks both command formatters.
+---
+--- a/drivers/spmi/spmi-msm.c
++++ b/drivers/spmi/spmi-msm.c
+@@ -95,12 +95,12 @@
+ 
+ static u32 pmic_arb_fmt_cmd_v1(u8 opc, u8 sid, u8 pid, u8 off)
+ {
+-	return (opc << 27) | (sid << 20) | (pid << 12) | (off << 4) | 1;
++	return (opc << 27) | (sid << 20) | (pid << 12) | (off << 4);
+ }
+ 
+ static u32 pmic_arb_fmt_cmd_v2(u8 opc, u8 off)
+ {
+-	return (opc << 27) | (off << 4) | 1;
++	return (opc << 27) | (off << 4);
+ }
+ 
+ static int msm_spmi_write(struct udevice *dev, int usid, int pid, int off,

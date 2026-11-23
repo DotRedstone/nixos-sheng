@@ -1,0 +1,145 @@
+From 56d77c9a10d97d15b8da900f861bc28b06b84b1c Mon Sep 17 00:00:00 2001
+From: Abel Vesa <abel.vesa@linaro.org>
+Date: Wed, 8 Feb 2023 21:01:57 +0200
+Subject: [PATCH] phy: qcom: Add QCOM SNPS eUSB2 repeater driver
+
+PM8550B contains a eUSB2 repeater used for making the eUSB2 from
+SM8550 USB 2.0 compliant. This can be modelled SW-wise as a Phy.
+So add a new phy driver for it.
+
+Signed-off-by: Abel Vesa <abel.vesa@linaro.org>
+Link: https://lore.kernel.org/r/20230208190200.2966723-5-abel.vesa@linaro.org
+Signed-off-by: Vinod Koul <vkoul@kernel.org>
+---
+
+Source: https://github.com/torvalds/linux/commit/56d77c9a10d97d15b8da900f861bc28b06b84b1c
+Local U-Boot port (not a byte-identical Linux diff): replace regmap/platform/
+regulator APIs with DM PMIC/PHY; retain PM8550B default register settings and
+shared ABL supply votes. Scope is Sheng's USB device mode only; clear the host
+workaround using the current Linux set_mode sequence (ad75da348a02 in
+https://github.com/ianchb/sm8550-mainline). Return SPMI errors and cap polling at
+5 ms. No SMB2360/SMB2370 or board tuning override interface is claimed.
+
+diff --git a/drivers/phy/qcom/phy-pm8550b-eusb2.c b/drivers/phy/qcom/phy-pm8550b-eusb2.c
+--- /dev/null
++++ b/drivers/phy/qcom/phy-pm8550b-eusb2.c
+@@ -0,0 +1,98 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (c) 2023, Linaro Limited
++ * PM8550B device-mode sequence from Linux phy-qcom-eusb2-repeater.c.
++ * ABL supplies the shared vdd18/vdd3 rails; never drop its power votes.
++ */
++#include <dm.h>
++#include <dm/read.h>
++#include <generic-phy.h>
++#include <power/pmic.h>
++#include <linux/delay.h>
++#include <linux/bitops.h>
++
++#define EUSB2_RPTR_STATUS 0x08
++#define RPTR_OK BIT(7)
++#define EUSB2_EN_CTL1 0x46
++#define EUSB2_RPTR_EN BIT(7)
++#define EUSB2_TUNE_IUSB2 0x51
++#define EUSB2_TUNE_SQUELCH_U 0x54
++#define EUSB2_TUNE_USB2_PREEM 0x57
++#define EUSB2_FORCE_EN_5 0xe8
++#define EUSB2_FORCE_VAL_5 0xed
++
++struct pm8550b_eusb2_priv {
++	u32 base;
++};
++
++static int pm8550b_eusb2_init(struct phy *phy)
++{
++	struct udevice *pmic = phy->dev->parent;
++	struct pm8550b_eusb2_priv *priv = dev_get_priv(phy->dev);
++	static const struct { u8 reg, val; } sequence[] = {
++		{ EUSB2_EN_CTL1, EUSB2_RPTR_EN },
++		{ EUSB2_TUNE_IUSB2, 0x8 },
++		{ EUSB2_TUNE_SQUELCH_U, 0x3 },
++		{ EUSB2_TUNE_USB2_PREEM, 0x5 },
++		/* Clear the host-mode workaround left by the previous stage. */
++		{ EUSB2_FORCE_EN_5, 0 },
++		{ EUSB2_FORCE_VAL_5, 0 },
++	};
++	int i, ret;
++
++	for (i = 0; i < ARRAY_SIZE(sequence); i++) {
++		ret = pmic_reg_write(pmic, priv->base + sequence[i].reg,
++				     sequence[i].val);
++		if (ret)
++			return ret;
++	}
++	/* Bound the wait to 5 ms, and distinguish SPMI failure from timeout. */
++	for (i = 0; i < 100; i++) {
++		ret = pmic_reg_read(pmic, priv->base + EUSB2_RPTR_STATUS);
++		if (ret < 0)
++			return ret;
++		if (ret & RPTR_OK)
++			return 0;
++		udelay(50);
++	}
++	return -ETIMEDOUT;
++}
++
++static int pm8550b_eusb2_exit(struct phy *phy)
++{
++	struct pm8550b_eusb2_priv *priv = dev_get_priv(phy->dev);
++
++	return pmic_reg_write(phy->dev->parent, priv->base + EUSB2_EN_CTL1, 0);
++}
++
++static int pm8550b_eusb2_probe(struct udevice *dev)
++{
++	struct pm8550b_eusb2_priv *priv = dev_get_priv(dev);
++	int ret;
++
++	ret = dev_read_u32(dev, "reg", &priv->base);
++	if (ret)
++		return ret;
++	if (priv->base > 0xff00)
++		return -EINVAL;
++	return 0;
++}
++
++static struct phy_ops pm8550b_eusb2_ops = {
++	.init = pm8550b_eusb2_init,
++	.exit = pm8550b_eusb2_exit,
++};
++
++static const struct udevice_id pm8550b_eusb2_ids[] = {
++	{ .compatible = "qcom,pm8550b-eusb2-repeater" },
++	{ }
++};
++
++U_BOOT_DRIVER(pm8550b_eusb2) = {
++	.name = "pm8550b-eusb2",
++	.id = UCLASS_PHY,
++	.of_match = pm8550b_eusb2_ids,
++	.ops = &pm8550b_eusb2_ops,
++	.probe = pm8550b_eusb2_probe,
++	.priv_auto = sizeof(struct pm8550b_eusb2_priv),
++};
+diff --git a/drivers/phy/qcom/Kconfig b/drivers/phy/qcom/Kconfig
+--- a/drivers/phy/qcom/Kconfig
++++ b/drivers/phy/qcom/Kconfig
+@@ -70,3 +70,9 @@
+ 	help
+ 	  Enable this to support the Super-Speed USB transceiver on various
+ 	  Qualcomm chipsets.
++
++config PHY_QCOM_PM8550B_EUSB2
++	bool "Qualcomm PM8550B eUSB2 repeater (device mode)"
++	depends on PHY && ARCH_SNAPDRAGON && PMIC_QCOM
++	help
++	  PM8550B SPMI repeater using supplies initialized by ABL.
+diff --git a/drivers/phy/qcom/Makefile b/drivers/phy/qcom/Makefile
+--- a/drivers/phy/qcom/Makefile
++++ b/drivers/phy/qcom/Makefile
+@@ -8,3 +8,4 @@
+ obj-$(CONFIG_PHY_QCOM_SNPS_EUSB2) += phy-qcom-snps-eusb2.o
+ obj-$(CONFIG_PHY_QCOM_USB_HS_28NM) += phy-qcom-usb-hs-28nm.o
+ obj-$(CONFIG_PHY_QCOM_USB_SS) += phy-qcom-usb-ss.o
++obj-$(CONFIG_PHY_QCOM_PM8550B_EUSB2) += phy-pm8550b-eusb2.o

@@ -25,9 +25,15 @@
       url = "github:DotRedstone/sheng-firmware-full/719086ce25222dcc54920ae12409eb5d4401bbff";
       # Note: This is now a true flake, so we remove `flake = false;`
     };
+    shengUbootSrc = {
+      # Official U-Boot v2026.10-rc5 signed tag commit. This experiment never
+      # imports device patches from third-party repositories.
+      url = "github:u-boot/u-boot/a06e89ab05eaa2b8344d521319399333cd760ae5";
+      flake = false;
+    };
   };
 
-  outputs = { self, mobile-nixos, nixpkgs, home-manager, shengKernelSrc, shengFirmware }:
+  outputs = { self, mobile-nixos, nixpkgs, home-manager, shengKernelSrc, shengFirmware, shengUbootSrc }:
     let
       system = "aarch64-linux";
       shengOverlay = final: prev: {
@@ -85,6 +91,29 @@
         sheng-fb-painter = final.callPackage ./packages/sheng-fb-painter.nix { };
         sheng-libssc = final.callPackage ./hardware/xiaomi-sheng/sensors/libssc.nix { };
         sheng-touch-firmware = final.callPackage ./packages/xiaomi-sheng-touch-firmware.nix { };
+        sheng-uboot-efi-preflight = final.callPackage ./packages/sheng-uboot-efi-preflight.nix {
+          inherit shengUbootSrc;
+        };
+        sheng-uboot-efi-sheng-dts-preflight = final.callPackage ./packages/sheng-uboot-efi-sheng-dts-preflight.nix {
+          inherit shengUbootSrc;
+        };
+        sheng-uboot-android-bootimg = final.callPackage ./packages/sheng-uboot-android-bootimg.nix {
+          inherit shengUbootSrc;
+        };
+        sheng-uboot-fastboot-probe-bootimg = final.callPackage ./packages/sheng-uboot-android-bootimg.nix {
+          autoFastboot = true;
+          inherit shengUbootSrc;
+        };
+        sheng-uboot-raw-fastboot-probe-bootimg = final.callPackage ./packages/sheng-uboot-android-bootimg.nix {
+          autoFastboot = true;
+          rawPayload = true;
+          inherit shengUbootSrc;
+        };
+        sheng-uboot-upstream-fastboot-probe-bootimg = final.callPackage ./packages/sheng-uboot-android-bootimg.nix {
+          autoFastboot = true;
+          upstreamAndroidLayout = true;
+          inherit shengUbootSrc;
+        };
         xiaomi-sheng-thp = final.callPackage ./packages/xiaomi-sheng-thp.nix {
           libssc = final.sheng-libssc;
         };
@@ -112,6 +141,50 @@
         inherit system;
         overlays = [ shengOverlay ];
       };
+      # The release outputs target aarch64-linux. Keep this host-side cross
+      # entry separate so maintainers can prove the firmware build on x86_64
+      # without changing device packages or image outputs.
+      ubootPreflightFor = buildSystem:
+        let buildPkgs = import nixpkgs { system = buildSystem; };
+        in buildPkgs.callPackage ./packages/sheng-uboot-efi-preflight.nix {
+          buildUBoot = buildPkgs.pkgsCross.aarch64-multiplatform.buildUBoot;
+          inherit shengUbootSrc;
+        };
+      ubootShengDtsPreflightFor = buildSystem:
+        let buildPkgs = import nixpkgs { system = buildSystem; };
+        in buildPkgs.callPackage ./packages/sheng-uboot-efi-sheng-dts-preflight.nix {
+          buildUBoot = buildPkgs.pkgsCross.aarch64-multiplatform.buildUBoot;
+          inherit shengUbootSrc;
+        };
+      ubootAndroidBootimgFor = buildSystem:
+        let buildPkgs = import nixpkgs { system = buildSystem; };
+        in buildPkgs.callPackage ./packages/sheng-uboot-android-bootimg.nix {
+          buildUBoot = buildPkgs.pkgsCross.aarch64-multiplatform.buildUBoot;
+          inherit shengUbootSrc;
+        };
+      ubootFastbootProbeFor = buildSystem:
+        let buildPkgs = import nixpkgs { system = buildSystem; };
+        in buildPkgs.callPackage ./packages/sheng-uboot-android-bootimg.nix {
+          autoFastboot = true;
+          buildUBoot = buildPkgs.pkgsCross.aarch64-multiplatform.buildUBoot;
+          inherit shengUbootSrc;
+        };
+      ubootRawFastbootProbeFor = buildSystem:
+        let buildPkgs = import nixpkgs { system = buildSystem; };
+        in buildPkgs.callPackage ./packages/sheng-uboot-android-bootimg.nix {
+          autoFastboot = true;
+          rawPayload = true;
+          buildUBoot = buildPkgs.pkgsCross.aarch64-multiplatform.buildUBoot;
+          inherit shengUbootSrc;
+        };
+      ubootUpstreamFastbootProbeFor = buildSystem:
+        let buildPkgs = import nixpkgs { system = buildSystem; };
+        in buildPkgs.callPackage ./packages/sheng-uboot-android-bootimg.nix {
+          autoFastboot = true;
+          upstreamAndroidLayout = true;
+          buildUBoot = buildPkgs.pkgsCross.aarch64-multiplatform.buildUBoot;
+          inherit shengUbootSrc;
+        };
       homeManagerModule = {
         environment.systemPackages = [
           home-manager.packages.${system}.default
@@ -132,6 +205,7 @@
           {
             _module.args = {
               inherit vars stage2Only;
+              mobileNixosSource = mobile-nixos;
             };
           }
           ({ lib, ... }: {
@@ -171,6 +245,9 @@
         includeHomeManager = true;
         stage2Only = true;
       };
+      mobileUbootRecoveryEval = mobileEvalFor {
+        extraModules = [ ./modules/sheng-uboot-recovery.nix ];
+      };
     in
     {
       # Reuse the exact Mobile NixOS evaluations used by the flashable images.
@@ -209,10 +286,38 @@
       packages.${system} = {
         xiaomiShengThp = pkgs.xiaomi-sheng-thp;
         xiaomiPenStatus = pkgs.xiaomi-pen-status;
+        # This validates the upstream U-Boot/EFI toolchain only. Its result is
+        # deliberately not an Android boot image and must never be flashed.
+        shengUbootEfiPreflight = pkgs.sheng-uboot-efi-preflight;
+        # Sheng device-tree compilation only; this output is never flashable.
+        shengUbootEfiShengDtsPreflight = pkgs.sheng-uboot-efi-sheng-dts-preflight;
+        # Experimental Android v0 envelope for a RAM-boot test. It is separate
+        # from mobileAndroidBootimg and must not be flashed before device proof.
+        shengUbootAndroidBootimg = pkgs.sheng-uboot-android-bootimg;
+        # USB-only RAM probe: U-Boot must re-enumerate as fastboot before
+        # storage, display, or an EFI payload is brought into the experiment.
+        shengUbootFastbootProbeBootimg = pkgs.sheng-uboot-fastboot-probe-bootimg;
+        # A separate raw-payload probe distinguishes ABL payload entry from
+        # U-Boot's USB path while leaving the gzip candidate unchanged.
+        shengUbootRawFastbootProbeBootimg = pkgs.sheng-uboot-raw-fastboot-probe-bootimg;
+        # This probe instead uses the upstream Qualcomm U-Boot Android v0
+        # layout to test ABL's container-address contract.
+        shengUbootUpstreamFastbootProbeBootimg = pkgs.sheng-uboot-upstream-fastboot-probe-bootimg;
+        # Immutable BLS payload for the dedicated linux-boot ESP. Building it
+        # validates the files U-Boot reads but cannot write a device partition.
+        shengUbootEfiEsp = pkgs.callPackage ./packages/sheng-uboot-efi-esp.nix {
+          kernel = mobileEval.config.system.build.kernel;
+          initrd = mobileEval.outputs.initrd;
+          kernelParams = mobileEval.config.boot.kernelParams;
+        };
         mobileAndroidBootimg = mobileEval.outputs.android.android-bootimg;
         mobileFastbootImages = mobileEval.outputs.android.android-fastboot-images;
         mobileRootfsImage = mobileEval.outputs.generatedFilesystems.rootfs;
         mobileRootfsImageGnome = mobileGnomeEval.outputs.generatedFilesystems.rootfs;
+        # RAM-only storage recovery. It is an Android boot image for boot_b
+        # testing, not a rootfs or a release artifact.
+        shengUbootStorageRecoveryBootimg =
+          mobileUbootRecoveryEval.outputs.recovery.mobile.outputs.android.android-bootimg;
         # Compatibility alias for older workflow names. This is the Mobile NixOS
         # generated rootfs, not a separate hand-built filesystem.
         fullRootfsImage = mobileEval.outputs.generatedFilesystems.rootfs;
@@ -222,7 +327,30 @@
         '';
       };
 
+      packages.x86_64-linux.shengUbootEfiPreflight = ubootPreflightFor "x86_64-linux";
+      packages.x86_64-linux.shengUbootEfiShengDtsPreflight = ubootShengDtsPreflightFor "x86_64-linux";
+      packages.x86_64-linux.shengUbootAndroidBootimg = ubootAndroidBootimgFor "x86_64-linux";
+      packages.x86_64-linux.shengUbootFastbootProbeBootimg = ubootFastbootProbeFor "x86_64-linux";
+      packages.x86_64-linux.shengUbootRawFastbootProbeBootimg = ubootRawFastbootProbeFor "x86_64-linux";
+      packages.x86_64-linux.shengUbootUpstreamFastbootProbeBootimg = ubootUpstreamFastbootProbeFor "x86_64-linux";
+
+      checks.x86_64-linux.shengUbootEfiPreflight = ubootPreflightFor "x86_64-linux";
+      checks.x86_64-linux.shengUbootEfiShengDtsPreflight = ubootShengDtsPreflightFor "x86_64-linux";
+      checks.x86_64-linux.shengUbootAndroidBootimg = ubootAndroidBootimgFor "x86_64-linux";
+      checks.x86_64-linux.shengUbootFastbootProbeBootimg = ubootFastbootProbeFor "x86_64-linux";
+      checks.x86_64-linux.shengUbootRawFastbootProbeBootimg = ubootRawFastbootProbeFor "x86_64-linux";
+      checks.x86_64-linux.shengUbootUpstreamFastbootProbeBootimg = ubootUpstreamFastbootProbeFor "x86_64-linux";
+
       checks.${system} = {
+        shengUbootEfiPreflight = pkgs.sheng-uboot-efi-preflight;
+        shengUbootEfiShengDtsPreflight = pkgs.sheng-uboot-efi-sheng-dts-preflight;
+        shengUbootAndroidBootimg = pkgs.sheng-uboot-android-bootimg;
+        # USB-only RAM probe: U-Boot must re-enumerate as fastboot before
+        # storage, display, or an EFI payload is brought into the experiment.
+        shengUbootFastbootProbeBootimg = pkgs.sheng-uboot-fastboot-probe-bootimg;
+        shengUbootRawFastbootProbeBootimg = pkgs.sheng-uboot-raw-fastboot-probe-bootimg;
+        shengUbootUpstreamFastbootProbeBootimg = pkgs.sheng-uboot-upstream-fastboot-probe-bootimg;
+
         bootAnimation = pkgs.runCommand "sheng-boot-animation-check" {
           nativeBuildInputs = [
             pkgs.ruby pkgs.mruby pkgs.sheng-fb-painter
@@ -245,6 +373,7 @@
             (pkgs.python3.withPackages (ps: [ ps.pillow ]))
             pkgs.ruby
             pkgs.mruby
+            pkgs.perl
             pkgs.sheng-fb-painter
           ];
         } ''
@@ -259,6 +388,9 @@
           ruby \
             ${../scripts/test-stage1-early-charge-guard.rb} \
             ${./patches/stage-1-early-charge-guard.rb}
+          perl \
+            ${../scripts/test-sheng-reboot-bootloader-marker.pl} \
+            ${./scripts/sheng-reboot-bootloader.pl}
           mruby \
             ${../scripts/test-stage1-udev-tolerant.rb} \
             ${./patches/stage-1-udev-trigger-tolerant.rb}

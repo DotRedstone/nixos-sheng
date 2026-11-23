@@ -21,6 +21,7 @@ module ShengEarlyChargeGuard
   # generation. /run is carried over switch_root along with the boot UI control
   # files, so this is the per-boot authority rather than persistent state.
   BOOT_MODE_PATH = "/run/sheng-boot-ui.mode"
+  EFI_BOOT_REASON_GUID = "f14997e2-2327-432f-9f1c-115399fbe7a7"
 
   def config()
     Configuration["sheng_early_charge_guard"] || {}
@@ -62,7 +63,30 @@ module ShengEarlyChargeGuard
   end
 
   def boot_value(key)
-    cmdline_value(key) || bootconfig_value(key)
+    cmdline_value(key) || bootconfig_value(key) || efi_boot_value(key)
+  end
+
+  def efi_boot_reason_path()
+    "/sys/firmware/efi/efivars/ShengBootReason-#{EFI_BOOT_REASON_GUID}"
+  end
+
+  def efi_boot_value(key)
+    return nil unless ["bootinfo.pureason", "androidboot.mode"].include?(key)
+    path = efi_boot_reason_path()
+    unless File.exist?(path)
+      return nil unless File.directory?("/sys/firmware/efi")
+      directory = File.dirname(path)
+      Dir.mkdir(directory) unless File.directory?(directory)
+      System.run("mount", "-t", "efivarfs", "efivarfs", directory)
+    end
+    # efivarfs prefixes variable data with four attribute bytes.
+    data = File.read(path)
+    return nil if data.length < 5 || data.length > 132
+    value = data[4..-1].split("\0", 2)[0]
+    match = value.match(/\A#{Regexp.escape(key)}=([^\s\0]{1,63})\z/)
+    match && match[1]
+  rescue
+    nil
   end
 
   def charger_power_on_reason?(value)

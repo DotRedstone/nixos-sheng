@@ -1,0 +1,47 @@
+From: dianqk <dianqk@dianqk.net>
+Date: Wed, 30 Sep 2026 13:30:00 +0800
+Subject: [PATCH] video: simplefb: initialize optional rotation and stride safely
+
+The optional rot read leaves its output untouched when the property is
+missing or malformed. Default rotation to zero instead of using an
+uninitialized value to select a video console driver.
+
+Only use the optional stride when its read succeeds and its value is
+nonzero; otherwise retain the video uclass automatic stride calculation.
+This also avoids reading an uninitialized stride after a property error.
+
+Local fix against U-Boot v2026.10-rc5, commit
+a06e89ab05eaa2b8344d521319399333cd760ae5. Source:
+https://git.u-boot-project.org/u-boot/u-boot/-/blob/a06e89ab05eaa2b8344d521319399333cd760ae5/drivers/video/simplefb.c
+
+Signed-off-by: dianqk <dianqk@dianqk.net>
+---
+diff --git a/drivers/video/simplefb.c b/drivers/video/simplefb.c
+--- a/drivers/video/simplefb.c
++++ b/drivers/video/simplefb.c
+@@ -21,7 +21,7 @@
+ 	int ret;
+ 	fdt_addr_t base;
+ 	fdt_size_t size;
+-	u32 width, height, stride, rot;
++	u32 width, height, stride;
+ 	struct ofnode_phandle_args args;
+ 
+ 	ret = dev_read_phandle_with_args(dev, "memory-region", NULL, 0, 0, &args);
+@@ -62,14 +62,13 @@
+ 		log_err("%s: invalid width or height: %d\n", __func__, ret);
+ 		return ret ?: -EINVAL;
+ 	}
+-	ofnode_read_u32(node, "rot", &rot);
+-	uc_priv->rot = rot;
++	uc_priv->rot = ofnode_read_u32_default(node, "rot", 0);
+ 	uc_priv->xsize = width;
+ 	uc_priv->ysize = height;
+ 
+ 	/* Optional - in most cases, auto-calculation works */
+ 	ret = ofnode_read_u32(node, "stride", &stride);
+-	if (!ret || stride)
++	if (!ret && stride)
+ 		uc_priv->line_length = stride;
+ 
+ 	format = ofnode_read_string(node, "format");
